@@ -1,0 +1,5 @@
+role Reader
+	modelPermission: read
+
+	tablePermission Customer =
+		filterExpression: [Country] = "United States"

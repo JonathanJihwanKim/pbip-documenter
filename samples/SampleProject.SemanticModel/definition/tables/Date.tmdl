@@ -1,0 +1,37 @@
+table 'Date'
+
+	column Date
+		dataType: dateTime
+		formatString: Short Date
+		sourceColumn: Date
+		summarizeBy: none
+
+	column Year
+		dataType: int64
+		sourceColumn: Year
+		summarizeBy: none
+
+	column Quarter
+		dataType: string
+		sourceColumn: Quarter
+		summarizeBy: none
+
+	column Month
+		dataType: string
+		sourceColumn: Month
+		summarizeBy: none
+
+	column MonthNumber
+		dataType: int64
+		sourceColumn: MonthNumber
+		summarizeBy: none
+		isHidden: true
+
+	partition 'Date' = m
+		mode: import
+		source =
+			let
+				Source = Sql.Database("server", "db"),
+				DateDim = Source{[Schema="dbo",Item="DateDim"]}[Data]
+			in
+				DateDim

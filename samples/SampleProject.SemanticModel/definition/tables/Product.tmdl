@@ -1,0 +1,64 @@
+/// Product dimension table
+table Product
+
+	column ProductID
+		dataType: int64
+		sourceColumn: ProductID
+		summarizeBy: none
+		isHidden: true
+
+	/// Product name
+	column 'Product Name'
+		dataType: string
+		sourceColumn: ProductName
+		summarizeBy: none
+
+	column Category
+		dataType: string
+		sourceColumn: Category
+		summarizeBy: none
+
+	column Subcategory
+		dataType: string
+		sourceColumn: Subcategory
+		summarizeBy: none
+
+	column Brand
+		dataType: string
+		sourceColumn: Brand
+		summarizeBy: none
+
+	column 'List Price'
+		dataType: decimal
+		formatString: \$#,0.00
+		sourceColumn: ListPrice
+		summarizeBy: none
+
+	hierarchy 'Product Hierarchy'
+
+		level Category
+			column: Category
+			ordinal: 0
+
+		level Subcategory
+			column: Subcategory
+			ordinal: 1
+
+		level 'Product Name'
+			column: 'Product Name'
+			ordinal: 2
+
+	/// Count of distinct products
+	measure 'Product Count' =
+		DISTINCTCOUNT(Product[ProductID])
+		formatString: #,0
+		displayFolder: Product Metrics
+
+	partition Product = m
+		mode: import
+		source =
+			let
+				Source = Sql.Database("server", "db"),
+				Product = Source{[Schema="dbo",Item="Product"]}[Data]
+			in
+				Product

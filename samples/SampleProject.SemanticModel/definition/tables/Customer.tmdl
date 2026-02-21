@@ -1,0 +1,43 @@
+/// Customer dimension
+table Customer
+
+	column CustomerID
+		dataType: int64
+		sourceColumn: CustomerID
+		summarizeBy: none
+		isHidden: true
+
+	column 'Customer Name'
+		dataType: string
+		sourceColumn: CustomerName
+		summarizeBy: none
+
+	column City
+		dataType: string
+		sourceColumn: City
+		summarizeBy: none
+
+	column Country
+		dataType: string
+		sourceColumn: Country
+		summarizeBy: none
+
+	column Segment
+		dataType: string
+		sourceColumn: Segment
+		summarizeBy: none
+
+	/// Count of distinct customers
+	measure 'Customer Count' =
+		DISTINCTCOUNT(Customer[CustomerID])
+		formatString: #,0
+		displayFolder: Customer Metrics
+
+	partition Customer = m
+		mode: import
+		source =
+			let
+				Source = Sql.Database("server", "db"),
+				Customer = Source{[Schema="dbo",Item="Customer"]}[Data]
+			in
+				Customer

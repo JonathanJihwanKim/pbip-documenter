@@ -1,0 +1,64 @@
+{
+    "visual": {
+        "visualType": "columnChart",
+        "visualContainerObjects": {
+            "title": [
+                {
+                    "properties": {
+                        "text": {
+                            "expr": {
+                                "Literal": {
+                                    "Value": "'Revenue by Category'"
+                                }
+                            }
+                        }
+                    }
+                }
+            ]
+        },
+        "query": {
+            "queryState": {
+                "Category": {
+                    "projections": [
+                        {
+                            "field": {
+                                "Column": {
+                                    "Expression": {
+                                        "SourceRef": {
+                                            "Entity": "Product"
+                                        }
+                                    },
+                                    "Property": "Category"
+                                }
+                            },
+                            "queryRef": "Product.Category"
+                        }
+                    ]
+                },
+                "Y": {
+                    "projections": [
+                        {
+                            "field": {
+                                "Measure": {
+                                    "Expression": {
+                                        "SourceRef": {
+                                            "Entity": "Sales"
+                                        }
+                                    },
+                                    "Property": "Total Revenue"
+                                }
+                            },
+                            "queryRef": "Sales.Total Revenue"
+                        }
+                    ]
+                }
+            }
+        }
+    },
+    "position": {
+        "x": 50,
+        "y": 50,
+        "width": 500,
+        "height": 350
+    }
+}

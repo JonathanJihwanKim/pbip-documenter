@@ -1,0 +1,47 @@
+{
+    "visual": {
+        "visualType": "card",
+        "visualContainerObjects": {
+            "title": [
+                {
+                    "properties": {
+                        "text": {
+                            "expr": {
+                                "Literal": {
+                                    "Value": "'Total Orders'"
+                                }
+                            }
+                        }
+                    }
+                }
+            ]
+        },
+        "query": {
+            "queryState": {
+                "Values": {
+                    "projections": [
+                        {
+                            "field": {
+                                "Measure": {
+                                    "Expression": {
+                                        "SourceRef": {
+                                            "Entity": "Sales"
+                                        }
+                                    },
+                                    "Property": "Order Count"
+                                }
+                            },
+                            "queryRef": "Sales.Order Count"
+                        }
+                    ]
+                }
+            }
+        }
+    },
+    "position": {
+        "x": 600,
+        "y": 50,
+        "width": 200,
+        "height": 150
+    }
+}
