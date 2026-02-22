@@ -46,11 +46,11 @@
         <!-- Landing / Folder Selection -->
         <div id="landingSection" class="content-panel folder-section">
             <h2>Generate Documentation from TMDL</h2>
-            <p>Select a PBIP project folder to parse your semantic model and generate comprehensive documentation.<br>
-            Supports Markdown, HTML, and JSON output with relationship diagrams and visual usage mapping.</p>
+            <p>Select a project folder to parse your semantic model and generate comprehensive documentation.<br>
+            Supports Markdown and HTML output with relationship diagrams and visual usage mapping.</p>
             <button id="openFolderBtn" class="btn-open-folder">
                 <span class="material-symbols-outlined">folder_open</span>
-                Open PBIP Folder
+                Open Project Folder
             </button>
             <p style="margin-top:16px;font-size:12px;color:var(--text-light)">
                 Your files stay local — nothing is uploaded. Works entirely in your browser.
@@ -131,32 +131,33 @@
             <div class="download-bar-header">
                 <span class="label">Export Documentation</span>
             </div>
-            <div class="download-bar-grid">
+            <div class="download-bar-grid download-bar-grid-2col">
                 <button id="downloadFullReport" class="btn-download btn-download-card btn-download-featured">
                     <span class="material-symbols-outlined btn-download-icon">auto_awesome</span>
                     <span class="btn-download-label">Full Report (.html)</span>
-                    <span class="btn-download-desc">Everything in one file: model docs, relationships, page layouts, visual usage</span>
+                    <span class="btn-download-desc">Interactive HTML with embedded diagrams, expand/collapse sections, and full visual layout</span>
                 </button>
-                <button id="downloadMD" class="btn-download btn-download-card">
-                    <span class="material-symbols-outlined btn-download-icon">description</span>
-                    <span class="btn-download-label">Markdown (.md)</span>
-                    <span class="btn-download-desc">Tables, measures, relationships, visual usage. Great for Git repos</span>
-                </button>
-                <button id="downloadHTML" class="btn-download btn-download-card">
-                    <span class="material-symbols-outlined btn-download-icon">code</span>
-                    <span class="btn-download-label">HTML (.html)</span>
-                    <span class="btn-download-desc">Styled documentation with DAX highlighting. Print-ready</span>
-                </button>
-                <button id="downloadJSON" class="btn-download btn-download-card">
-                    <span class="material-symbols-outlined btn-download-icon">data_object</span>
-                    <span class="btn-download-label">JSON (.json)</span>
-                    <span class="btn-download-desc">Machine-readable structured data for automation and tooling</span>
-                </button>
-                <button id="downloadSVG" class="btn-download btn-download-card">
-                    <span class="material-symbols-outlined btn-download-icon">image</span>
-                    <span class="btn-download-label">Diagram (.svg)</span>
-                    <span class="btn-download-desc">Relationship diagram as SVG image. Embed in docs or presentations</span>
-                </button>
+                <div class="btn-download-group">
+                    <button id="downloadMD" class="btn-download btn-download-card">
+                        <span class="material-symbols-outlined btn-download-icon">description</span>
+                        <span class="btn-download-label">Full Report (.md)</span>
+                        <span class="btn-download-desc">Markdown documentation for Git repos. Click to choose scope.</span>
+                    </button>
+                    <div class="btn-download-md-options" id="mdOptions">
+                        <button id="downloadMDAll" class="btn-download-sub">
+                            <span class="material-symbols-outlined" style="font-size:16px">select_all</span>
+                            All (Model + Visuals)
+                        </button>
+                        <button id="downloadMDModel" class="btn-download-sub">
+                            <span class="material-symbols-outlined" style="font-size:16px">database</span>
+                            Semantic Model Only
+                        </button>
+                        <button id="downloadMDVisual" class="btn-download-sub">
+                            <span class="material-symbols-outlined" style="font-size:16px">auto_stories</span>
+                            Visuals Only
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -374,7 +375,7 @@
             setTimeout(function() { toast.classList.add('hidden'); }, 30000);
         }
         // Hook into download buttons
-        ['downloadFullReport', 'downloadMD', 'downloadHTML', 'downloadJSON'].forEach(function(id) {
+        ['downloadFullReport', 'downloadMDAll', 'downloadMDModel', 'downloadMDVisual'].forEach(function(id) {
             const btn = document.getElementById(id);
             if (btn) {
                 btn.addEventListener('click', function() {

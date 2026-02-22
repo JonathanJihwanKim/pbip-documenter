@@ -29,10 +29,13 @@ class App {
         document.getElementById('openFolderBtn').addEventListener('click', () => this.openFolder());
         document.getElementById('changeFolderBtn').addEventListener('click', () => this.openFolder());
         document.getElementById('downloadFullReport').addEventListener('click', () => this.downloadFullReport());
-        document.getElementById('downloadMD').addEventListener('click', () => this.downloadMarkdown());
-        document.getElementById('downloadHTML').addEventListener('click', () => this.downloadHTML());
-        document.getElementById('downloadJSON').addEventListener('click', () => this.downloadJSON());
-        document.getElementById('downloadSVG').addEventListener('click', () => this.downloadSVG());
+        document.getElementById('downloadMD').addEventListener('click', () => {
+            const mdOptions = document.getElementById('mdOptions');
+            mdOptions.classList.toggle('open');
+        });
+        document.getElementById('downloadMDAll').addEventListener('click', () => this.downloadMarkdown('all'));
+        document.getElementById('downloadMDModel').addEventListener('click', () => this.downloadMarkdown('model'));
+        document.getElementById('downloadMDVisual').addEventListener('click', () => this.downloadMarkdown('visuals'));
 
         // Sidebar navigation
         document.querySelectorAll('.sidebar-header').forEach(header => {
@@ -122,7 +125,7 @@ class App {
         if (allModels.length === 0) {
             throw new Error(
                 'No semantic model found.\n\n' +
-                'Please select a PBIP project folder containing a .SemanticModel subfolder,\n' +
+                'Please select a project folder containing a .SemanticModel subfolder,\n' +
                 'or select the .SemanticModel folder directly.'
             );
         }
@@ -130,22 +133,18 @@ class App {
         // If exactly one model, auto-select it
         if (allModels.length === 1) {
             this.semanticModelHandle = allModels[0];
-            // Auto-select first matching report (or only report)
-            if (allReports.length === 1) {
-                this.reportHandle = allReports[0];
-            } else if (allReports.length > 1) {
-                // Try to match report to model by name prefix
-                const modelPrefix = allModels[0].name.replace('.SemanticModel', '');
-                const matched = allReports.find(r => r.name.startsWith(modelPrefix));
-                this.reportHandle = matched || allReports[0];
-            }
-            // If only one of each, no discovery needed
-            if (allReports.length <= 1) {
+            const modelPrefix = allModels[0].name.replace('.SemanticModel', '');
+            const matchingReports = allReports.filter(r => r.name.startsWith(modelPrefix));
+
+            if (matchingReports.length <= 1) {
+                // 0 or 1 matching report — auto-proceed without discovery
+                this.reportHandle = matchingReports[0] || null;
                 return { needsDiscovery: false };
             }
+            // Multiple matching reports — show discovery so user can pick
         }
 
-        // Multiple models or multiple reports — show discovery
+        // Multiple models or multiple matching reports — show discovery
         return { needsDiscovery: true, models: allModels, reports: allReports };
     }
 
@@ -228,14 +227,27 @@ class App {
             return;
         }
 
-        reportHint.textContent = 'Select a report folder to include visual usage data.';
-
+        // Filter to only show reports related to the selected model
+        const matchingReports = [];
         for (let i = 0; i < reports.length; i++) {
-            const report = reports[i];
-            const isMatch = report.name.startsWith(modelPrefix);
+            if (reports[i].name.startsWith(modelPrefix)) {
+                matchingReports.push({ report: reports[i], originalIndex: i });
+            }
+        }
+
+        if (matchingReports.length === 0) {
+            reportHint.textContent = 'No related report folders found for this semantic model.';
+            return;
+        }
+
+        reportHint.textContent = matchingReports.length === 1
+            ? 'Related report folder will be included.'
+            : 'Select which related report folders to include.';
+
+        for (const { report, originalIndex } of matchingReports) {
             const item = document.createElement('label');
-            item.className = 'discovery-item' + (isMatch ? ' selected' : '');
-            item.innerHTML = `<input type="checkbox" name="discovery-report" value="${i}" ${isMatch ? 'checked' : ''}>
+            item.className = 'discovery-item selected';
+            item.innerHTML = `<input type="checkbox" name="discovery-report" value="${originalIndex}" checked>
                 <span class="discovery-item-name">${this._esc(report.name.replace('.Report', ''))}</span>
                 <span class="discovery-item-type">.Report</span>`;
             item.querySelector('input').addEventListener('change', (e) => {
@@ -1174,40 +1186,18 @@ class App {
     // DOWNLOADS
     // ──────────────────────────────────────────────
 
-    downloadMarkdown() {
+    downloadMarkdown(scope = 'all') {
         if (!this.docGenerator) return;
-        const md = this.docGenerator.generateMarkdown();
-        const name = (this.parsedModel.database?.name || 'model') + '-documentation.md';
-        this._downloadFile(md, name, 'text/markdown');
-        this.showToast('Markdown downloaded');
-    }
-
-    downloadHTML() {
-        if (!this.docGenerator) return;
-        const html = this.docGenerator.generateHTML();
-        const name = (this.parsedModel.database?.name || 'model') + '-documentation.html';
-        this._downloadFile(html, name, 'text/html');
-        this.showToast('HTML downloaded');
-    }
-
-    downloadJSON() {
-        if (!this.docGenerator) return;
-        const json = this.docGenerator.generateJSON();
-        const name = (this.parsedModel.database?.name || 'model') + '-documentation.json';
-        this._downloadFile(json, name, 'application/json');
-        this.showToast('JSON downloaded');
-    }
-
-    downloadSVG() {
-        if (!this.diagramRenderer) return;
-        const svgStr = this.diagramRenderer.exportSVG();
-        if (!svgStr) {
-            this.showToast('No diagram to export', 'error');
+        if (scope === 'visuals' && (!this.visualData || this.visualData.pages.length === 0)) {
+            this.showToast('No report data — include a report folder to export visuals', 'error');
             return;
         }
-        const name = (this.parsedModel.database?.name || 'model') + '-relationships.svg';
-        this._downloadFile(svgStr, name, 'image/svg+xml');
-        this.showToast('SVG diagram downloaded');
+        const md = this.docGenerator.generateMarkdown(scope, this.visualData);
+        const suffixMap = { all: '', model: '-model', visuals: '-visuals' };
+        const name = (this.parsedModel.database?.name || 'model') + '-documentation' + (suffixMap[scope] || '') + '.md';
+        this._downloadFile(md, name, 'text/markdown');
+        this.showToast('Markdown downloaded');
+        document.getElementById('mdOptions')?.classList.remove('open');
     }
 
     downloadFullReport() {

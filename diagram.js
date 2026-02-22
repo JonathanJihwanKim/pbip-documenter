@@ -44,58 +44,121 @@ class DiagramRenderer {
         const existingPlaceholder = this.container.querySelector('p');
         if (existingPlaceholder) existingPlaceholder.remove();
 
-        if (relationships.length === 0) {
+        if (tables.length === 0) {
             const p = document.createElement('p');
             p.style.cssText = 'text-align:center;color:#666;padding:40px;';
-            p.textContent = 'No relationships defined in this model.';
+            p.textContent = 'No tables found in this model.';
             this.container.appendChild(p);
             return;
         }
 
-        // Collect tables involved in relationships
-        const relatedTableNames = new Set();
+        // Build map of columns that participate in relationships
+        const relColumns = new Map(); // tableName → Set<columnName>
         for (const r of relationships) {
-            if (r.fromTable) relatedTableNames.add(r.fromTable);
-            if (r.toTable) relatedTableNames.add(r.toTable);
+            if (r.fromTable) {
+                if (!relColumns.has(r.fromTable)) relColumns.set(r.fromTable, new Set());
+                relColumns.get(r.fromTable).add(r.fromColumn);
+            }
+            if (r.toTable) {
+                if (!relColumns.has(r.toTable)) relColumns.set(r.toTable, new Set());
+                relColumns.get(r.toTable).add(r.toColumn);
+            }
         }
 
-        // Build table nodes with column info
-        const tableNodes = [];
+        // Build table nodes: connected vs disconnected
+        const connectedNodes = [];
+        const disconnectedNodes = [];
         const tableMap = new Map();
 
-        for (const tName of relatedTableNames) {
-            const tableData = tables.find(t => t.name === tName);
-            const columns = tableData ? tableData.columns.map(c => c.name) : [];
-            const measures = tableData ? tableData.measures.length : 0;
+        for (const tableData of tables) {
+            const tName = tableData.name;
+            const measures = tableData.measures.length;
 
-            tableNodes.push({
-                name: tName,
-                columns: columns.slice(0, 8),
-                totalColumns: columns.length,
-                measures
-            });
+            if (relColumns.has(tName)) {
+                // Connected: show only relationship columns
+                const relColNames = relColumns.get(tName);
+                const columns = tableData.columns
+                    .filter(c => relColNames.has(c.name))
+                    .map(c => c.name);
+                connectedNodes.push({
+                    name: tName,
+                    columns,
+                    totalColumns: tableData.columns.length,
+                    measures,
+                    isDisconnected: false
+                });
+            } else {
+                // Disconnected: compact node
+                disconnectedNodes.push({
+                    name: tName,
+                    columns: [],
+                    totalColumns: tableData.columns.length,
+                    measures,
+                    isDisconnected: true
+                });
+            }
         }
 
         const nodeWidth = 200;
-        const nodeMinHeight = 60;
+        const compactNodeWidth = 160;
+        const nodeMinHeight = 50;
+        const compactNodeHeight = 50;
         const rowHeight = 18;
 
         // Calculate node heights
-        for (const node of tableNodes) {
+        for (const node of connectedNodes) {
             node.width = nodeWidth;
-            node.height = nodeMinHeight + node.columns.length * rowHeight;
+            const colRows = node.columns.length;
+            // Extra row for "(X of Y cols shown)" note
+            const noteRow = node.totalColumns > node.columns.length ? 1 : 0;
+            node.height = nodeMinHeight + (colRows + noteRow) * rowHeight;
+        }
+        for (const node of disconnectedNodes) {
+            node.width = compactNodeWidth;
+            node.height = compactNodeHeight;
         }
 
-        // Layout: star schema BFS rings or horizontal for small models
-        if (tableNodes.length < 4) {
-            this._horizontalLayout(tableNodes);
-        } else {
-            this._starSchemaLayout(tableNodes, relationships);
+        // Layout connected tables
+        if (connectedNodes.length > 0) {
+            if (connectedNodes.length < 4) {
+                this._horizontalLayout(connectedNodes);
+            } else {
+                this._starSchemaLayout(connectedNodes, relationships);
+            }
         }
+
+        // Layout disconnected tables in a row below connected ones
+        if (disconnectedNodes.length > 0) {
+            let maxConnectedY = 0;
+            for (const n of connectedNodes) {
+                maxConnectedY = Math.max(maxConnectedY, (n.y || 0) + n.height);
+            }
+
+            const disconnectedStartY = connectedNodes.length > 0 ? maxConnectedY + 80 : 60;
+            const gap = 20;
+            const maxRowWidth = Math.max(800, connectedNodes.length > 0 ?
+                Math.max(...connectedNodes.map(n => n.x + n.width)) : 800);
+            let x = 60;
+            let y = disconnectedStartY + 24; // 24px for section label
+
+            for (const node of disconnectedNodes) {
+                if (x + node.width > maxRowWidth && x > 60) {
+                    // Wrap to next row
+                    x = 60;
+                    y += compactNodeHeight + gap;
+                }
+                node.x = x;
+                node.y = y;
+                x += node.width + gap;
+            }
+        }
+
+        // Combine all nodes
+        const allNodes = [...connectedNodes, ...disconnectedNodes];
 
         // Calculate SVG bounds
         let maxX = 0, maxY = 0;
-        for (const n of tableNodes) {
+        for (const n of allNodes) {
             maxX = Math.max(maxX, n.x + n.width);
             maxY = Math.max(maxY, n.y + n.height);
             tableMap.set(n.name, n);
@@ -121,8 +184,21 @@ class DiagramRenderer {
             this._drawRelationshipBezier(svg, fromNode, toNode, rel);
         }
 
+        // Draw "Standalone Tables" section label if needed
+        if (disconnectedNodes.length > 0 && connectedNodes.length > 0) {
+            let maxConnectedY = 0;
+            for (const n of connectedNodes) {
+                maxConnectedY = Math.max(maxConnectedY, n.y + n.height);
+            }
+            svg.appendChild(this._createText(
+                `Standalone Tables (${disconnectedNodes.length})`,
+                60, maxConnectedY + 70,
+                { fontSize: '13px', fontWeight: '600', fill: this.colors.textLight }
+            ));
+        }
+
         // Draw table nodes on top
-        for (const node of tableNodes) {
+        for (const node of allNodes) {
             this._drawTableNode(svg, node);
         }
 
@@ -284,69 +360,87 @@ class DiagramRenderer {
         g.appendChild(shadow);
 
         // Background
+        const bgColor = node.isDisconnected ? '#f9f7f4' : this.colors.bg;
+        const borderColor = node.isDisconnected ? '#ccc' : this.colors.border;
         const bg = this._createRect(node.x, node.y, node.width, node.height, {
-            fill: this.colors.bg, stroke: this.colors.border, strokeWidth: '2', rx: '6'
+            fill: bgColor, stroke: borderColor, strokeWidth: node.isDisconnected ? '1.5' : '2', rx: '6'
         });
         g.appendChild(bg);
 
         // Header
+        const headerColor = node.isDisconnected ? '#78909c' : this.colors.tableHeader;
         const header = this._createRect(node.x, node.y, node.width, 32, {
-            fill: this.colors.tableHeader, rx: '6'
+            fill: headerColor, rx: '6'
         });
         g.appendChild(header);
 
         // Header bottom fill (to square off bottom corners of header)
         const headerBottom = this._createRect(node.x, node.y + 20, node.width, 12, {
-            fill: this.colors.tableHeader
+            fill: headerColor
         });
         g.appendChild(headerBottom);
 
         // Table name
+        const maxNameLen = node.isDisconnected ? 18 : 22;
         const nameText = this._createText(
-            this._truncate(node.name, 22),
+            this._truncate(node.name, maxNameLen),
             node.x + node.width / 2,
             node.y + 21,
             { fontSize: '13px', fontWeight: '600', fill: '#ffffff', textAnchor: 'middle' }
         );
         g.appendChild(nameText);
 
-        // Columns
-        const startY = node.y + 44;
-        for (let i = 0; i < node.columns.length; i++) {
-            const colText = this._createText(
-                this._truncate(node.columns[i], 24),
-                node.x + 12,
-                startY + i * 18,
-                { fontSize: '11px', fill: this.colors.text }
-            );
-            g.appendChild(colText);
-        }
+        if (node.isDisconnected) {
+            // Compact: show summary line "X cols, Y measures"
+            const parts = [];
+            if (node.totalColumns > 0) parts.push(`${node.totalColumns} col${node.totalColumns !== 1 ? 's' : ''}`);
+            if (node.measures > 0) parts.push(`${node.measures} measure${node.measures !== 1 ? 's' : ''}`);
+            const summaryText = parts.join(', ') || 'empty';
+            g.appendChild(this._createText(
+                summaryText,
+                node.x + node.width / 2,
+                node.y + 44,
+                { fontSize: '11px', fill: this.colors.textLight, textAnchor: 'middle' }
+            ));
+        } else {
+            // Connected table: show relationship columns
+            const startY = node.y + 44;
+            for (let i = 0; i < node.columns.length; i++) {
+                const colText = this._createText(
+                    this._truncate(node.columns[i], 24),
+                    node.x + 12,
+                    startY + i * 18,
+                    { fontSize: '11px', fill: this.colors.text }
+                );
+                g.appendChild(colText);
+            }
 
-        if (node.totalColumns > node.columns.length) {
-            const moreText = this._createText(
-                `... +${node.totalColumns - node.columns.length} more`,
-                node.x + 12,
-                startY + node.columns.length * 18,
-                { fontSize: '11px', fill: this.colors.textLight, fontStyle: 'italic' }
-            );
-            g.appendChild(moreText);
-        }
+            // Show "(X of Y cols shown)" note if not all columns displayed
+            if (node.totalColumns > node.columns.length) {
+                g.appendChild(this._createText(
+                    `(${node.columns.length} of ${node.totalColumns} cols shown)`,
+                    node.x + 12,
+                    startY + node.columns.length * 18,
+                    { fontSize: '10px', fill: this.colors.textLight, fontStyle: 'italic' }
+                ));
+            }
 
-        // Measure count badge
-        if (node.measures > 0) {
-            const badgeX = node.x + node.width - 40;
-            const badgeY = node.y + node.height - 16;
-            const badge = this._createRect(badgeX, badgeY - 10, 36, 16, {
-                fill: this.colors.measureBg, stroke: this.colors.accent, strokeWidth: '1', rx: '8'
-            });
-            g.appendChild(badge);
-            const badgeText = this._createText(
-                `${node.measures}m`,
-                badgeX + 18,
-                badgeY + 1,
-                { fontSize: '10px', fill: this.colors.accent, fontWeight: '600', textAnchor: 'middle' }
-            );
-            g.appendChild(badgeText);
+            // Measure count badge
+            if (node.measures > 0) {
+                const badgeX = node.x + node.width - 40;
+                const badgeY = node.y + node.height - 16;
+                const badge = this._createRect(badgeX, badgeY - 10, 36, 16, {
+                    fill: this.colors.measureBg, stroke: this.colors.accent, strokeWidth: '1', rx: '8'
+                });
+                g.appendChild(badge);
+                const badgeText = this._createText(
+                    `${node.measures}m`,
+                    badgeX + 18,
+                    badgeY + 1,
+                    { fontSize: '10px', fill: this.colors.accent, fontWeight: '600', textAnchor: 'middle' }
+                );
+                g.appendChild(badgeText);
+            }
         }
 
         svg.appendChild(g);
