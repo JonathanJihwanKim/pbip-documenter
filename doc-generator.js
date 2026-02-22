@@ -208,12 +208,17 @@ class DocGenerator {
             }
 
             // Field parameter detection
-            const isFieldParameter = table.columns.some(c =>
-                c.expression && /NAMEOF|SWITCH/i.test(c.expression)
-            );
-            if (isFieldParameter) {
+            const fpItems = this._getFieldParameterItems(table.name);
+            if (fpItems !== null) {
                 lines.push('**Field Parameter** — This table is a dynamic field selector.');
                 lines.push('');
+                if (fpItems.length > 0) {
+                    lines.push('Available fields:');
+                    for (const item of fpItems) {
+                        lines.push(`- \`'${item.table}'[${item.column}]\``);
+                    }
+                    lines.push('');
+                }
             }
 
             // Calculation Group
@@ -410,7 +415,8 @@ class DocGenerator {
     }
 
     /**
-     * Append visual/report page sections to markdown
+     * Append visual/report page sections to markdown.
+     * Includes ASCII layout diagrams per page and field param / calc group annotations.
      */
     _appendMarkdownVisualSections(lines, visualData) {
         lines.push('## Report Pages & Visual Layout');
@@ -419,7 +425,7 @@ class DocGenerator {
         for (const page of visualData.pages) {
             lines.push(`### ${this._escMd(page.displayName)}`);
             lines.push('');
-            lines.push(`*${page.visuals.length} visual(s)${page.pageWidth ? ` — ${page.pageWidth}x${page.pageHeight}` : ''}*`);
+            lines.push(`*${page.visuals.length} visual(s)${page.pageWidth ? ` \u2014 ${page.pageWidth}\u00d7${page.pageHeight}` : ''}*`);
             lines.push('');
 
             if (page.visuals.length === 0) {
@@ -428,24 +434,36 @@ class DocGenerator {
                 continue;
             }
 
+            // ASCII layout diagram
+            const asciiLayout = this._renderAsciiLayout(page);
+            if (asciiLayout) {
+                lines.push(asciiLayout);
+                lines.push('');
+            }
+
             for (const visual of page.visuals) {
                 const vName = visual.visualName || visual.visualType || 'Visual';
                 lines.push(`#### ${this._escMd(vName)} (\`${visual.visualType || 'unknown'}\`)`);
                 lines.push('');
 
-                if (visual.position && visual.position.x != null) {
-                    lines.push(`Position: (${visual.position.x}, ${visual.position.y}) — ${visual.position.width || '?'}x${visual.position.height || '?'}`);
-                    lines.push('');
-                }
-
                 if (visual.fields && visual.fields.length > 0) {
-                    lines.push('| Role | Field |');
-                    lines.push('|------|-------|');
+                    lines.push('| Role | Field | Notes |');
+                    lines.push('|------|-------|-------|');
                     for (const f of visual.fields) {
                         const role = this._normalizeRoleForReport(f.projectionName);
-                        const table = f.table || f.entity || '';
+                        const tableName = f.table || f.entity || '';
                         const name = f.name || f.column || f.hierarchy || '';
-                        lines.push(`| ${role} | ${this._escMd(table)}[${this._escMd(name)}] |`);
+                        let notes = '';
+                        const fpItems = this._getFieldParameterItems(tableName);
+                        if (fpItems !== null) {
+                            notes = `Field Param (${fpItems.length} field${fpItems.length !== 1 ? 's' : ''})`;
+                        } else {
+                            const cgItems = this._getCalculationGroupItems(tableName);
+                            if (cgItems !== null) {
+                                notes = `Calc Group (${cgItems.length} item${cgItems.length !== 1 ? 's' : ''})`;
+                            }
+                        }
+                        lines.push(`| ${role} | ${this._escMd(tableName)}[${this._escMd(name)}] | ${notes} |`);
                     }
                     lines.push('');
                 } else {
@@ -891,7 +909,7 @@ blockquote {
     // FULL REPORT (comprehensive HTML)
     // ──────────────────────────────────────────────
 
-    generateFullReport(visualData, diagramRenderer) {
+    generateFullReport(visualData, diagramRenderer, scope = 'all') {
         const modelName = this.model.database?.name || this.model.model?.name || 'Semantic Model';
         const totalMeasures = this.model.tables.reduce((sum, t) => sum + t.measures.length, 0);
         const totalColumns = this.model.tables.reduce((sum, t) => sum + t.columns.length, 0);
@@ -1182,29 +1200,31 @@ details > .details-content {
 </style>
 </head>
 <body>
-<h1>${this._escHtml(modelName)} — Full Report</h1>
+<h1>${this._escHtml(modelName)} \u2014 ${scope === 'model' ? 'Model Documentation' : scope === 'visuals' ? 'Visual Documentation' : 'Full Report'}</h1>
 <p class="subtitle">Comprehensive documentation generated on ${new Date().toLocaleDateString()}</p>
 `;
 
         // Table of Contents
         html += `<h2>Table of Contents</h2><div class="toc">
 <a href="#model-overview">Model Overview</a>`;
-        if (relDiagramSVG) html += `<a href="#relationship-diagram">Relationship Diagram</a>`;
-        html += `<a href="#table-inventory">Table Inventory</a>`;
-        for (const table of this.model.tables) {
-            html += `<a href="#${this._anchor(table.name)}">&nbsp;&nbsp;${this._escHtml(table.name)}</a>`;
-        }
-        html += `<a href="#measure-catalog">Measure Catalog</a>
+        if (scope !== 'visuals' && relDiagramSVG) html += `<a href="#relationship-diagram">Relationship Diagram</a>`;
+        if (scope !== 'visuals') {
+            html += `<a href="#table-inventory">Table Inventory</a>`;
+            for (const table of this.model.tables) {
+                html += `<a href="#${this._anchor(table.name)}">&nbsp;&nbsp;${this._escHtml(table.name)}</a>`;
+            }
+            html += `<a href="#measure-catalog">Measure Catalog</a>
 <a href="#relationships">Relationships</a>`;
-        if (this.model.roles.length > 0) html += `<a href="#roles">Roles</a>`;
-        if (this.model.expressions.length > 0) html += `<a href="#expressions">Expressions</a>`;
-        if (visualData && visualData.pages.length > 0) {
+            if (this.model.roles.length > 0) html += `<a href="#roles">Roles</a>`;
+            if (this.model.expressions.length > 0) html += `<a href="#expressions">Expressions</a>`;
+        }
+        if (scope !== 'model' && visualData && visualData.pages.length > 0) {
             html += `<a href="#report-pages">Report Pages &amp; Visual Layout</a>`;
             for (const page of visualData.pages) {
                 html += `<a href="#page-${this._anchor(page.displayName)}">&nbsp;&nbsp;${this._escHtml(page.displayName)}</a>`;
             }
         }
-        if (Object.keys(this.visualUsage).length > 0) html += `<a href="#visual-usage">Visual Usage</a>`;
+        if (scope !== 'model' && Object.keys(this.visualUsage).length > 0) html += `<a href="#visual-usage">Visual Usage</a>`;
         html += `</div>`;
 
         // Model Overview
@@ -1226,6 +1246,8 @@ details > .details-content {
         if (this.model.model?.culture) html += `<tr><td>Culture</td><td>${this.model.model.culture}</td></tr>`;
         html += `</table>`;
 
+        if (scope !== 'visuals') {
+
         // Relationship Diagram (embedded SVG)
         if (relDiagramSVG) {
             html += `<h2 id="relationship-diagram">Relationship Diagram</h2>
@@ -1244,12 +1266,17 @@ details > .details-content {
                 html += `<blockquote>${this._escHtml(table.description)}</blockquote>`;
             }
 
-            // Field parameter heuristic detection
-            const isFieldParameter = table.columns.some(c =>
-                c.expression && /NAMEOF|SWITCH/i.test(c.expression)
-            );
-            if (isFieldParameter) {
-                html += `<p style="margin:8px 0"><span class="badge badge-field-param">Field Parameter</span> This table appears to be a field parameter (dynamic field selector).</p>`;
+            // Field parameter detection
+            const fpItems = this._getFieldParameterItems(table.name);
+            if (fpItems !== null) {
+                html += `<p style="margin:8px 0"><span class="badge badge-field-param">Field Parameter</span> This table is a dynamic field selector.</p>`;
+                if (fpItems.length > 0) {
+                    html += `<div style="margin:8px 0;padding:8px 12px;background:#e3f2fd;border-radius:4px;font-size:13px"><strong>Available fields (${fpItems.length}):</strong><br>`;
+                    for (const item of fpItems) {
+                        html += `<span style="display:inline-block;background:#fff;border:1px solid #bbdefb;border-radius:3px;padding:1px 6px;margin:2px;font-family:monospace;font-size:12px">'${this._escHtml(item.table)}'[${this._escHtml(item.column)}]</span>`;
+                    }
+                    html += `</div>`;
+                }
             }
 
             // Calculation Group
@@ -1391,8 +1418,10 @@ details > .details-content {
             }
         }
 
+        } // end: scope !== 'visuals'
+
         // Report Pages with Layout Diagrams
-        if (visualData && visualData.pages.length > 0) {
+        if (scope !== 'model' && visualData && visualData.pages.length > 0) {
             html += `<h2 id="report-pages">Report Pages &amp; Visual Layout</h2>`;
 
             for (const page of visualData.pages) {
@@ -1461,7 +1490,17 @@ ${rects}
                                 for (const f of fields) {
                                     const t = f.table || f.entity || '';
                                     const n = f.name || f.column || f.hierarchy || '';
-                                    html += `<span class="field-chip-report ${cssClass}">${this._escHtml(t)}[${this._escHtml(n)}]</span> `;
+                                    html += `<span class="field-chip-report ${cssClass}">${this._escHtml(t)}[${this._escHtml(n)}]</span>`;
+                                    const fpItems = this._getFieldParameterItems(t);
+                                    if (fpItems !== null) {
+                                        html += ` <span class="badge" style="background:#e3f2fd;color:#1565c0;font-size:10px" title="${fpItems.length > 0 ? fpItems.map(i => `'${i.table}'[${i.column}]`).join(', ') : 'Field Parameter'}">Field Param&thinsp;(${fpItems.length})</span>`;
+                                    } else {
+                                        const cgItems = this._getCalculationGroupItems(t);
+                                        if (cgItems !== null) {
+                                            html += ` <span class="badge" style="background:#e8f5e9;color:#2e7d32;font-size:10px" title="${cgItems.map(i => i.name).join(', ')}">Calc Group&thinsp;(${cgItems.length})</span>`;
+                                        }
+                                    }
+                                    html += ' ';
                                 }
                                 html += `</div>`;
                             }
@@ -1481,7 +1520,7 @@ ${rects}
         }
 
         // Visual Usage Summary
-        if (Object.keys(this.visualUsage).length > 0) {
+        if (scope !== 'model' && Object.keys(this.visualUsage).length > 0) {
             html += `<h2 id="visual-usage">Visual Usage Summary</h2>
 <table><tr><th>Field</th><th>Type</th><th>Table</th><th>Used In</th></tr>`;
             for (const [key, usages] of Object.entries(this.visualUsage)) {
@@ -1513,6 +1552,90 @@ ${rects}
         if (lower === 'tooltips' || lower === 'tooltip') return 'Tooltips';
         if (lower === 'sort' || lower === 'visualobjects') return 'Other';
         return projectionName.charAt(0).toUpperCase() + projectionName.slice(1);
+    }
+
+    /**
+     * Returns NAMEOF field items for a field parameter table, or null if not a field parameter.
+     * Returns [] if detected as field param (via SWITCH) but no NAMEOF references found.
+     */
+    _getFieldParameterItems(tableName) {
+        const table = this.model.tables.find(t => t.name === tableName);
+        if (!table) return null;
+        const isFieldParam = table.columns.some(c => c.expression && /NAMEOF|SWITCH/i.test(c.expression));
+        if (!isFieldParam) return null;
+        const items = [];
+        for (const col of table.columns) {
+            if (col.expression) {
+                const matches = [...col.expression.matchAll(/NAMEOF\s*\(\s*'([^']+)'\[([^\]]+)\]\s*\)/gi)];
+                for (const m of matches) items.push({ table: m[1], column: m[2] });
+            }
+        }
+        return items;
+    }
+
+    /**
+     * Returns calculation group items for a table, or null if not a calc group table.
+     */
+    _getCalculationGroupItems(tableName) {
+        const table = this.model.tables.find(t => t.name === tableName);
+        if (!table || !table.calculationGroup || table.calculationGroup.items.length === 0) return null;
+        return table.calculationGroup.items;
+    }
+
+    /**
+     * Renders a compact ASCII layout grid of visual positions for Markdown output.
+     * Groups visuals into rows by proximity (y within 80px), then sorts by x.
+     * Returns a fenced code block string, or null if no positioned visuals.
+     */
+    _renderAsciiLayout(page) {
+        const pw = page.pageWidth || 1280;
+        const ph = page.pageHeight || 720;
+        const visuals = page.visuals.filter(v => v.position && v.position.x != null);
+        if (visuals.length === 0) return null;
+
+        // Sort by y then x
+        const sorted = [...visuals].sort((a, b) => {
+            const dy = (a.position.y || 0) - (b.position.y || 0);
+            if (Math.abs(dy) > 80) return dy;
+            return (a.position.x || 0) - (b.position.x || 0);
+        });
+
+        // Group into rows (visuals whose y is within 80px of the row's first visual)
+        const rows = [];
+        for (const v of sorted) {
+            const y = v.position.y || 0;
+            const lastRow = rows[rows.length - 1];
+            if (lastRow && (y - (lastRow[0].position.y || 0)) <= 80) {
+                lastRow.push(v);
+            } else {
+                rows.push([v]);
+            }
+        }
+
+        const W = 72;
+        const SEP = '+' + '-'.repeat(W) + '+';
+        const lines = ['```'];
+        lines.push(`Page Layout: ${pw} \u00d7 ${ph}`);
+        lines.push(SEP);
+
+        for (const row of rows) {
+            const colW = Math.max(8, Math.floor(W / row.length));
+            let nameLine = '|';
+            let sizeLine = '|';
+            for (const v of row) {
+                const name = v.visualName || v.visualType || 'visual';
+                const truncName = name.length > colW - 2 ? name.substring(0, colW - 3) + '\u2026' : name;
+                const pos = `${v.position.width || '?'}\u00d7${v.position.height || '?'}`;
+                nameLine += (' ' + truncName).padEnd(colW) + '|';
+                sizeLine += (' ' + pos).padEnd(colW) + '|';
+            }
+            lines.push(nameLine);
+            lines.push(sizeLine);
+            lines.push(SEP);
+        }
+
+        lines.push('```');
+        return lines.join('\n');
     }
 
     // ──────────────────────────────────────────────

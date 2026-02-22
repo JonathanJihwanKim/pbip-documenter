@@ -132,11 +132,27 @@
                 <span class="label">Export Documentation</span>
             </div>
             <div class="download-bar-grid download-bar-grid-2col">
-                <button id="downloadFullReport" class="btn-download btn-download-card btn-download-featured">
-                    <span class="material-symbols-outlined btn-download-icon">auto_awesome</span>
-                    <span class="btn-download-label">Full Report (.html)</span>
-                    <span class="btn-download-desc">Interactive HTML with embedded diagrams, expand/collapse sections, and full visual layout</span>
-                </button>
+                <div class="btn-download-group">
+                    <button id="downloadFullReport" class="btn-download btn-download-card">
+                        <span class="material-symbols-outlined btn-download-icon">auto_awesome</span>
+                        <span class="btn-download-label">Full Report (.html)</span>
+                        <span class="btn-download-desc">Interactive HTML with embedded diagrams. Click to choose scope.</span>
+                    </button>
+                    <div class="btn-download-html-options" id="htmlOptions">
+                        <button id="downloadHTMLAll" class="btn-download-sub">
+                            <span class="material-symbols-outlined" style="font-size:16px">select_all</span>
+                            All (Model + Visuals)
+                        </button>
+                        <button id="downloadHTMLModel" class="btn-download-sub">
+                            <span class="material-symbols-outlined" style="font-size:16px">database</span>
+                            Semantic Model Only
+                        </button>
+                        <button id="downloadHTMLVisual" class="btn-download-sub">
+                            <span class="material-symbols-outlined" style="font-size:16px">auto_stories</span>
+                            Visuals Only
+                        </button>
+                    </div>
+                </div>
                 <div class="btn-download-group">
                     <button id="downloadMD" class="btn-download btn-download-card">
                         <span class="material-symbols-outlined btn-download-icon">description</span>
@@ -375,7 +391,7 @@
             setTimeout(function() { toast.classList.add('hidden'); }, 30000);
         }
         // Hook into download buttons
-        ['downloadFullReport', 'downloadMDAll', 'downloadMDModel', 'downloadMDVisual'].forEach(function(id) {
+        ['downloadHTMLAll', 'downloadHTMLModel', 'downloadHTMLVisual', 'downloadMDAll', 'downloadMDModel', 'downloadMDVisual'].forEach(function(id) {
             const btn = document.getElementById(id);
             if (btn) {
                 btn.addEventListener('click', function() {

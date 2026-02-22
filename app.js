@@ -28,10 +28,14 @@ class App {
         // Bind events
         document.getElementById('openFolderBtn').addEventListener('click', () => this.openFolder());
         document.getElementById('changeFolderBtn').addEventListener('click', () => this.openFolder());
-        document.getElementById('downloadFullReport').addEventListener('click', () => this.downloadFullReport());
+        document.getElementById('downloadFullReport').addEventListener('click', () => {
+            document.getElementById('htmlOptions').classList.toggle('open');
+        });
+        document.getElementById('downloadHTMLAll').addEventListener('click', () => this.downloadFullReport('all'));
+        document.getElementById('downloadHTMLModel').addEventListener('click', () => this.downloadFullReport('model'));
+        document.getElementById('downloadHTMLVisual').addEventListener('click', () => this.downloadFullReport('visuals'));
         document.getElementById('downloadMD').addEventListener('click', () => {
-            const mdOptions = document.getElementById('mdOptions');
-            mdOptions.classList.toggle('open');
+            document.getElementById('mdOptions').classList.toggle('open');
         });
         document.getElementById('downloadMDAll').addEventListener('click', () => this.downloadMarkdown('all'));
         document.getElementById('downloadMDModel').addEventListener('click', () => this.downloadMarkdown('model'));
@@ -1200,15 +1204,22 @@ class App {
         document.getElementById('mdOptions')?.classList.remove('open');
     }
 
-    downloadFullReport() {
+    downloadFullReport(scope = 'all') {
         if (!this.docGenerator) return;
+        if (scope === 'visuals' && (!this.visualData || this.visualData.pages.length === 0)) {
+            this.showToast('No report data — include a report folder to export visuals', 'error');
+            return;
+        }
         const html = this.docGenerator.generateFullReport(
             this.visualData,
-            this.diagramRenderer
+            this.diagramRenderer,
+            scope
         );
-        const name = (this.parsedModel.database?.name || 'model') + '-full-report.html';
+        const suffixMap = { all: '', model: '-model', visuals: '-visuals' };
+        const name = (this.parsedModel.database?.name || 'model') + '-full-report' + (suffixMap[scope] || '') + '.html';
         this._downloadFile(html, name, 'text/html');
         this.showToast('Full report downloaded');
+        document.getElementById('htmlOptions')?.classList.remove('open');
     }
 
     _downloadFile(content, filename, mimeType) {
