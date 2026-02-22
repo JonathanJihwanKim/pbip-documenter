@@ -177,10 +177,26 @@
             </div>
         </div>
 
+        <!-- Warning Banner -->
+        <div id="warningBanner" class="warning-banner hidden">
+            <span class="material-symbols-outlined" style="font-size:18px">warning</span>
+            <span id="warningBannerText"></span>
+            <button type="button" id="warningBannerDetails" class="warning-banner-link">View details</button>
+            <button type="button" id="warningBannerClose" class="warning-banner-close" title="Dismiss">&times;</button>
+        </div>
+
         <!-- Main App Body (sidebar + content) -->
         <div id="appBody" class="app-body hidden">
             <!-- Sidebar Navigation -->
             <aside class="sidebar" id="sidebar">
+                <div class="sidebar-search" id="sidebarSearch">
+                    <div class="sidebar-search-input-wrap">
+                        <span class="material-symbols-outlined sidebar-search-icon">search</span>
+                        <input type="text" id="sidebarSearchInput" placeholder="Search tables, measures..." autocomplete="off">
+                        <button type="button" id="sidebarSearchClear" class="sidebar-search-clear hidden" title="Clear search">&times;</button>
+                    </div>
+                    <div class="sidebar-search-count hidden" id="sidebarSearchCount"></div>
+                </div>
                 <div class="sidebar-section">
                     <div class="sidebar-header" data-section="overview">
                         <span class="material-symbols-outlined">dashboard</span>
@@ -362,6 +378,24 @@
                 <a href="https://github.com/sponsors/JonathanJihwanKim" target="_blank" class="btn-sponsor-toast-secondary">Sponsor on GitHub</a>
             </div>
             <button id="sponsor-toast-close" class="sponsor-toast-close" title="Dismiss">&times;</button>
+        </div>
+    </div>
+
+    <!-- Error Detail Modal -->
+    <div id="errorModal" class="error-modal hidden">
+        <div class="error-modal-backdrop"></div>
+        <div class="error-modal-content">
+            <div class="error-modal-header">
+                <h3><span class="material-symbols-outlined" style="font-size:20px;vertical-align:middle">error</span> Parse Errors</h3>
+                <button type="button" id="errorModalClose" class="error-modal-close">&times;</button>
+            </div>
+            <div class="error-modal-body" id="errorModalBody"></div>
+            <div class="error-modal-footer">
+                <button type="button" id="errorModalCopy" class="btn-error-copy">
+                    <span class="material-symbols-outlined" style="font-size:16px">content_copy</span>
+                    Copy error details
+                </button>
+            </div>
         </div>
     </div>
 

@@ -14,6 +14,8 @@ class App {
         this.docGenerator = null;
         this.diagramRenderer = null;
 
+        this.parseErrors = [];
+
         this.init();
     }
 
@@ -47,6 +49,37 @@ class App {
                 const section = header.dataset.section;
                 this.showSection(section);
             });
+        });
+
+        // Sidebar search
+        const searchInput = document.getElementById('sidebarSearchInput');
+        const searchClear = document.getElementById('sidebarSearchClear');
+        searchInput.addEventListener('input', () => this.filterSidebar(searchInput.value));
+        searchClear.addEventListener('click', () => {
+            searchInput.value = '';
+            this.filterSidebar('');
+            searchInput.focus();
+        });
+
+        // Ctrl+F shortcut
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                const appBody = document.getElementById('appBody');
+                if (appBody && !appBody.classList.contains('hidden')) {
+                    e.preventDefault();
+                    searchInput.focus();
+                    searchInput.select();
+                }
+            }
+        });
+
+        // Error modal bindings
+        document.getElementById('errorModalClose').addEventListener('click', () => this.hideErrorModal());
+        document.querySelector('.error-modal-backdrop').addEventListener('click', () => this.hideErrorModal());
+        document.getElementById('errorModalCopy').addEventListener('click', () => this.copyErrorDetails());
+        document.getElementById('warningBannerDetails').addEventListener('click', () => this.showErrorModal());
+        document.getElementById('warningBannerClose').addEventListener('click', () => {
+            document.getElementById('warningBanner').classList.add('hidden');
         });
 
         // Sidebar chevron collapse/expand
@@ -274,15 +307,18 @@ class App {
     // ──────────────────────────────────────────────
 
     async parseModel() {
-        this.showLoading(true);
+        this.showLoading(true, 'Reading TMDL files...');
 
         try {
             // Read all TMDL files
             const files = await this.readAllTMDLFiles();
+            const tableCount = Object.keys(files).filter(f => f.startsWith('tables/')).length;
+            this.showLoading(true, `Parsing ${tableCount} table${tableCount !== 1 ? 's' : ''}...`);
 
             // Parse TMDL
             const parser = new TMDLParser();
             this.parsedModel = parser.parseAll(files);
+            this.parseErrors = parser.errors;
 
             // Extract DAX references
             this.measureRefs = parser.extractAllReferences();
@@ -319,11 +355,20 @@ class App {
             // Pre-render relationship diagram
             this.renderRelationshipDiagram();
 
+            // Show warning banner if there were parse errors
+            if (this.parseErrors.length > 0) {
+                const banner = document.getElementById('warningBanner');
+                document.getElementById('warningBannerText').textContent =
+                    `Parsed with ${this.parseErrors.length} warning${this.parseErrors.length !== 1 ? 's' : ''} — some items may be incomplete`;
+                banner.classList.remove('hidden');
+            }
+
         } catch (error) {
+            this.parseErrors.push({ file: 'general', line: null, message: error.message });
             this.showToast('Error parsing model: ' + error.message, 'error');
             console.error('Parse error:', error);
         } finally {
-            this.showLoading(false);
+            this.showLoading(false, 'Parsing TMDL files...');
         }
     }
 
@@ -539,6 +584,61 @@ class App {
         document.getElementById('sidebarVisualUsageSection').classList.toggle('hidden', !this.visualData);
     }
 
+    filterSidebar(query) {
+        const q = query.trim().toLowerCase();
+        const clearBtn = document.getElementById('sidebarSearchClear');
+        const countEl = document.getElementById('sidebarSearchCount');
+
+        clearBtn.classList.toggle('hidden', q === '');
+
+        if (!this.parsedModel || q === '') {
+            // Reset: show all items
+            document.querySelectorAll('.sidebar-item').forEach(item => item.classList.remove('search-hidden'));
+            countEl.classList.add('hidden');
+            return;
+        }
+
+        // Build measure lookup (table sidebar items that have matching measures)
+        const measureMatchTables = new Set();
+        for (const table of this.parsedModel.tables) {
+            for (const measure of table.measures) {
+                if (measure.name.toLowerCase().includes(q) ||
+                    (measure.description && measure.description.toLowerCase().includes(q))) {
+                    measureMatchTables.add(table.name);
+                }
+            }
+        }
+
+        let shown = 0;
+        let total = 0;
+        const tableList = document.getElementById('sidebarTableList');
+        tableList.querySelectorAll('.sidebar-item').forEach(item => {
+            total++;
+            const tableName = (item.dataset.table || '').toLowerCase();
+            const match = tableName.includes(q) || measureMatchTables.has(item.dataset.table);
+            item.classList.toggle('search-hidden', !match);
+            if (match) shown++;
+        });
+
+        // Also filter report pages
+        const pageList = document.getElementById('sidebarPageList');
+        pageList.querySelectorAll('.sidebar-item').forEach(item => {
+            const pageName = (item.textContent || '').toLowerCase();
+            item.classList.toggle('search-hidden', !pageName.includes(q));
+        });
+
+        // Auto-expand tables section when searching
+        if (q) {
+            const tablesSection = tableList.closest('.sidebar-section');
+            tablesSection.classList.remove('collapsed');
+            const chevron = tablesSection.querySelector('.sidebar-chevron');
+            if (chevron) chevron.setAttribute('aria-expanded', 'true');
+        }
+
+        countEl.textContent = `Showing ${shown} of ${total} tables`;
+        countEl.classList.remove('hidden');
+    }
+
     showSection(section) {
         // Hide all section views
         document.querySelectorAll('.section-view').forEach(el => el.classList.remove('active'));
@@ -665,6 +765,7 @@ class App {
         }
 
         content.innerHTML = html;
+        this._bindDaxToggles(content);
     }
 
     renderOverview() {
@@ -759,13 +860,24 @@ class App {
         const folders = Object.keys(byFolder).sort();
 
         for (const folder of folders) {
-            html += `<h3>${this._esc(folder)}</h3>`;
-            for (const measure of byFolder[folder]) {
-                html += this._renderMeasureCard(measure, measure.tableName);
+            const measures = byFolder[folder];
+            if (measures.length > 20) {
+                html += `<details><summary><strong>${this._esc(folder)}</strong> (${measures.length} measures)</summary>`;
+                for (const measure of measures) {
+                    html += this._renderMeasureCard(measure, measure.tableName);
+                }
+                html += `</details>`;
+            } else {
+                html += `<h3>${this._esc(folder)}</h3>`;
+                for (const measure of measures) {
+                    html += this._renderMeasureCard(measure, measure.tableName);
+                }
             }
         }
 
-        document.getElementById('measuresContent').innerHTML = html;
+        const measuresEl = document.getElementById('measuresContent');
+        measuresEl.innerHTML = html;
+        this._bindDaxToggles(measuresEl);
     }
 
     renderRoles() {
@@ -1230,7 +1342,13 @@ class App {
         html += '</div>';
 
         if (measure.expression) {
-            html += `<div class="dax-block">${this._esc(measure.expression)}</div>`;
+            const lines = measure.expression.split('\n');
+            const shouldTruncate = lines.length > 5;
+            const daxId = `dax-${Math.random().toString(36).substr(2, 9)}`;
+            html += `<div class="dax-block${shouldTruncate ? ' truncated' : ''}" id="${daxId}">${this._esc(measure.expression)}</div>`;
+            if (shouldTruncate) {
+                html += `<button type="button" class="btn-dax-toggle" data-target="${daxId}">Show more</button>`;
+            }
         }
 
         // References
@@ -1317,6 +1435,48 @@ class App {
     // UTILITIES
     // ──────────────────────────────────────────────
 
+    _bindDaxToggles(container) {
+        (container || document).querySelectorAll('.btn-dax-toggle').forEach(btn => {
+            if (btn.dataset.bound) return;
+            btn.dataset.bound = 'true';
+            btn.addEventListener('click', () => {
+                const block = document.getElementById(btn.dataset.target);
+                if (!block) return;
+                const isTruncated = block.classList.contains('truncated');
+                block.classList.toggle('truncated');
+                btn.textContent = isTruncated ? 'Show less' : 'Show more';
+            });
+        });
+    }
+
+    showErrorModal() {
+        const modal = document.getElementById('errorModal');
+        const body = document.getElementById('errorModalBody');
+        let html = '';
+        for (const err of this.parseErrors) {
+            html += `<div class="error-modal-item">
+                <span class="error-file">${this._esc(err.file)}</span>
+                ${err.line != null ? `<span class="error-line">Line ${err.line}</span>` : ''}
+                <div class="error-message">${this._esc(err.message)}</div>
+            </div>`;
+        }
+        body.innerHTML = html;
+        modal.classList.remove('hidden');
+    }
+
+    hideErrorModal() {
+        document.getElementById('errorModal').classList.add('hidden');
+    }
+
+    copyErrorDetails() {
+        const text = this.parseErrors.map(e =>
+            `File: ${e.file}${e.line != null ? ` (Line ${e.line})` : ''}\nError: ${e.message}`
+        ).join('\n\n');
+        navigator.clipboard.writeText(text).then(() => {
+            this.showToast('Error details copied to clipboard');
+        });
+    }
+
     showToast(message, type = '') {
         const toast = document.getElementById('toast');
         toast.textContent = message;
@@ -1324,8 +1484,13 @@ class App {
         setTimeout(() => toast.classList.add('hidden'), 4000);
     }
 
-    showLoading(show) {
-        document.getElementById('loadingIndicator').classList.toggle('hidden', !show);
+    showLoading(show, message) {
+        const indicator = document.getElementById('loadingIndicator');
+        indicator.classList.toggle('hidden', !show);
+        if (message) {
+            const span = indicator.querySelector('span');
+            if (span) span.textContent = message;
+        }
     }
 
     _esc(str) {

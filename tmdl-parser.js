@@ -14,6 +14,7 @@ class TMDLParser {
             roles: [],
             expressions: []
         };
+        this.errors = [];
     }
 
     /**
@@ -45,18 +46,26 @@ class TMDLParser {
         // Parse table files
         const tableFiles = Object.keys(files).filter(f => f.startsWith('tables/'));
         for (const tableFile of tableFiles) {
-            const table = this.parseTable(files[tableFile], tableFile);
-            if (table) {
-                this.model.tables.push(table);
+            try {
+                const table = this.parseTable(files[tableFile], tableFile);
+                if (table) {
+                    this.model.tables.push(table);
+                }
+            } catch (err) {
+                this.errors.push({ file: tableFile, line: null, message: err.message });
             }
         }
 
         // Parse role files
         const roleFiles = Object.keys(files).filter(f => f.startsWith('roles/'));
         for (const roleFile of roleFiles) {
-            const role = this.parseRole(files[roleFile], roleFile);
-            if (role) {
-                this.model.roles.push(role);
+            try {
+                const role = this.parseRole(files[roleFile], roleFile);
+                if (role) {
+                    this.model.roles.push(role);
+                }
+            } catch (err) {
+                this.errors.push({ file: roleFile, line: null, message: err.message });
             }
         }
 
