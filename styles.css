@@ -212,6 +212,32 @@ body {
     color: var(--text-secondary);
 }
 
+.sidebar-children {
+    max-height: 2000px;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+}
+
+.sidebar-section.collapsed .sidebar-children {
+    max-height: 0;
+}
+
+.sidebar-chevron {
+    margin-left: auto;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--primary);
+    padding: 0;
+    display: flex;
+    align-items: center;
+    transition: transform 0.2s ease;
+}
+
+.sidebar-section.collapsed .sidebar-chevron {
+    transform: rotate(-90deg);
+}
+
 /* ── MAIN CONTENT ── */
 .main-content {
     flex: 1;
@@ -332,6 +358,17 @@ body {
     color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.5px;
+}
+
+.stat-hint {
+    font-size: 11px;
+    color: var(--text-light);
+    margin-top: 4px;
+    min-height: 14px;
+}
+
+.stat-card.dimmed {
+    opacity: 0.5;
 }
 
 /* ── TABLES ── */
@@ -678,6 +715,257 @@ tr:hover {
     border-radius: 2px;
     font-size: 12px;
     margin: 2px;
+}
+
+/* ── VIEW TOGGLE (segmented control) ── */
+.view-toggle {
+    display: inline-flex;
+    border: 2px solid var(--primary);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 16px;
+}
+
+.view-toggle-btn {
+    padding: 6px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    border: none;
+    background: var(--bg);
+    color: var(--primary);
+    cursor: pointer;
+    transition: all var(--transition);
+}
+
+.view-toggle-btn:not(:last-child) {
+    border-right: 2px solid var(--primary);
+}
+
+.view-toggle-btn.active {
+    background: var(--primary);
+    color: #ffffff;
+}
+
+.view-toggle-btn:hover:not(.active) {
+    background: #e8eaf6;
+}
+
+/* ── VISUAL CARD ── */
+.visual-card {
+    background: var(--card-bg);
+    border: 1px solid #ce93d8;
+    border-left: 4px solid #9c27b0;
+    border-radius: var(--radius);
+    padding: 16px;
+    margin: 12px 0;
+}
+
+.visual-card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.visual-card-header h4 {
+    font-size: 14px;
+    color: var(--primary);
+    margin: 0;
+}
+
+.badge-visual-type {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 2px;
+    font-size: 11px;
+    font-weight: 600;
+    background: #f3e5f5;
+    color: #6a1b9a;
+}
+
+.visual-field-roles {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.visual-role-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 12px;
+}
+
+.visual-role-label {
+    font-weight: 600;
+    min-width: 70px;
+    flex-shrink: 0;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    font-size: 11px;
+    padding-top: 3px;
+}
+
+.visual-role-fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.field-chip {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 2px;
+    font-size: 12px;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all var(--transition);
+    border: none;
+    background: none;
+    font-family: inherit;
+}
+
+.field-chip:hover {
+    filter: brightness(0.9);
+    text-decoration: underline;
+}
+
+.field-chip[data-role="Values"]   { background: #fff8e1; color: #f57f17; }
+.field-chip[data-role="Category"] { background: #e3f2fd; color: #1565c0; }
+.field-chip[data-role="Series"]   { background: #e8f5e9; color: #2e7d32; }
+.field-chip[data-role="Filters"]  { background: #fce4ec; color: #c62828; }
+.field-chip[data-role="Tooltips"] { background: #f5f5f5; color: var(--text-secondary); }
+.field-chip[data-role="Other"]    { background: var(--bg); color: var(--text-secondary); }
+
+/* ── PAGE GROUP (By Visual view) ── */
+.page-group-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 0 6px;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--primary);
+    border-bottom: 2px solid var(--accent);
+    margin: 20px 0 8px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.page-group-header:first-child {
+    margin-top: 0;
+}
+
+.page-group-header .material-symbols-outlined {
+    font-size: 18px;
+    transition: transform 0.25s ease;
+}
+
+.page-group-header.collapsed .chevron-icon {
+    transform: rotate(-90deg);
+}
+
+.page-group-content {
+    overflow: hidden;
+    max-height: 5000px;
+    transition: max-height 0.3s ease-out, opacity 0.2s ease;
+    opacity: 1;
+}
+
+.page-group-content.collapsed {
+    max-height: 0;
+    opacity: 0;
+}
+
+.visual-card-empty {
+    font-style: italic;
+    color: var(--text-secondary);
+    font-size: 13px;
+    padding: 4px 0;
+}
+
+/* ── INTERACTIVE DIAGRAM ── */
+.diagram-interactive {
+    position: relative;
+    overflow: hidden;
+    cursor: grab;
+    min-height: 400px;
+}
+
+.diagram-interactive.panning {
+    cursor: grabbing;
+}
+
+.diagram-interactive svg {
+    cursor: inherit;
+}
+
+.diagram-controls {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    z-index: 10;
+}
+
+.diagram-ctrl-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--card-bg);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all var(--transition);
+    color: var(--primary);
+    padding: 0;
+}
+
+.diagram-ctrl-btn:hover {
+    background: var(--bg);
+    border-color: var(--primary);
+}
+
+.diagram-ctrl-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.diagram-ctrl-btn .material-symbols-outlined {
+    font-size: 20px;
+}
+
+/* SVG node interactivity */
+.table-node {
+    cursor: pointer;
+}
+
+.table-node.dimmed {
+    opacity: 0.15;
+    transition: opacity 0.2s ease;
+}
+
+.table-node.highlighted > rect:nth-of-type(2) {
+    stroke: var(--accent);
+    stroke-width: 3;
+}
+
+.rel-line {
+    transition: opacity 0.2s ease;
+}
+
+.rel-line.highlighted path {
+    stroke: var(--accent) !important;
+    stroke-width: 3 !important;
+}
+
+.rel-line.dimmed {
+    opacity: 0.1;
 }
 
 /* ── RESPONSIVE ── */

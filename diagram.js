@@ -38,10 +38,17 @@ class DiagramRenderer {
      * @param {Array} relationships - Parsed relationships
      */
     renderRelationshipDiagram(tables, relationships) {
-        this.container.innerHTML = '';
+        // Keep only the SVG area, preserve control buttons
+        const existingSvg = this.container.querySelector('svg');
+        if (existingSvg) existingSvg.remove();
+        const existingPlaceholder = this.container.querySelector('p');
+        if (existingPlaceholder) existingPlaceholder.remove();
 
         if (relationships.length === 0) {
-            this.container.innerHTML = '<p style="text-align:center;color:#666;padding:40px;">No relationships defined in this model.</p>';
+            const p = document.createElement('p');
+            p.style.cssText = 'text-align:center;color:#666;padding:40px;';
+            p.textContent = 'No relationships defined in this model.';
+            this.container.appendChild(p);
             return;
         }
 
@@ -63,41 +70,184 @@ class DiagramRenderer {
 
             tableNodes.push({
                 name: tName,
-                columns: columns.slice(0, 8), // Show max 8 columns
+                columns: columns.slice(0, 8),
                 totalColumns: columns.length,
                 measures
             });
         }
 
-        // Layout: grid arrangement
         const nodeWidth = 200;
         const nodeMinHeight = 60;
         const rowHeight = 18;
-        const padding = 60;
-        const cols = Math.ceil(Math.sqrt(tableNodes.length));
-        const hGap = nodeWidth + 80;
-        const vGap = 200;
 
-        tableNodes.forEach((node, i) => {
-            const col = i % cols;
-            const row = Math.floor(i / cols);
-            node.x = padding + col * hGap;
-            node.y = padding + row * vGap;
-            node.height = nodeMinHeight + node.columns.length * rowHeight;
+        // Calculate node heights
+        for (const node of tableNodes) {
             node.width = nodeWidth;
-            tableMap.set(node.name, node);
-        });
+            node.height = nodeMinHeight + node.columns.length * rowHeight;
+        }
 
-        const svgWidth = padding * 2 + cols * hGap;
-        const rows = Math.ceil(tableNodes.length / cols);
-        const svgHeight = padding * 2 + rows * vGap;
+        // Layout: star schema BFS rings or horizontal for small models
+        if (tableNodes.length < 4) {
+            this._horizontalLayout(tableNodes);
+        } else {
+            this._starSchemaLayout(tableNodes, relationships);
+        }
+
+        // Calculate SVG bounds
+        let maxX = 0, maxY = 0;
+        for (const n of tableNodes) {
+            maxX = Math.max(maxX, n.x + n.width);
+            maxY = Math.max(maxY, n.y + n.height);
+            tableMap.set(n.name, n);
+        }
+        const svgWidth = maxX + 80;
+        const svgHeight = maxY + 100;
 
         const svg = this._createSVG(svgWidth, svgHeight);
 
         // Defs for markers
+        svg.appendChild(this._createDefs());
+
+        // Title
+        svg.appendChild(this._createText('Relationship Diagram', svgWidth / 2, 30, {
+            fontSize: '18px', fontWeight: '700', fill: this.colors.primary, textAnchor: 'middle'
+        }));
+
+        // Draw relationship bezier lines first (behind nodes)
+        for (const rel of relationships) {
+            const fromNode = tableMap.get(rel.fromTable);
+            const toNode = tableMap.get(rel.toTable);
+            if (!fromNode || !toNode) continue;
+            this._drawRelationshipBezier(svg, fromNode, toNode, rel);
+        }
+
+        // Draw table nodes on top
+        for (const node of tableNodes) {
+            this._drawTableNode(svg, node);
+        }
+
+        // Legend
+        this._drawRelLegend(svg, svgWidth, svgHeight);
+
+        this.container.appendChild(svg);
+
+        // Initialize zoom/pan/hover interactivity
+        this._initInteractivity(svg, svgWidth, svgHeight);
+    }
+
+    _horizontalLayout(nodes) {
+        const padding = 60;
+        const gap = 80;
+        let x = padding;
+        for (const node of nodes) {
+            node.x = x;
+            node.y = padding + 40;
+            x += node.width + gap;
+        }
+    }
+
+    _starSchemaLayout(nodes, relationships) {
+        // 1. Detect fact table: most many-side relationships
+        const manySideCounts = {};
+        for (const node of nodes) { manySideCounts[node.name] = 0; }
+
+        for (const rel of relationships) {
+            const fromCard = rel.fromCardinality || 'many';
+            const toCard = rel.toCardinality || 'one';
+            if (fromCard === 'many' && manySideCounts[rel.fromTable] !== undefined) {
+                manySideCounts[rel.fromTable]++;
+            }
+            if (toCard === 'many' && manySideCounts[rel.toTable] !== undefined) {
+                manySideCounts[rel.toTable]++;
+            }
+        }
+
+        let factTable = nodes[0].name;
+        let maxCount = -1;
+        for (const [name, count] of Object.entries(manySideCounts)) {
+            if (count > maxCount || (count === maxCount && name < factTable)) {
+                factTable = name;
+                maxCount = count;
+            }
+        }
+
+        // 2. Build adjacency list
+        const adj = {};
+        for (const node of nodes) { adj[node.name] = new Set(); }
+        for (const rel of relationships) {
+            if (adj[rel.fromTable]) adj[rel.fromTable].add(rel.toTable);
+            if (adj[rel.toTable]) adj[rel.toTable].add(rel.fromTable);
+        }
+
+        // 3. BFS from fact table
+        const visited = new Set([factTable]);
+        const rings = [[factTable]];
+        let frontier = [factTable];
+
+        while (frontier.length > 0) {
+            const nextFrontier = [];
+            for (const current of frontier) {
+                for (const neighbor of (adj[current] || [])) {
+                    if (!visited.has(neighbor)) {
+                        visited.add(neighbor);
+                        nextFrontier.push(neighbor);
+                    }
+                }
+            }
+            if (nextFrontier.length > 0) {
+                rings.push(nextFrontier);
+            }
+            frontier = nextFrontier;
+        }
+
+        // Add disconnected tables to outermost ring
+        for (const node of nodes) {
+            if (!visited.has(node.name)) {
+                if (rings.length <= 1) rings.push([]);
+                rings[rings.length - 1].push(node.name);
+            }
+        }
+
+        // 4. Position nodes in concentric rings
+        const ringRadius = 250;
+        const centerX = ringRadius * Math.max(rings.length - 1, 1) + 150;
+        const centerY = centerX;
+        const nodeMap = new Map(nodes.map(n => [n.name, n]));
+
+        for (let ringIdx = 0; ringIdx < rings.length; ringIdx++) {
+            const ring = rings[ringIdx];
+            const radius = ringIdx * ringRadius;
+
+            if (ringIdx === 0) {
+                const node = nodeMap.get(ring[0]);
+                node.x = centerX - node.width / 2;
+                node.y = centerY - node.height / 2;
+            } else {
+                for (let i = 0; i < ring.length; i++) {
+                    const angle = (2 * Math.PI * i / ring.length) - Math.PI / 2;
+                    const node = nodeMap.get(ring[i]);
+                    node.x = centerX + radius * Math.cos(angle) - node.width / 2;
+                    node.y = centerY + radius * Math.sin(angle) - node.height / 2;
+                }
+            }
+        }
+
+        // 5. Normalize to positive coordinates
+        let minX = Infinity, minY = Infinity;
+        for (const n of nodes) {
+            minX = Math.min(minX, n.x);
+            minY = Math.min(minY, n.y);
+        }
+        const padding = 60;
+        for (const n of nodes) {
+            n.x -= minX - padding;
+            n.y -= minY - padding;
+        }
+    }
+
+    _createDefs() {
         const defs = document.createElementNS(this.SVG_NS, 'defs');
 
-        // Arrow marker
         const marker = document.createElementNS(this.SVG_NS, 'marker');
         marker.setAttribute('id', 'arrowhead');
         marker.setAttribute('markerWidth', '10');
@@ -111,38 +261,12 @@ class DiagramRenderer {
         marker.appendChild(polygon);
         defs.appendChild(marker);
 
-        // Bi-directional arrow
         const marker2 = marker.cloneNode(true);
         marker2.setAttribute('id', 'arrowhead-start');
         marker2.setAttribute('orient', 'auto-start-reverse');
         defs.appendChild(marker2);
 
-        svg.appendChild(defs);
-
-        // Title
-        const title = this._createText('Relationship Diagram', svgWidth / 2, 30, {
-            fontSize: '18px', fontWeight: '700', fill: this.colors.primary, textAnchor: 'middle'
-        });
-        svg.appendChild(title);
-
-        // Draw relationships (lines first, then tables on top)
-        for (const rel of relationships) {
-            const fromNode = tableMap.get(rel.fromTable);
-            const toNode = tableMap.get(rel.toTable);
-            if (!fromNode || !toNode) continue;
-
-            this._drawRelationshipLine(svg, fromNode, toNode, rel);
-        }
-
-        // Draw table nodes
-        for (const node of tableNodes) {
-            this._drawTableNode(svg, node);
-        }
-
-        // Legend
-        this._drawRelLegend(svg, svgWidth, svgHeight);
-
-        this.container.appendChild(svg);
+        return defs;
     }
 
     /**
@@ -151,6 +275,7 @@ class DiagramRenderer {
     _drawTableNode(svg, node) {
         const g = document.createElementNS(this.SVG_NS, 'g');
         g.setAttribute('class', 'table-node');
+        g.setAttribute('data-table-name', node.name);
 
         // Shadow
         const shadow = this._createRect(node.x + 3, node.y + 3, node.width, node.height, {
@@ -228,84 +353,222 @@ class DiagramRenderer {
     }
 
     /**
-     * Draw a relationship line between two table nodes
+     * Draw a bezier curve relationship between two table nodes
      */
-    _drawRelationshipLine(svg, fromNode, toNode, rel) {
-        // Find best connection points
+    _drawRelationshipBezier(svg, fromNode, toNode, rel) {
         const from = this._getConnectionPoint(fromNode, toNode);
         const to = this._getConnectionPoint(toNode, fromNode);
 
         const g = document.createElementNS(this.SVG_NS, 'g');
+        g.setAttribute('class', 'rel-line');
+        g.setAttribute('data-from', rel.fromTable);
+        g.setAttribute('data-to', rel.toTable);
 
-        // Line
-        const line = document.createElementNS(this.SVG_NS, 'line');
-        line.setAttribute('x1', from.x);
-        line.setAttribute('y1', from.y);
-        line.setAttribute('x2', to.x);
-        line.setAttribute('y2', to.y);
-        line.setAttribute('stroke', rel.isActive ? this.colors.linePrimary : this.colors.inactiveRel);
-        line.setAttribute('stroke-width', rel.isActive ? '2' : '1.5');
+        // Calculate bezier control points with gentle curve
+        const dx = to.x - from.x;
+        const dy = to.y - from.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        const curvature = Math.min(dist * 0.2, 60);
+        const nx = -dy / dist * curvature;
+        const ny = dx / dist * curvature;
 
-        if (!rel.isActive) {
-            line.setAttribute('stroke-dasharray', '6,4');
+        const cp1x = from.x + dx * 0.33 + nx;
+        const cp1y = from.y + dy * 0.33 + ny;
+        const cp2x = from.x + dx * 0.66 + nx;
+        const cp2y = from.y + dy * 0.66 + ny;
+
+        const path = document.createElementNS(this.SVG_NS, 'path');
+        path.setAttribute('d', `M ${from.x} ${from.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${to.x} ${to.y}`);
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', rel.isActive !== false ? this.colors.linePrimary : this.colors.inactiveRel);
+        path.setAttribute('stroke-width', rel.isActive !== false ? '2' : '1.5');
+
+        if (rel.isActive === false) {
+            path.setAttribute('stroke-dasharray', '6,4');
         }
 
         if (rel.crossFilteringBehavior === 'bothDirections') {
-            line.setAttribute('marker-end', 'url(#arrowhead)');
-            line.setAttribute('marker-start', 'url(#arrowhead-start)');
+            path.setAttribute('marker-end', 'url(#arrowhead)');
+            path.setAttribute('marker-start', 'url(#arrowhead-start)');
         } else {
-            line.setAttribute('marker-end', 'url(#arrowhead)');
+            path.setAttribute('marker-end', 'url(#arrowhead)');
         }
 
-        g.appendChild(line);
+        g.appendChild(path);
 
-        // Cardinality labels
+        // Cardinality label at bezier midpoint
+        const midX = (from.x + 3 * cp1x + 3 * cp2x + to.x) / 8;
+        const midY = (from.y + 3 * cp1y + 3 * cp2y + to.y) / 8;
+
         const fromCard = rel.fromCardinality || 'many';
         const toCard = rel.toCardinality || 'one';
 
-        const midX = (from.x + to.x) / 2;
-        const midY = (from.y + to.y) / 2;
+        const labelBg = this._createRect(midX - 22, midY - 18, 44, 18, {
+            fill: this.colors.bg, rx: '3', stroke: this.colors.border, strokeWidth: '0.5'
+        });
+        g.appendChild(labelBg);
 
         const cardText = this._createText(
             `${fromCard === 'many' ? '*' : '1'} : ${toCard === 'many' ? '*' : '1'}`,
-            midX,
-            midY - 8,
+            midX, midY - 5,
             {
-                fontSize: '11px',
-                fontWeight: '600',
-                fill: rel.isActive ? this.colors.primary : this.colors.inactiveRel,
+                fontSize: '11px', fontWeight: '600',
+                fill: rel.isActive !== false ? this.colors.primary : this.colors.inactiveRel,
                 textAnchor: 'middle'
             }
         );
-
-        // Background for label
-        const labelBg = this._createRect(midX - 20, midY - 20, 40, 16, {
-            fill: this.colors.bg, rx: '3'
-        });
-        g.appendChild(labelBg);
         g.appendChild(cardText);
 
-        // Column labels near endpoints
-        if (rel.fromColumn) {
-            const fcText = this._createText(
-                rel.fromColumn,
-                from.x + (to.x - from.x) * 0.15,
-                from.y + (to.y - from.y) * 0.15 + 14,
-                { fontSize: '10px', fill: this.colors.textLight, textAnchor: 'middle' }
-            );
-            g.appendChild(fcText);
-        }
-        if (rel.toColumn) {
-            const tcText = this._createText(
-                rel.toColumn,
-                from.x + (to.x - from.x) * 0.85,
-                from.y + (to.y - from.y) * 0.85 + 14,
-                { fontSize: '10px', fill: this.colors.textLight, textAnchor: 'middle' }
-            );
-            g.appendChild(tcText);
-        }
-
         svg.appendChild(g);
+    }
+
+    /**
+     * Initialize zoom, pan, and hover-to-highlight interactivity
+     */
+    _initInteractivity(svg, origWidth, origHeight) {
+        // Clean up previous window listeners if re-rendering
+        if (this._cleanupInteractivity) this._cleanupInteractivity();
+
+        let vb = { x: 0, y: 0, w: origWidth, h: origHeight };
+        const origVB = { ...vb };
+        const MIN_SCALE = 0.25;
+        const MAX_SCALE = 4;
+
+        const updateViewBox = () => {
+            svg.setAttribute('viewBox', `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
+        };
+
+        // Zoom buttons
+        const zoomIn = document.getElementById('diagramZoomIn');
+        const zoomOut = document.getElementById('diagramZoomOut');
+        const zoomReset = document.getElementById('diagramZoomReset');
+
+        const onZoomIn = () => {
+            if (vb.w < origVB.w * MIN_SCALE) return;
+            const cx = vb.x + vb.w / 2, cy = vb.y + vb.h / 2;
+            vb.w *= 0.8; vb.h *= 0.8;
+            vb.x = cx - vb.w / 2; vb.y = cy - vb.h / 2;
+            updateViewBox();
+        };
+
+        const onZoomOut = () => {
+            if (vb.w > origVB.w * MAX_SCALE) return;
+            const cx = vb.x + vb.w / 2, cy = vb.y + vb.h / 2;
+            vb.w *= 1.25; vb.h *= 1.25;
+            vb.x = cx - vb.w / 2; vb.y = cy - vb.h / 2;
+            updateViewBox();
+        };
+
+        const onZoomReset = () => {
+            vb = { ...origVB };
+            updateViewBox();
+        };
+
+        if (zoomIn) zoomIn.addEventListener('click', onZoomIn);
+        if (zoomOut) zoomOut.addEventListener('click', onZoomOut);
+        if (zoomReset) zoomReset.addEventListener('click', onZoomReset);
+
+        // Mouse wheel zoom (centered on cursor)
+        svg.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const rect = svg.getBoundingClientRect();
+            const mx = (e.clientX - rect.left) / rect.width;
+            const my = (e.clientY - rect.top) / rect.height;
+
+            const factor = e.deltaY > 0 ? 1.1 : 0.9;
+            const newW = vb.w * factor;
+            const newH = vb.h * factor;
+
+            if (newW < origVB.w * MIN_SCALE || newW > origVB.w * MAX_SCALE) return;
+
+            vb.x += (vb.w - newW) * mx;
+            vb.y += (vb.h - newH) * my;
+            vb.w = newW;
+            vb.h = newH;
+            updateViewBox();
+        }, { passive: false });
+
+        // Pan (drag on empty space)
+        const container = this.container;
+        let isPanning = false;
+        let panStart = { x: 0, y: 0 };
+
+        svg.addEventListener('mousedown', (e) => {
+            if (e.target.closest('.table-node')) return;
+            isPanning = true;
+            panStart = { x: e.clientX, y: e.clientY };
+            container.classList.add('panning');
+        });
+
+        const onMouseMove = (e) => {
+            if (!isPanning) return;
+            const rect = svg.getBoundingClientRect();
+            const scale = vb.w / rect.width;
+            vb.x -= (e.clientX - panStart.x) * scale;
+            vb.y -= (e.clientY - panStart.y) * scale;
+            panStart = { x: e.clientX, y: e.clientY };
+            updateViewBox();
+        };
+
+        const onMouseUp = () => {
+            isPanning = false;
+            container.classList.remove('panning');
+        };
+
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+
+        // Store cleanup function for re-renders
+        this._cleanupInteractivity = () => {
+            window.removeEventListener('mousemove', onMouseMove);
+            window.removeEventListener('mouseup', onMouseUp);
+            if (zoomIn) zoomIn.removeEventListener('click', onZoomIn);
+            if (zoomOut) zoomOut.removeEventListener('click', onZoomOut);
+            if (zoomReset) zoomReset.removeEventListener('click', onZoomReset);
+        };
+
+        // Hover-to-highlight
+        svg.querySelectorAll('.table-node').forEach(nodeEl => {
+            const name = nodeEl.dataset.tableName;
+
+            nodeEl.addEventListener('mouseenter', () => {
+                const connectedTables = new Set([name]);
+
+                svg.querySelectorAll('.rel-line').forEach(lineEl => {
+                    const from = lineEl.dataset.from;
+                    const to = lineEl.dataset.to;
+                    if (from === name || to === name) {
+                        lineEl.classList.add('highlighted');
+                        connectedTables.add(from);
+                        connectedTables.add(to);
+                    } else {
+                        lineEl.classList.add('dimmed');
+                    }
+                });
+
+                svg.querySelectorAll('.table-node').forEach(n => {
+                    const nName = n.dataset.tableName;
+                    if (connectedTables.has(nName)) {
+                        n.classList.add('highlighted');
+                    } else {
+                        n.classList.add('dimmed');
+                    }
+                });
+            });
+
+            nodeEl.addEventListener('mouseleave', () => {
+                svg.querySelectorAll('.table-node').forEach(n =>
+                    n.classList.remove('highlighted', 'dimmed'));
+                svg.querySelectorAll('.rel-line').forEach(l =>
+                    l.classList.remove('highlighted', 'dimmed'));
+            });
+
+            // Double-click to navigate to table detail
+            nodeEl.addEventListener('dblclick', (e) => {
+                e.preventDefault();
+                if (window.app) window.app.showTableDetail(name);
+            });
+        });
     }
 
     /**

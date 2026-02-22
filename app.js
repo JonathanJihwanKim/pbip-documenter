@@ -40,6 +40,18 @@ class App {
                 this.showSection(section);
             });
         });
+
+        // Sidebar chevron collapse/expand
+        document.querySelectorAll('.sidebar-chevron').forEach(chevron => {
+            chevron.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const section = chevron.closest('.sidebar-section');
+                section.classList.toggle('collapsed');
+                const isExpanded = !section.classList.contains('collapsed');
+                chevron.setAttribute('aria-expanded', String(isExpanded));
+                try { localStorage.setItem('pbip-doc-sidebar-tables-collapsed', !isExpanded); } catch {}
+            });
+        });
     }
 
     // ──────────────────────────────────────────────
@@ -160,11 +172,8 @@ class App {
             document.getElementById('downloadBar').classList.remove('hidden');
             document.getElementById('appBody').classList.remove('hidden');
 
-            // Render diagrams
+            // Pre-render relationship diagram
             this.renderRelationshipDiagram();
-            if (this.visualData) {
-                this.renderVisualUsageDiagram();
-            }
 
         } catch (error) {
             this.showToast('Error parsing model: ' + error.message, 'error');
@@ -301,6 +310,20 @@ class App {
         document.getElementById('statMeasures').textContent = totalMeasures;
         document.getElementById('statRelationships').textContent = m.relationships.length;
         document.getElementById('statVisuals').textContent = totalVisuals;
+
+        // Visuals hint and dimmed state
+        const visualsCard = document.getElementById('statVisualsCard');
+        const visualsHint = document.getElementById('statVisualsHint');
+        if (!this.reportHandle) {
+            visualsCard.classList.add('dimmed');
+            visualsHint.textContent = 'No .Report folder found';
+        } else if (totalVisuals === 0) {
+            visualsCard.classList.remove('dimmed');
+            visualsHint.textContent = 'No visuals detected';
+        } else {
+            visualsCard.classList.remove('dimmed');
+            visualsHint.textContent = '';
+        }
     }
 
     buildSidebar() {
@@ -311,6 +334,25 @@ class App {
         document.getElementById('sidebarMeasureCount').textContent = totalMeasures;
         document.getElementById('sidebarRelCount').textContent = m.relationships.length;
         document.getElementById('sidebarRoleCount').textContent = m.roles.length;
+
+        // Report Pages list
+        const pageSectionEl = document.getElementById('sidebarReportPagesSection');
+        if (this.visualData && this.visualData.pages.length > 0) {
+            pageSectionEl.classList.remove('hidden');
+            document.getElementById('sidebarPageCount').textContent = this.visualData.pages.length;
+            const pageList = document.getElementById('sidebarPageList');
+            pageList.innerHTML = '';
+            for (const page of this.visualData.pages) {
+                const item = document.createElement('div');
+                item.className = 'sidebar-item';
+                item.textContent = page.displayName;
+                item.dataset.pageId = page.id;
+                item.addEventListener('click', () => this.showPageDetail(page.id));
+                pageList.appendChild(item);
+            }
+        } else {
+            pageSectionEl.classList.add('hidden');
+        }
 
         // Table list
         const tableList = document.getElementById('sidebarTableList');
@@ -323,6 +365,22 @@ class App {
             item.dataset.table = table.name;
             item.addEventListener('click', () => this.showTableDetail(table.name));
             tableList.appendChild(item);
+        }
+
+        // Collapse/expand table list based on saved state or table count
+        const tablesSection = tableList.closest('.sidebar-section');
+        const chevron = tablesSection.querySelector('.sidebar-chevron');
+        let savedState = null;
+        try { savedState = localStorage.getItem('pbip-doc-sidebar-tables-collapsed'); } catch {}
+        let shouldCollapse;
+        if (savedState !== null) {
+            shouldCollapse = savedState === 'true';
+        } else {
+            shouldCollapse = m.tables.length > 10;
+        }
+        tablesSection.classList.toggle('collapsed', shouldCollapse);
+        if (chevron) {
+            chevron.setAttribute('aria-expanded', String(!shouldCollapse));
         }
 
         // Show/hide sections
@@ -350,11 +408,12 @@ class App {
         document.querySelectorAll('.sidebar-item').forEach(item => item.classList.remove('active'));
 
         // Render content on demand
+        if (section === 'report-pages') this.renderReportPagesOverview();
         if (section === 'tables') this.renderTables();
         if (section === 'measures') this.renderMeasureCatalog();
         if (section === 'roles') this.renderRoles();
         if (section === 'expressions') this.renderExpressions();
-        if (section === 'visual-usage') this.renderVisualUsageDiagram();
+        if (section === 'visual-usage') this.renderVisualUsageView();
     }
 
     showTableDetail(tableName) {
@@ -601,15 +660,197 @@ class App {
         document.getElementById('relationshipsList').innerHTML = html;
     }
 
-    renderVisualUsageDiagram() {
+    // ──────────────────────────────────────────────
+    // REPORT PAGES & VISUAL EXPLORER
+    // ──────────────────────────────────────────────
+
+    renderReportPagesOverview() {
+        if (!this.visualData) return;
+        let html = '<table><tr><th>Page</th><th>Visuals</th></tr>';
+        for (const page of this.visualData.pages) {
+            html += `<tr>
+                <td><a href="#" class="page-nav-link" data-page-id="${this._esc(page.id)}"
+                    style="color:var(--primary);font-weight:500;text-decoration:none">
+                    ${this._esc(page.displayName)}</a></td>
+                <td>${page.visuals.length}</td>
+            </tr>`;
+        }
+        html += '</table>';
+        document.getElementById('reportPagesContent').innerHTML = html;
+
+        document.querySelectorAll('.page-nav-link').forEach(link => {
+            link.addEventListener('click', e => {
+                e.preventDefault();
+                this.showPageDetail(link.dataset.pageId);
+            });
+        });
+    }
+
+    showPageDetail(pageId) {
+        if (!this.visualData) return;
+        const page = this.visualData.pages.find(p => p.id === pageId);
+        if (!page) return;
+
+        document.querySelectorAll('.section-view').forEach(el => el.classList.remove('active'));
+        document.getElementById('view-report-page').classList.add('active');
+        document.getElementById('reportPageName').textContent = page.displayName;
+
+        // Mark sidebar active
+        document.querySelectorAll('.sidebar-header').forEach(h => h.classList.remove('active'));
+        document.querySelectorAll('.sidebar-item').forEach(item => {
+            item.classList.toggle('active', item.dataset.pageId === pageId);
+        });
+
+        let html = '';
+        if (page.visuals.length === 0) {
+            html = '<p class="placeholder"><span class="material-symbols-outlined">visibility_off</span>No visuals on this page.</p>';
+        } else {
+            for (const visual of page.visuals) {
+                html += this._renderVisualCard(visual);
+            }
+        }
+        document.getElementById('reportPageContent').innerHTML = html;
+        this._bindFieldChips();
+    }
+
+    renderVisualUsageView() {
         if (!this.visualData) return;
 
-        const container = document.getElementById('visualUsageContent');
+        // Set up toggle
+        const toggle = document.getElementById('visualUsageToggle');
+        if (!toggle.dataset.bound) {
+            toggle.dataset.bound = 'true';
+            toggle.querySelectorAll('.view-toggle-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    toggle.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    const view = btn.dataset.view;
+                    document.getElementById('visualUsageByVisual').classList.toggle('hidden', view !== 'by-visual');
+                    document.getElementById('visualUsageByField').classList.toggle('hidden', view !== 'by-field');
+                    if (view === 'by-field') {
+                        this._ensureFieldDiagramRendered();
+                    }
+                });
+            });
+        }
+
+        // Render "By Visual" view
+        this._renderByVisualView();
+    }
+
+    _ensureFieldDiagramRendered() {
+        const container = document.getElementById('visualUsageByField');
+        if (container.children.length > 0) return;
         const renderer = new DiagramRenderer(container);
         renderer.renderVisualUsageDiagram(
             this.visualData.fieldUsageMap,
             this.visualData.pages
         );
+    }
+
+    _renderByVisualView() {
+        let html = '';
+        for (const page of this.visualData.pages) {
+            html += `<div class="page-group">
+                <div class="page-group-header" data-page-group="${this._esc(page.id)}">
+                    <span class="material-symbols-outlined">auto_stories</span>
+                    ${this._esc(page.displayName)}
+                    <span style="font-size:12px;font-weight:400;color:var(--text-secondary);margin-left:auto">
+                        ${page.visuals.length} visual${page.visuals.length !== 1 ? 's' : ''}
+                    </span>
+                    <span class="material-symbols-outlined chevron-icon">expand_more</span>
+                </div>
+                <div class="page-group-content">`;
+
+            if (page.visuals.length === 0) {
+                html += '<p class="visual-card-empty">No visuals on this page.</p>';
+            } else {
+                for (const visual of page.visuals) {
+                    html += this._renderVisualCard(visual);
+                }
+            }
+            html += '</div></div>';
+        }
+        document.getElementById('visualUsageByVisual').innerHTML = html;
+
+        // Bind page group collapse
+        document.querySelectorAll('.page-group-header').forEach(header => {
+            header.addEventListener('click', () => {
+                header.classList.toggle('collapsed');
+                header.nextElementSibling.classList.toggle('collapsed');
+            });
+        });
+
+        this._bindFieldChips();
+    }
+
+    _renderVisualCard(visual) {
+        const vType = visual.visualType || 'unknown';
+        const vName = visual.visualName || vType;
+
+        let html = `<div class="visual-card">
+            <div class="visual-card-header">
+                <h4>${this._esc(vName)}</h4>
+                <span class="badge-visual-type">${this._esc(vType)}</span>
+            </div>`;
+
+        if (!visual.fields || visual.fields.length === 0) {
+            html += '<p class="visual-card-empty">No data fields</p>';
+        } else {
+            const roleGroups = {};
+            for (const field of visual.fields) {
+                const role = this._normalizeRoleName(field.projectionName || 'Other');
+                if (!roleGroups[role]) roleGroups[role] = [];
+                roleGroups[role].push(field);
+            }
+
+            const roleOrder = ['Values', 'Category', 'Series', 'Filters', 'Tooltips', 'Other'];
+            html += '<div class="visual-field-roles">';
+            for (const role of roleOrder) {
+                const fields = roleGroups[role];
+                if (!fields || fields.length === 0) continue;
+
+                html += `<div class="visual-role-row">
+                    <span class="visual-role-label">${this._esc(role)}</span>
+                    <div class="visual-role-fields">`;
+
+                for (const field of fields) {
+                    const tableName = field.table || field.entity || '';
+                    const fieldName = field.name || field.column || field.hierarchy || '';
+                    html += `<button type="button" class="field-chip" data-role="${this._esc(role)}"
+                        data-table="${this._esc(tableName)}"
+                        data-field="${this._esc(fieldName)}">${this._esc(tableName)}[${this._esc(fieldName)}]</button>`;
+                }
+                html += '</div></div>';
+            }
+            html += '</div>';
+        }
+
+        html += '</div>';
+        return html;
+    }
+
+    _normalizeRoleName(projectionName) {
+        if (!projectionName) return 'Other';
+        const lower = projectionName.toLowerCase();
+        if (lower === 'values' || lower === 'y') return 'Values';
+        if (lower === 'category' || lower === 'x' || lower === 'axis' || lower === 'rows' || lower === 'columns') return 'Category';
+        if (lower === 'series' || lower === 'legend') return 'Series';
+        if (lower === 'filter' || lower === 'filters') return 'Filters';
+        if (lower === 'tooltips' || lower === 'tooltip') return 'Tooltips';
+        if (lower === 'sort' || lower === 'visualobjects') return 'Other';
+        return projectionName.charAt(0).toUpperCase() + projectionName.slice(1);
+    }
+
+    _bindFieldChips() {
+        document.querySelectorAll('.field-chip[data-table]').forEach(chip => {
+            chip.addEventListener('click', () => {
+                const tableName = chip.dataset.table;
+                if (tableName && this.parsedModel.tables.find(t => t.name === tableName)) {
+                    this.showTableDetail(tableName);
+                }
+            });
+        });
     }
 
     // ──────────────────────────────────────────────

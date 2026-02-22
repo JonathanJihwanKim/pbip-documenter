@@ -86,9 +86,10 @@
                 <div class="stat-value" id="statRelationships">0</div>
                 <div class="stat-label">Relationships</div>
             </div>
-            <div class="stat-card">
-                <div class="stat-value" id="statVisuals">0</div>
+            <div class="stat-card" id="statVisualsCard">
+                <div class="stat-value" id="statVisuals" aria-describedby="statVisualsHint">0</div>
                 <div class="stat-label">Visuals</div>
+                <div class="stat-hint" id="statVisualsHint"></div>
             </div>
         </div>
 
@@ -123,13 +124,24 @@
                         Model Overview
                     </div>
                 </div>
+                <div class="sidebar-section hidden" id="sidebarReportPagesSection">
+                    <div class="sidebar-header" data-section="report-pages">
+                        <span class="material-symbols-outlined">auto_stories</span>
+                        Report Pages
+                        <span class="sidebar-badge" id="sidebarPageCount">0</span>
+                    </div>
+                    <div id="sidebarPageList" class="sidebar-children"></div>
+                </div>
                 <div class="sidebar-section">
                     <div class="sidebar-header" data-section="tables">
                         <span class="material-symbols-outlined">table_chart</span>
                         Tables
                         <span class="sidebar-badge" id="sidebarTableCount">0</span>
+                        <button type="button" class="sidebar-chevron" aria-label="Toggle table list" aria-expanded="false" aria-controls="sidebarTableList">
+                            <span class="material-symbols-outlined">expand_more</span>
+                        </button>
                     </div>
-                    <div id="sidebarTableList"></div>
+                    <div id="sidebarTableList" class="sidebar-children"></div>
                 </div>
                 <div class="sidebar-section">
                     <div class="sidebar-header" data-section="measures">
@@ -174,6 +186,18 @@
                     <div id="overviewContent"></div>
                 </div>
 
+                <!-- Report Pages -->
+                <div id="view-report-pages" class="section-view content-panel">
+                    <h2>Report Pages</h2>
+                    <div id="reportPagesContent"></div>
+                </div>
+
+                <!-- Report Page Detail -->
+                <div id="view-report-page" class="section-view content-panel">
+                    <h2 id="reportPageName">Page</h2>
+                    <div id="reportPageContent"></div>
+                </div>
+
                 <!-- Tables Section -->
                 <div id="view-tables" class="section-view content-panel">
                     <h2>Table Inventory</h2>
@@ -195,13 +219,30 @@
                 <!-- Visual Usage -->
                 <div id="view-visual-usage" class="section-view content-panel">
                     <h2>Visual Usage Map</h2>
-                    <div id="visualUsageContent" class="diagram-container"></div>
+                    <div class="view-toggle" id="visualUsageToggle">
+                        <button type="button" class="view-toggle-btn active" data-view="by-visual">By Visual</button>
+                        <button type="button" class="view-toggle-btn" data-view="by-field">By Field</button>
+                    </div>
+                    <div id="visualUsageByVisual"></div>
+                    <div id="visualUsageByField" class="diagram-container hidden"></div>
                 </div>
 
                 <!-- Relationships -->
                 <div id="view-relationships" class="section-view content-panel">
                     <h2>Relationships</h2>
-                    <div id="relationshipsDiagram" class="diagram-container"></div>
+                    <div id="relationshipsDiagram" class="diagram-container diagram-interactive">
+                        <div class="diagram-controls" id="diagramControls">
+                            <button class="diagram-ctrl-btn" id="diagramZoomIn" title="Zoom In">
+                                <span class="material-symbols-outlined">add</span>
+                            </button>
+                            <button class="diagram-ctrl-btn" id="diagramZoomOut" title="Zoom Out">
+                                <span class="material-symbols-outlined">remove</span>
+                            </button>
+                            <button class="diagram-ctrl-btn" id="diagramZoomReset" title="Fit to View">
+                                <span class="material-symbols-outlined">fit_screen</span>
+                            </button>
+                        </div>
+                    </div>
                     <div id="relationshipsList"></div>
                 </div>
 
