@@ -25,6 +25,8 @@ class VisualParser {
                 id: page.pageId,
                 name: page.pageName || page.displayName || page.pageId,
                 displayName: page.displayName || page.pageName || page.pageId,
+                pageWidth: page.pageWidth || null,
+                pageHeight: page.pageHeight || null,
                 visuals: []
             };
 

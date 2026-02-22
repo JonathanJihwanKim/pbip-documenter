@@ -28,6 +28,7 @@ class App {
         // Bind events
         document.getElementById('openFolderBtn').addEventListener('click', () => this.openFolder());
         document.getElementById('changeFolderBtn').addEventListener('click', () => this.openFolder());
+        document.getElementById('downloadFullReport').addEventListener('click', () => this.downloadFullReport());
         document.getElementById('downloadMD').addEventListener('click', () => this.downloadMarkdown());
         document.getElementById('downloadHTML').addEventListener('click', () => this.downloadHTML());
         document.getElementById('downloadJSON').addEventListener('click', () => this.downloadJSON());
@@ -66,15 +67,15 @@ class App {
             });
 
             // Find SemanticModel and Report folders
-            await this.findPBIPStructure();
+            const result = await this.findPBIPStructure();
 
-            // Show folder info
-            document.getElementById('landingSection').classList.add('hidden');
-            document.getElementById('folderInfo').classList.remove('hidden');
-            document.getElementById('folderName').textContent = this.folderHandle.name;
-
-            // Parse the model
-            await this.parseModel();
+            if (result.needsDiscovery) {
+                // Multiple models/reports found — show discovery panel
+                this.showDiscoveryPanel(result.models, result.reports);
+            } else {
+                // Single model found — proceed directly
+                this._proceedAfterSelection();
+            }
 
         } catch (error) {
             if (error.name === 'AbortError') return; // User cancelled
@@ -90,39 +91,166 @@ class App {
         // Check if selected folder IS a .SemanticModel folder
         if (this.folderHandle.name.endsWith('.SemanticModel')) {
             this.semanticModelHandle = this.folderHandle;
-            return;
+            return { needsDiscovery: false };
         }
 
         // Check if selected folder contains definition/ directly (is a SemanticModel)
         try {
             await this.folderHandle.getDirectoryHandle('definition');
-            // Check for tables subfolder in definition
             const def = await this.folderHandle.getDirectoryHandle('definition');
             await def.getDirectoryHandle('tables');
             this.semanticModelHandle = this.folderHandle;
-            return;
+            return { needsDiscovery: false };
         } catch {
             // Not a direct semantic model folder, scan children
         }
 
-        // Scan for .SemanticModel and .Report subfolders
+        // Scan ALL children for .SemanticModel and .Report subfolders
+        const allModels = [];
+        const allReports = [];
+
         for await (const entry of this.folderHandle.values()) {
             if (entry.kind === 'directory') {
                 if (entry.name.endsWith('.SemanticModel')) {
-                    this.semanticModelHandle = entry;
+                    allModels.push(entry);
                 } else if (entry.name.endsWith('.Report')) {
-                    this.reportHandle = entry;
+                    allReports.push(entry);
                 }
             }
         }
 
-        if (!this.semanticModelHandle) {
+        if (allModels.length === 0) {
             throw new Error(
                 'No semantic model found.\n\n' +
                 'Please select a PBIP project folder containing a .SemanticModel subfolder,\n' +
                 'or select the .SemanticModel folder directly.'
             );
         }
+
+        // If exactly one model, auto-select it
+        if (allModels.length === 1) {
+            this.semanticModelHandle = allModels[0];
+            // Auto-select first matching report (or only report)
+            if (allReports.length === 1) {
+                this.reportHandle = allReports[0];
+            } else if (allReports.length > 1) {
+                // Try to match report to model by name prefix
+                const modelPrefix = allModels[0].name.replace('.SemanticModel', '');
+                const matched = allReports.find(r => r.name.startsWith(modelPrefix));
+                this.reportHandle = matched || allReports[0];
+            }
+            // If only one of each, no discovery needed
+            if (allReports.length <= 1) {
+                return { needsDiscovery: false };
+            }
+        }
+
+        // Multiple models or multiple reports — show discovery
+        return { needsDiscovery: true, models: allModels, reports: allReports };
+    }
+
+    showDiscoveryPanel(models, reports) {
+        document.getElementById('landingSection').classList.add('hidden');
+        document.getElementById('discoveryPanel').classList.remove('hidden');
+        document.getElementById('folderInfo').classList.add('hidden');
+
+        // Render model checkboxes
+        const modelList = document.getElementById('discoveryModelList');
+        modelList.innerHTML = '';
+        for (let i = 0; i < models.length; i++) {
+            const item = document.createElement('label');
+            item.className = 'discovery-item' + (i === 0 ? ' selected' : '');
+            item.innerHTML = `<input type="radio" name="discovery-model" value="${i}" ${i === 0 ? 'checked' : ''}>
+                <span class="discovery-item-name">${this._esc(models[i].name.replace('.SemanticModel', ''))}</span>
+                <span class="discovery-item-type">.SemanticModel</span>`;
+            item.querySelector('input').addEventListener('change', () => {
+                modelList.querySelectorAll('.discovery-item').forEach(el => el.classList.remove('selected'));
+                item.classList.add('selected');
+                this._updateDiscoveryReports(models, reports);
+            });
+            modelList.appendChild(item);
+        }
+
+        // Render report checkboxes
+        this._updateDiscoveryReports(models, reports);
+
+        // Bind continue button
+        const continueBtn = document.getElementById('discoveryContinueBtn');
+        const cancelBtn = document.getElementById('discoveryCancelBtn');
+
+        // Remove old listeners by replacing elements
+        const newContinueBtn = continueBtn.cloneNode(true);
+        continueBtn.parentNode.replaceChild(newContinueBtn, continueBtn);
+        const newCancelBtn = cancelBtn.cloneNode(true);
+        cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+
+        newContinueBtn.addEventListener('click', () => {
+            // Get selected model
+            const selectedModelIdx = modelList.querySelector('input:checked')?.value;
+            if (selectedModelIdx == null) {
+                this.showToast('Please select a semantic model', 'error');
+                return;
+            }
+            this.semanticModelHandle = models[parseInt(selectedModelIdx)];
+
+            // Get selected report(s)
+            const reportList = document.getElementById('discoveryReportList');
+            const checkedReports = reportList.querySelectorAll('input:checked');
+            if (checkedReports.length > 0) {
+                this.reportHandle = reports[parseInt(checkedReports[0].value)];
+            } else {
+                this.reportHandle = null;
+            }
+
+            document.getElementById('discoveryPanel').classList.add('hidden');
+            this._proceedAfterSelection();
+        });
+
+        newCancelBtn.addEventListener('click', () => {
+            document.getElementById('discoveryPanel').classList.add('hidden');
+            document.getElementById('landingSection').classList.remove('hidden');
+        });
+    }
+
+    _updateDiscoveryReports(models, reports) {
+        const modelList = document.getElementById('discoveryModelList');
+        const reportList = document.getElementById('discoveryReportList');
+        const reportHint = document.getElementById('discoveryReportHint');
+
+        const selectedModelIdx = parseInt(modelList.querySelector('input:checked')?.value || '0');
+        const selectedModel = models[selectedModelIdx];
+        const modelPrefix = selectedModel.name.replace('.SemanticModel', '');
+
+        reportList.innerHTML = '';
+
+        if (reports.length === 0) {
+            reportHint.textContent = 'No report folders found. Visual usage data will not be available.';
+            return;
+        }
+
+        reportHint.textContent = 'Select a report folder to include visual usage data.';
+
+        for (let i = 0; i < reports.length; i++) {
+            const report = reports[i];
+            const isMatch = report.name.startsWith(modelPrefix);
+            const item = document.createElement('label');
+            item.className = 'discovery-item' + (isMatch ? ' selected' : '');
+            item.innerHTML = `<input type="checkbox" name="discovery-report" value="${i}" ${isMatch ? 'checked' : ''}>
+                <span class="discovery-item-name">${this._esc(report.name.replace('.Report', ''))}</span>
+                <span class="discovery-item-type">.Report</span>`;
+            item.querySelector('input').addEventListener('change', (e) => {
+                item.classList.toggle('selected', e.target.checked);
+            });
+            reportList.appendChild(item);
+        }
+    }
+
+    _proceedAfterSelection() {
+        document.getElementById('landingSection').classList.add('hidden');
+        document.getElementById('discoveryPanel').classList.add('hidden');
+        document.getElementById('folderInfo').classList.remove('hidden');
+        document.getElementById('folderName').textContent = this.folderHandle.name;
+        this.parseModel();
     }
 
     // ──────────────────────────────────────────────
@@ -244,13 +372,17 @@ class App {
             let pageName = pageEntry.name;
             let displayName = pageEntry.name;
 
-            // Try reading page.json for display name
+            // Try reading page.json for display name and dimensions
+            let pageWidth = null;
+            let pageHeight = null;
             try {
                 const pageJsonHandle = await pageEntry.getFileHandle('page.json');
                 const pageContent = await this.readFile(pageJsonHandle);
                 const pageData = JSON.parse(pageContent);
                 displayName = pageData.displayName || pageData.name || pageEntry.name;
                 pageName = pageData.name || pageEntry.name;
+                pageWidth = pageData.width || null;
+                pageHeight = pageData.height || null;
             } catch {
                 // OK, use folder name
             }
@@ -283,6 +415,8 @@ class App {
                 pageId: pageEntry.name,
                 pageName,
                 displayName,
+                pageWidth,
+                pageHeight,
                 visuals
             });
         }
@@ -702,8 +836,15 @@ class App {
         });
 
         let html = '';
+
+        // Render page layout minimap if visuals have position data
+        const visualsWithPosition = page.visuals.filter(v => v.position && v.position.x != null);
+        if (visualsWithPosition.length > 0) {
+            html += this._renderPageLayoutDiagram(page, visualsWithPosition);
+        }
+
         if (page.visuals.length === 0) {
-            html = '<p class="placeholder"><span class="material-symbols-outlined">visibility_off</span>No visuals on this page.</p>';
+            html += '<p class="placeholder"><span class="material-symbols-outlined">visibility_off</span>No visuals on this page.</p>';
         } else {
             for (const visual of page.visuals) {
                 html += this._renderVisualCard(visual);
@@ -711,6 +852,7 @@ class App {
         }
         document.getElementById('reportPageContent').innerHTML = html;
         this._bindFieldChips();
+        this._bindLayoutDiagramInteractions();
     }
 
     renderVisualUsageView() {
@@ -782,6 +924,128 @@ class App {
         });
 
         this._bindFieldChips();
+    }
+
+    _renderPageLayoutDiagram(page, visualsWithPosition) {
+        const pageW = page.pageWidth || 1280;
+        const pageH = page.pageHeight || 720;
+
+        // Scale to fit max 700px wide
+        const maxWidth = 700;
+        const scale = Math.min(maxWidth / pageW, 1);
+        const svgW = Math.round(pageW * scale);
+        const svgH = Math.round(pageH * scale);
+
+        // Visual type color map
+        const typeColors = {
+            pivotTable: { fill: '#e3f2fd', stroke: '#1565c0' },
+            table: { fill: '#e3f2fd', stroke: '#1565c0' },
+            matrix: { fill: '#e3f2fd', stroke: '#1565c0' },
+            barChart: { fill: '#fff8e1', stroke: '#f57f17' },
+            columnChart: { fill: '#fff8e1', stroke: '#f57f17' },
+            clusteredBarChart: { fill: '#fff8e1', stroke: '#f57f17' },
+            clusteredColumnChart: { fill: '#fff8e1', stroke: '#f57f17' },
+            stackedBarChart: { fill: '#fff8e1', stroke: '#f57f17' },
+            stackedColumnChart: { fill: '#fff8e1', stroke: '#f57f17' },
+            lineChart: { fill: '#e8f5e9', stroke: '#2e7d32' },
+            areaChart: { fill: '#e8f5e9', stroke: '#2e7d32' },
+            lineClusteredColumnComboChart: { fill: '#e8f5e9', stroke: '#2e7d32' },
+            pieChart: { fill: '#fce4ec', stroke: '#c62828' },
+            donutChart: { fill: '#fce4ec', stroke: '#c62828' },
+            card: { fill: '#f3e5f5', stroke: '#6a1b9a' },
+            multiRowCard: { fill: '#f3e5f5', stroke: '#6a1b9a' },
+            slicer: { fill: '#e0f2f1', stroke: '#00695c' },
+            map: { fill: '#e8eaf6', stroke: '#283593' },
+            filledMap: { fill: '#e8eaf6', stroke: '#283593' },
+            shape: { fill: '#f5f5f5', stroke: '#9e9e9e' },
+            textbox: { fill: '#f5f5f5', stroke: '#9e9e9e' },
+            image: { fill: '#f5f5f5', stroke: '#9e9e9e' },
+            actionButton: { fill: '#f5f5f5', stroke: '#9e9e9e' }
+        };
+        const defaultColor = { fill: '#f5f5f5', stroke: '#757575' };
+
+        let rects = '';
+        for (let i = 0; i < visualsWithPosition.length; i++) {
+            const v = visualsWithPosition[i];
+            const pos = v.position;
+            const x = Math.round(pos.x * scale);
+            const y = Math.round(pos.y * scale);
+            const w = Math.round((pos.width || 100) * scale);
+            const h = Math.round((pos.height || 60) * scale);
+            const vName = v.visualName || v.visualType || 'visual';
+            const vType = v.visualType || 'unknown';
+            const colors = typeColors[vType] || defaultColor;
+
+            // Truncate label to fit
+            const maxChars = Math.max(3, Math.floor(w / 7));
+            const label = vName.length > maxChars ? vName.substring(0, maxChars - 1) + '...' : vName;
+
+            rects += `<g class="layout-visual-rect" data-visual-index="${i}" data-visual-name="${this._esc(vName)}">
+                <rect x="${x}" y="${y}" width="${w}" height="${h}"
+                    rx="3" ry="3"
+                    fill="${colors.fill}" stroke="${colors.stroke}" stroke-width="1.5"
+                    opacity="0.85"/>
+                <text x="${x + w / 2}" y="${y + h / 2 + 4}" text-anchor="middle"
+                    font-size="10" font-family="Inter, sans-serif" fill="${colors.stroke}"
+                    pointer-events="none">${this._esc(label)}</text>
+            </g>`;
+        }
+
+        return `<div class="page-layout-diagram">
+            <div class="page-layout-header">
+                <span class="material-symbols-outlined" style="font-size:16px">grid_view</span>
+                Page Layout
+                <span class="page-layout-dims">${pageW} x ${pageH}</span>
+            </div>
+            <svg width="${svgW}" height="${svgH}" viewBox="0 0 ${svgW} ${svgH}" xmlns="http://www.w3.org/2000/svg">
+                <rect width="${svgW}" height="${svgH}" fill="#f8f8f8" stroke="#d0ccc4" stroke-width="1" rx="2"/>
+                ${rects}
+            </svg>
+            <div class="page-layout-tooltip" id="layoutTooltip" style="display:none"></div>
+        </div>`;
+    }
+
+    _bindLayoutDiagramInteractions() {
+        document.querySelectorAll('.layout-visual-rect').forEach(g => {
+            const visualName = g.dataset.visualName;
+
+            g.addEventListener('mouseenter', () => {
+                const rect = g.querySelector('rect');
+                rect.setAttribute('opacity', '1');
+                rect.setAttribute('stroke-width', '2.5');
+
+                // Show tooltip
+                const tooltip = document.getElementById('layoutTooltip');
+                if (tooltip) {
+                    tooltip.textContent = visualName;
+                    tooltip.style.display = 'block';
+                }
+            });
+
+            g.addEventListener('mouseleave', () => {
+                const rect = g.querySelector('rect');
+                rect.setAttribute('opacity', '0.85');
+                rect.setAttribute('stroke-width', '1.5');
+
+                const tooltip = document.getElementById('layoutTooltip');
+                if (tooltip) tooltip.style.display = 'none';
+            });
+
+            // Click to scroll to corresponding visual card
+            g.addEventListener('click', () => {
+                const cards = document.querySelectorAll('.visual-card');
+                for (const card of cards) {
+                    const h4 = card.querySelector('h4');
+                    if (h4 && h4.textContent.trim() === visualName) {
+                        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        card.style.transition = 'box-shadow 0.3s ease';
+                        card.style.boxShadow = '0 0 0 3px var(--accent)';
+                        setTimeout(() => { card.style.boxShadow = ''; }, 2000);
+                        break;
+                    }
+                }
+            });
+        });
     }
 
     _renderVisualCard(visual) {
@@ -944,6 +1208,17 @@ class App {
         const name = (this.parsedModel.database?.name || 'model') + '-relationships.svg';
         this._downloadFile(svgStr, name, 'image/svg+xml');
         this.showToast('SVG diagram downloaded');
+    }
+
+    downloadFullReport() {
+        if (!this.docGenerator) return;
+        const html = this.docGenerator.generateFullReport(
+            this.visualData,
+            this.diagramRenderer
+        );
+        const name = (this.parsedModel.database?.name || 'model') + '-full-report.html';
+        this._downloadFile(html, name, 'text/html');
+        this.showToast('Full report downloaded');
     }
 
     _downloadFile(content, filename, mimeType) {

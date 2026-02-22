@@ -57,6 +57,39 @@
             </p>
         </div>
 
+        <!-- Discovery Panel (shown when multiple models/reports found) -->
+        <div id="discoveryPanel" class="content-panel discovery-panel hidden">
+            <h2>Select Items to Document</h2>
+            <p class="discovery-hint">We found multiple items in your project folder. Select which semantic models and reports to include.</p>
+
+            <div id="discoveryModels" class="discovery-group">
+                <h3>
+                    <span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle">database</span>
+                    Semantic Models
+                </h3>
+                <div id="discoveryModelList" class="discovery-list"></div>
+            </div>
+
+            <div id="discoveryReports" class="discovery-group">
+                <h3>
+                    <span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle">auto_stories</span>
+                    Reports
+                </h3>
+                <p class="discovery-report-hint" id="discoveryReportHint"></p>
+                <div id="discoveryReportList" class="discovery-list"></div>
+            </div>
+
+            <div class="discovery-actions">
+                <button id="discoveryContinueBtn" class="btn-open-folder">
+                    <span class="material-symbols-outlined">arrow_forward</span>
+                    Continue
+                </button>
+                <button id="discoveryCancelBtn" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:13px;margin-left:12px">
+                    Cancel
+                </button>
+            </div>
+        </div>
+
         <!-- Folder Info (shown after selection) -->
         <div id="folderInfo" class="folder-info hidden">
             <span class="material-symbols-outlined">folder</span>
@@ -95,23 +128,36 @@
 
         <!-- Download Bar -->
         <div id="downloadBar" class="download-bar hidden">
-            <span class="label">Export:</span>
-            <button id="downloadMD" class="btn-download">
-                <span class="material-symbols-outlined" style="font-size:18px">description</span>
-                Markdown (.md)
-            </button>
-            <button id="downloadHTML" class="btn-download btn-secondary">
-                <span class="material-symbols-outlined" style="font-size:18px">code</span>
-                HTML (.html)
-            </button>
-            <button id="downloadJSON" class="btn-download btn-secondary">
-                <span class="material-symbols-outlined" style="font-size:18px">data_object</span>
-                JSON (.json)
-            </button>
-            <button id="downloadSVG" class="btn-download btn-secondary" title="Export current diagram as SVG">
-                <span class="material-symbols-outlined" style="font-size:18px">image</span>
-                Diagram (.svg)
-            </button>
+            <div class="download-bar-header">
+                <span class="label">Export Documentation</span>
+            </div>
+            <div class="download-bar-grid">
+                <button id="downloadFullReport" class="btn-download btn-download-card btn-download-featured">
+                    <span class="material-symbols-outlined btn-download-icon">auto_awesome</span>
+                    <span class="btn-download-label">Full Report (.html)</span>
+                    <span class="btn-download-desc">Everything in one file: model docs, relationships, page layouts, visual usage</span>
+                </button>
+                <button id="downloadMD" class="btn-download btn-download-card">
+                    <span class="material-symbols-outlined btn-download-icon">description</span>
+                    <span class="btn-download-label">Markdown (.md)</span>
+                    <span class="btn-download-desc">Tables, measures, relationships, visual usage. Great for Git repos</span>
+                </button>
+                <button id="downloadHTML" class="btn-download btn-download-card">
+                    <span class="material-symbols-outlined btn-download-icon">code</span>
+                    <span class="btn-download-label">HTML (.html)</span>
+                    <span class="btn-download-desc">Styled documentation with DAX highlighting. Print-ready</span>
+                </button>
+                <button id="downloadJSON" class="btn-download btn-download-card">
+                    <span class="material-symbols-outlined btn-download-icon">data_object</span>
+                    <span class="btn-download-label">JSON (.json)</span>
+                    <span class="btn-download-desc">Machine-readable structured data for automation and tooling</span>
+                </button>
+                <button id="downloadSVG" class="btn-download btn-download-card">
+                    <span class="material-symbols-outlined btn-download-icon">image</span>
+                    <span class="btn-download-label">Diagram (.svg)</span>
+                    <span class="btn-download-desc">Relationship diagram as SVG image. Embed in docs or presentations</span>
+                </button>
+            </div>
         </div>
 
         <!-- Main App Body (sidebar + content) -->
@@ -328,7 +374,7 @@
             setTimeout(function() { toast.classList.add('hidden'); }, 30000);
         }
         // Hook into download buttons
-        ['downloadMD', 'downloadHTML', 'downloadJSON'].forEach(function(id) {
+        ['downloadFullReport', 'downloadMD', 'downloadHTML', 'downloadJSON'].forEach(function(id) {
             const btn = document.getElementById(id);
             if (btn) {
                 btn.addEventListener('click', function() {

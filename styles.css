@@ -329,6 +329,91 @@ body {
     color: #2e7d32;
 }
 
+/* ── DISCOVERY PANEL ── */
+.discovery-panel {
+    max-width: 700px;
+    margin: 0 auto 20px;
+}
+
+.discovery-panel h2 {
+    border-bottom: none;
+    text-align: center;
+}
+
+.discovery-hint {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 14px;
+    margin-bottom: 24px;
+}
+
+.discovery-group {
+    margin-bottom: 20px;
+}
+
+.discovery-group h3 {
+    margin-bottom: 10px;
+}
+
+.discovery-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.discovery-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: var(--bg-light);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all var(--transition);
+}
+
+.discovery-item:hover {
+    border-color: var(--primary);
+    background: #e8eaf6;
+}
+
+.discovery-item.selected {
+    border-color: var(--primary);
+    background: #e8eaf6;
+}
+
+.discovery-item input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--primary);
+}
+
+.discovery-item-name {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--primary);
+}
+
+.discovery-item-type {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-left: auto;
+}
+
+.discovery-report-hint {
+    font-size: 12px;
+    color: var(--text-light);
+    margin-bottom: 8px;
+}
+
+.discovery-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 24px;
+}
+
 /* ── STATS BAR ── */
 .stats-bar {
     display: grid;
@@ -461,42 +546,43 @@ tr:hover {
 
 /* ── DOWNLOAD BAR ── */
 .download-bar {
-    display: flex;
-    gap: 12px;
-    padding: 16px 24px;
+    padding: 20px 24px;
     background: var(--card-bg);
     border: 2px solid var(--border);
     border-top: 4px solid var(--accent);
     border-radius: var(--radius);
     margin-bottom: 20px;
-    flex-wrap: wrap;
-    align-items: center;
+}
+
+.download-bar-header {
+    margin-bottom: 14px;
 }
 
 .download-bar .label {
     font-weight: 700;
     color: var(--primary);
     font-size: 14px;
-    margin-right: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.download-bar-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
 }
 
 .btn-download {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 16px;
-    font-size: 13px;
-    font-weight: 600;
-    background: var(--primary);
-    color: #ffffff;
     border: none;
     border-radius: var(--radius);
     cursor: pointer;
     transition: all var(--transition);
+    font-family: inherit;
 }
 
 .btn-download:hover {
-    background: var(--primary-light);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-hover);
 }
 
 .btn-download:disabled {
@@ -504,14 +590,66 @@ tr:hover {
     cursor: not-allowed;
 }
 
-.btn-download.btn-secondary {
-    background: var(--bg);
-    color: var(--primary);
-    border: 2px solid var(--primary);
+.btn-download-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 14px 16px;
+    background: var(--bg-light);
+    border: 2px solid var(--border);
+    text-align: left;
 }
 
-.btn-download.btn-secondary:hover {
+.btn-download-card:hover {
+    border-color: var(--primary);
     background: #e8eaf6;
+}
+
+.btn-download-featured {
+    grid-column: 1 / -1;
+    background: var(--primary);
+    color: #ffffff;
+    border-color: var(--primary);
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-download-featured:hover {
+    background: var(--primary-light);
+    border-color: var(--primary-light);
+}
+
+.btn-download-featured .btn-download-desc {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.btn-download-featured .btn-download-label {
+    color: #ffffff;
+}
+
+.btn-download-icon {
+    font-size: 18px;
+    color: var(--primary);
+}
+
+.btn-download-featured .btn-download-icon {
+    color: var(--accent);
+}
+
+.btn-download-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--primary);
+}
+
+.btn-download-desc {
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-weight: 400;
+    line-height: 1.4;
 }
 
 /* ── DIAGRAM CONTAINER ── */
@@ -748,6 +886,65 @@ tr:hover {
 
 .view-toggle-btn:hover:not(.active) {
     background: #e8eaf6;
+}
+
+/* ── PAGE LAYOUT DIAGRAM ── */
+.page-layout-diagram {
+    background: var(--card-bg);
+    border: 2px solid var(--border);
+    border-top: 3px solid var(--accent);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 20px;
+    position: relative;
+}
+
+.page-layout-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--primary);
+    margin-bottom: 12px;
+}
+
+.page-layout-dims {
+    margin-left: auto;
+    font-weight: 400;
+    color: var(--text-light);
+    font-size: 11px;
+    text-transform: none;
+}
+
+.page-layout-diagram svg {
+    display: block;
+    max-width: 100%;
+    height: auto;
+}
+
+.layout-visual-rect {
+    cursor: pointer;
+}
+
+.layout-visual-rect:hover rect {
+    filter: brightness(0.95);
+}
+
+.page-layout-tooltip {
+    position: absolute;
+    background: var(--primary);
+    color: #fff;
+    padding: 4px 10px;
+    border-radius: var(--radius);
+    font-size: 12px;
+    pointer-events: none;
+    white-space: nowrap;
+    bottom: 8px;
+    left: 16px;
+    z-index: 5;
 }
 
 /* ── VISUAL CARD ── */
@@ -1010,8 +1207,8 @@ tr:hover {
         justify-content: center;
     }
 
-    .download-bar {
-        flex-direction: column;
+    .download-bar-grid {
+        grid-template-columns: 1fr;
     }
 
     .stats-bar {

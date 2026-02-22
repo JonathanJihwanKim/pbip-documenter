@@ -709,6 +709,559 @@ blockquote {
     }
 
     // ──────────────────────────────────────────────
+    // FULL REPORT (comprehensive HTML)
+    // ──────────────────────────────────────────────
+
+    generateFullReport(visualData, diagramRenderer) {
+        const modelName = this.model.database?.name || this.model.model?.name || 'Semantic Model';
+        const totalMeasures = this.model.tables.reduce((sum, t) => sum + t.measures.length, 0);
+        const totalColumns = this.model.tables.reduce((sum, t) => sum + t.columns.length, 0);
+
+        // Get relationship diagram SVG
+        let relDiagramSVG = '';
+        if (diagramRenderer) {
+            relDiagramSVG = diagramRenderer.exportSVG() || '';
+        }
+
+        let html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${this._escHtml(modelName)} — Full Report</title>
+<style>
+:root {
+    --primary: #1a3a5c;
+    --accent: #c89632;
+    --bg: #fafaf8;
+    --card-bg: #ffffff;
+    --border: #e0dcd4;
+    --text: #2c2c2c;
+    --text-secondary: #666;
+    --code-bg: #f5f2ed;
+    --measure-bg: #fff8e1;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 40px 24px;
+}
+h1 { color: var(--primary); font-size: 28px; margin-bottom: 8px; }
+h2 {
+    color: var(--primary);
+    font-size: 22px;
+    margin: 40px 0 16px;
+    padding-bottom: 8px;
+    border-bottom: 3px solid var(--accent);
+}
+h3 { color: var(--primary); font-size: 18px; margin: 24px 0 12px; }
+h4 { color: var(--text); font-size: 15px; margin: 16px 0 8px; }
+h5 { color: var(--text-secondary); font-size: 14px; margin: 12px 0 6px; }
+.subtitle { color: var(--text-secondary); margin-bottom: 32px; font-size: 14px; }
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 24px;
+    font-size: 14px;
+}
+th {
+    background: var(--primary);
+    color: white;
+    text-align: left;
+    padding: 10px 12px;
+    font-weight: 600;
+}
+td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+}
+tr:nth-child(even) { background: #f8f6f2; }
+tr:hover { background: #f0ebe3; }
+.dax-block {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--accent);
+    padding: 12px 16px;
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 8px 0 16px;
+    border-radius: 4px;
+}
+.measure-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin: 12px 0;
+}
+.measure-card h5 {
+    margin: 0 0 8px;
+    color: var(--primary);
+    font-size: 15px;
+}
+.measure-meta {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+.badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+}
+.badge-column { background: #e3f2fd; color: #1565c0; }
+.badge-measure { background: var(--measure-bg); color: #f57f17; }
+.badge-hidden { background: #fce4ec; color: #c62828; }
+.badge-active { background: #e8f5e9; color: #2e7d32; }
+.badge-inactive { background: #fce4ec; color: #c62828; }
+.badge-visual-type {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    background: #f3e5f5;
+    color: #6a1b9a;
+}
+.ref-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 4px 0;
+}
+.ref-tag {
+    background: #e8eaf6;
+    color: #283593;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-family: monospace;
+}
+.visual-usage {
+    background: #f3e5f5;
+    border-radius: 4px;
+    padding: 8px 12px;
+    margin: 4px 0;
+    font-size: 13px;
+}
+.visual-usage strong { color: #6a1b9a; }
+blockquote {
+    border-left: 4px solid var(--accent);
+    padding: 8px 16px;
+    margin: 8px 0;
+    background: #fffde7;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+.toc { columns: 2; margin: 0 0 32px; }
+.toc a {
+    color: var(--primary);
+    text-decoration: none;
+    display: block;
+    padding: 2px 0;
+}
+.toc a:hover { text-decoration: underline; }
+.overview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin: 16px 0;
+}
+.stat-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    text-align: center;
+}
+.stat-card .stat-value {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--primary);
+}
+.stat-card .stat-label {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+.rel-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin: 6px 0;
+    font-size: 14px;
+}
+.rel-arrow { color: var(--accent); font-weight: 700; font-size: 18px; }
+.page-layout-section {
+    background: #f8f8f8;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin: 16px 0;
+}
+.page-layout-section svg { max-width: 100%; height: auto; }
+.visual-card-report {
+    background: var(--card-bg);
+    border: 1px solid #ce93d8;
+    border-left: 4px solid #9c27b0;
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin: 8px 0;
+}
+.visual-card-report h5 { color: var(--primary); margin: 0 0 6px; }
+.field-chip-report {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    margin: 1px;
+}
+.field-chip-report.values { background: #fff8e1; color: #f57f17; }
+.field-chip-report.category { background: #e3f2fd; color: #1565c0; }
+.field-chip-report.series { background: #e8f5e9; color: #2e7d32; }
+.field-chip-report.filters { background: #fce4ec; color: #c62828; }
+.field-chip-report.other { background: #f5f5f5; color: var(--text-secondary); }
+.footer {
+    margin-top: 48px;
+    padding-top: 16px;
+    border-top: 2px solid var(--border);
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+.footer a { color: var(--primary); }
+.dax-keyword { color: #0000ff; font-weight: 600; }
+.dax-function { color: #795548; }
+.dax-string { color: #b71c1c; }
+.dax-comment { color: #388e3c; font-style: italic; }
+.dax-number { color: #e65100; }
+.dax-ref { color: #1565c0; }
+@media print {
+    body { max-width: 100%; padding: 20px; }
+    h2 { page-break-before: always; }
+    .measure-card, .visual-card-report { page-break-inside: avoid; }
+}
+@media (max-width: 768px) {
+    .toc { columns: 1; }
+    .overview-grid { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
+</head>
+<body>
+<h1>${this._escHtml(modelName)} — Full Report</h1>
+<p class="subtitle">Comprehensive documentation generated on ${new Date().toLocaleDateString()}</p>
+`;
+
+        // Table of Contents
+        html += `<h2>Table of Contents</h2><div class="toc">
+<a href="#model-overview">Model Overview</a>`;
+        if (relDiagramSVG) html += `<a href="#relationship-diagram">Relationship Diagram</a>`;
+        html += `<a href="#table-inventory">Table Inventory</a>`;
+        for (const table of this.model.tables) {
+            html += `<a href="#${this._anchor(table.name)}">&nbsp;&nbsp;${this._escHtml(table.name)}</a>`;
+        }
+        html += `<a href="#measure-catalog">Measure Catalog</a>
+<a href="#relationships">Relationships</a>`;
+        if (this.model.roles.length > 0) html += `<a href="#roles">Roles</a>`;
+        if (this.model.expressions.length > 0) html += `<a href="#expressions">Expressions</a>`;
+        if (visualData && visualData.pages.length > 0) {
+            html += `<a href="#report-pages">Report Pages &amp; Visual Layout</a>`;
+            for (const page of visualData.pages) {
+                html += `<a href="#page-${this._anchor(page.displayName)}">&nbsp;&nbsp;${this._escHtml(page.displayName)}</a>`;
+            }
+        }
+        if (Object.keys(this.visualUsage).length > 0) html += `<a href="#visual-usage">Visual Usage</a>`;
+        html += `</div>`;
+
+        // Model Overview
+        html += `<h2 id="model-overview">Model Overview</h2>
+<div class="overview-grid">
+    <div class="stat-card"><div class="stat-value">${this.model.tables.length}</div><div class="stat-label">Tables</div></div>
+    <div class="stat-card"><div class="stat-value">${totalColumns}</div><div class="stat-label">Columns</div></div>
+    <div class="stat-card"><div class="stat-value">${totalMeasures}</div><div class="stat-label">Measures</div></div>
+    <div class="stat-card"><div class="stat-value">${this.model.relationships.length}</div><div class="stat-label">Relationships</div></div>`;
+        if (visualData) {
+            html += `<div class="stat-card"><div class="stat-value">${visualData.pages.length}</div><div class="stat-label">Pages</div></div>
+    <div class="stat-card"><div class="stat-value">${visualData.visuals.length}</div><div class="stat-label">Visuals</div></div>`;
+        }
+        html += `</div>
+<table>
+<tr><th>Property</th><th>Value</th></tr>`;
+        if (this.model.database?.name) html += `<tr><td>Database</td><td>${this._escHtml(this.model.database.name)}</td></tr>`;
+        if (this.model.database?.compatibilityLevel) html += `<tr><td>Compatibility Level</td><td>${this.model.database.compatibilityLevel}</td></tr>`;
+        if (this.model.model?.culture) html += `<tr><td>Culture</td><td>${this.model.model.culture}</td></tr>`;
+        html += `</table>`;
+
+        // Relationship Diagram (embedded SVG)
+        if (relDiagramSVG) {
+            html += `<h2 id="relationship-diagram">Relationship Diagram</h2>
+<div style="overflow-x:auto;margin:16px 0">${relDiagramSVG}</div>`;
+        }
+
+        // Table Inventory (same as regular HTML export)
+        html += `<h2 id="table-inventory">Table Inventory</h2>`;
+
+        for (const table of this.model.tables) {
+            html += `<h3 id="${this._anchor(table.name)}">${this._escHtml(table.name)}`;
+            if (table.isHidden) html += ` <span class="badge badge-hidden">Hidden</span>`;
+            html += `</h3>`;
+
+            if (table.description) {
+                html += `<blockquote>${this._escHtml(table.description)}</blockquote>`;
+            }
+
+            if (table.columns.length > 0) {
+                html += `<h4>Columns (${table.columns.length})</h4>
+<table><tr><th>Column</th><th>Data Type</th><th>Description</th><th>Format</th><th>Status</th></tr>`;
+                for (const col of table.columns) {
+                    html += `<tr>
+    <td>${this._escHtml(col.name)}</td>
+    <td>${col.dataType || ''}</td>
+    <td>${this._escHtml(col.description || '')}</td>
+    <td>${this._escHtml(col.formatString || '')}</td>
+    <td>${col.isHidden ? '<span class="badge badge-hidden">Hidden</span>' : ''}</td>
+</tr>`;
+                }
+                html += `</table>`;
+            }
+
+            if (table.measures.length > 0) {
+                html += `<h4>Measures (${table.measures.length})</h4>`;
+                for (const measure of table.measures) {
+                    html += `<div class="measure-card">
+    <h5>${this._escHtml(measure.name)}</h5>`;
+                    if (measure.description) html += `<blockquote>${this._escHtml(measure.description)}</blockquote>`;
+                    html += `<div class="measure-meta">`;
+                    if (measure.displayFolder) html += `<span>Folder: ${this._escHtml(measure.displayFolder)}</span>`;
+                    if (measure.formatString) html += `<span>Format: ${this._escHtml(measure.formatString)}</span>`;
+                    html += `</div>`;
+                    if (measure.expression) {
+                        html += `<div class="dax-block">${this._highlightDAX(measure.expression)}</div>`;
+                    }
+                    const refs = this.measureRefs[measure.name];
+                    if (refs) {
+                        if (refs.columnRefs.length > 0) {
+                            html += `<div class="ref-list"><strong>Columns:&nbsp;</strong>`;
+                            for (const r of refs.columnRefs) html += `<span class="ref-tag">${this._escHtml(r.table)}[${this._escHtml(r.column)}]</span>`;
+                            html += `</div>`;
+                        }
+                        if (refs.measureRefs.length > 0) {
+                            html += `<div class="ref-list"><strong>Measures:&nbsp;</strong>`;
+                            for (const r of refs.measureRefs) html += `<span class="ref-tag badge-measure">[${this._escHtml(r)}]</span>`;
+                            html += `</div>`;
+                        }
+                    }
+                    const usageKey = `measure|${table.name}|${measure.name}`;
+                    const usage = this.visualUsage[usageKey];
+                    if (usage && usage.length > 0) {
+                        html += `<div class="visual-usage"><strong>Used in:</strong> `;
+                        const byPage = this._groupByPage(usage);
+                        const parts = [];
+                        for (const [page, visuals] of Object.entries(byPage)) {
+                            parts.push(`<em>${this._escHtml(page)}</em>: ${visuals.map(v => this._escHtml(v.visualName)).join(', ')}`);
+                        }
+                        html += parts.join(' | ') + `</div>`;
+                    }
+                    html += `</div>`;
+                }
+            }
+        }
+
+        // Measure Catalog
+        html += `<h2 id="measure-catalog">Measure Catalog</h2>
+<table><tr><th>#</th><th>Measure</th><th>Table</th><th>Display Folder</th><th>Format</th><th>Description</th></tr>`;
+        let num = 0;
+        for (const table of this.model.tables) {
+            for (const m of table.measures) {
+                num++;
+                html += `<tr><td>${num}</td><td>${this._escHtml(m.name)}</td><td>${this._escHtml(table.name)}</td><td>${this._escHtml(m.displayFolder || '')}</td><td>${this._escHtml(m.formatString || '')}</td><td>${this._escHtml(m.description || '')}</td></tr>`;
+            }
+        }
+        html += `</table>`;
+
+        // Relationships
+        html += `<h2 id="relationships">Relationships</h2>`;
+        if (this.model.relationships.length > 0) {
+            for (const r of this.model.relationships) {
+                const statusBadge = r.isActive
+                    ? '<span class="badge badge-active">Active</span>'
+                    : '<span class="badge badge-inactive">Inactive</span>';
+                html += `<div class="rel-card">
+    <span>${this._escHtml(r.fromTable)}[${this._escHtml(r.fromColumn)}]</span>
+    <span class="rel-arrow">&rarr;</span>
+    <span>${this._escHtml(r.toTable)}[${this._escHtml(r.toColumn)}]</span>
+    <span class="badge">${this._formatCardinality(r)}</span>
+    ${statusBadge}
+</div>`;
+            }
+        } else {
+            html += `<p><em>No relationships defined.</em></p>`;
+        }
+
+        // Roles
+        if (this.model.roles.length > 0) {
+            html += `<h2 id="roles">Roles</h2>`;
+            for (const role of this.model.roles) {
+                html += `<h3>${this._escHtml(role.name)}</h3>`;
+                if (role.modelPermission) html += `<p><strong>Permission:</strong> ${role.modelPermission}</p>`;
+                if (role.tablePermissions.length > 0) {
+                    html += `<table><tr><th>Table</th><th>Filter Expression</th></tr>`;
+                    for (const tp of role.tablePermissions) {
+                        html += `<tr><td>${this._escHtml(tp.table)}</td><td><code>${this._escHtml(tp.filterExpression || '')}</code></td></tr>`;
+                    }
+                    html += `</table>`;
+                }
+            }
+        }
+
+        // Expressions
+        if (this.model.expressions.length > 0) {
+            html += `<h2 id="expressions">Expressions</h2>`;
+            for (const expr of this.model.expressions) {
+                html += `<h3>${this._escHtml(expr.name)}</h3>`;
+                if (expr.kind) html += `<p><strong>Kind:</strong> ${expr.kind}</p>`;
+                if (expr.expression) html += `<div class="dax-block">${this._escHtml(expr.expression)}</div>`;
+            }
+        }
+
+        // Report Pages with Layout Diagrams
+        if (visualData && visualData.pages.length > 0) {
+            html += `<h2 id="report-pages">Report Pages &amp; Visual Layout</h2>`;
+
+            for (const page of visualData.pages) {
+                html += `<h3 id="page-${this._anchor(page.displayName)}">${this._escHtml(page.displayName)} <span style="font-weight:400;font-size:14px;color:var(--text-secondary)">(${page.visuals.length} visuals)</span></h3>`;
+
+                // Page layout diagram
+                const visualsWithPos = page.visuals.filter(v => v.position && v.position.x != null);
+                if (visualsWithPos.length > 0) {
+                    const pw = page.pageWidth || 1280;
+                    const ph = page.pageHeight || 720;
+                    const scale = Math.min(600 / pw, 1);
+                    const svgW = Math.round(pw * scale);
+                    const svgH = Math.round(ph * scale);
+
+                    const typeColors = {
+                        pivotTable: '#1565c0', table: '#1565c0', matrix: '#1565c0',
+                        barChart: '#f57f17', columnChart: '#f57f17', clusteredBarChart: '#f57f17',
+                        clusteredColumnChart: '#f57f17', stackedBarChart: '#f57f17', stackedColumnChart: '#f57f17',
+                        lineChart: '#2e7d32', areaChart: '#2e7d32', lineClusteredColumnComboChart: '#2e7d32',
+                        pieChart: '#c62828', donutChart: '#c62828',
+                        card: '#6a1b9a', multiRowCard: '#6a1b9a',
+                        slicer: '#00695c', map: '#283593', filledMap: '#283593'
+                    };
+
+                    let rects = '';
+                    for (const v of visualsWithPos) {
+                        const p = v.position;
+                        const x = Math.round(p.x * scale);
+                        const y = Math.round(p.y * scale);
+                        const w = Math.round((p.width || 100) * scale);
+                        const h = Math.round((p.height || 60) * scale);
+                        const color = typeColors[v.visualType] || '#757575';
+                        const maxChars = Math.max(3, Math.floor(w / 7));
+                        const label = (v.visualName || v.visualType || '').substring(0, maxChars);
+
+                        rects += `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2" fill="${color}" fill-opacity="0.12" stroke="${color}" stroke-width="1"/>
+<text x="${x + w / 2}" y="${y + h / 2 + 3}" text-anchor="middle" font-size="9" font-family="Segoe UI, sans-serif" fill="${color}">${this._escHtml(label)}</text>`;
+                    }
+
+                    html += `<div class="page-layout-section">
+<svg width="${svgW}" height="${svgH}" viewBox="0 0 ${svgW} ${svgH}" xmlns="http://www.w3.org/2000/svg">
+<rect width="${svgW}" height="${svgH}" fill="#f8f8f8" stroke="#ddd" stroke-width="1" rx="2"/>
+${rects}
+</svg>
+</div>`;
+                }
+
+                // Visual details
+                for (const visual of page.visuals) {
+                    const vName = visual.visualName || visual.visualType || 'Visual';
+                    html += `<div class="visual-card-report">
+<h5>${this._escHtml(vName)} <span class="badge-visual-type">${this._escHtml(visual.visualType || 'unknown')}</span></h5>`;
+
+                    if (visual.fields && visual.fields.length > 0) {
+                        const roleGroups = {};
+                        for (const f of visual.fields) {
+                            const role = this._normalizeRoleForReport(f.projectionName);
+                            if (!roleGroups[role]) roleGroups[role] = [];
+                            roleGroups[role].push(f);
+                        }
+                        for (const [role, fields] of Object.entries(roleGroups)) {
+                            const cssClass = role.toLowerCase().replace(/\s+/g, '');
+                            html += `<div style="margin:3px 0"><strong style="font-size:11px;color:var(--text-secondary);text-transform:uppercase">${this._escHtml(role)}:</strong> `;
+                            for (const f of fields) {
+                                const t = f.table || f.entity || '';
+                                const n = f.name || f.column || f.hierarchy || '';
+                                html += `<span class="field-chip-report ${cssClass}">${this._escHtml(t)}[${this._escHtml(n)}]</span> `;
+                            }
+                            html += `</div>`;
+                        }
+                    } else {
+                        html += `<p style="font-size:12px;color:var(--text-secondary);font-style:italic">No data fields</p>`;
+                    }
+
+                    if (visual.position && visual.position.x != null) {
+                        html += `<p style="font-size:11px;color:var(--text-secondary);margin-top:4px">Position: x:${visual.position.x}, y:${visual.position.y}, ${visual.position.width || '?'}x${visual.position.height || '?'}</p>`;
+                    }
+
+                    html += `</div>`;
+                }
+            }
+        }
+
+        // Visual Usage Summary
+        if (Object.keys(this.visualUsage).length > 0) {
+            html += `<h2 id="visual-usage">Visual Usage Summary</h2>
+<table><tr><th>Field</th><th>Type</th><th>Table</th><th>Used In</th></tr>`;
+            for (const [key, usages] of Object.entries(this.visualUsage)) {
+                const [type, table, field] = key.split('|');
+                const visualList = usages.map(u => `${this._escHtml(u.pageName)}: ${this._escHtml(u.visualName)}`).join('; ');
+                html += `<tr><td>${this._escHtml(field)}</td><td>${type}</td><td>${this._escHtml(table)}</td><td>${visualList}</td></tr>`;
+            }
+            html += `</table>`;
+        }
+
+        // Footer
+        html += `<div class="footer">
+    <p>Generated with <a href="https://github.com/JonathanJihwanKim/pbip-documenter" target="_blank">pbip-documenter</a> — free, open-source TMDL documentation.</p>
+    <p><a href="https://github.com/JonathanJihwanKim/pbip-impact-analyzer" target="_blank">PBIP Impact Analyzer</a> | <a href="https://jonathanjihwankim.github.io/isHiddenInViewMode/" target="_blank">PBIR Visual Manager</a></p>
+</div>
+</body>
+</html>`;
+
+        return html;
+    }
+
+    _normalizeRoleForReport(projectionName) {
+        if (!projectionName) return 'Other';
+        const lower = projectionName.toLowerCase();
+        if (lower === 'values' || lower === 'y') return 'Values';
+        if (lower === 'category' || lower === 'x' || lower === 'axis' || lower === 'rows' || lower === 'columns') return 'Category';
+        if (lower === 'series' || lower === 'legend') return 'Series';
+        if (lower === 'filter' || lower === 'filters') return 'Filters';
+        if (lower === 'tooltips' || lower === 'tooltip') return 'Tooltips';
+        if (lower === 'sort' || lower === 'visualobjects') return 'Other';
+        return projectionName.charAt(0).toUpperCase() + projectionName.slice(1);
+    }
+
+    // ──────────────────────────────────────────────
     // JSON
     // ──────────────────────────────────────────────
 
