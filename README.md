@@ -1,42 +1,64 @@
 # PBIP Documenter
 
-**Generate comprehensive documentation from Power BI PBIP/TMDL semantic models.**
+**Generate comprehensive documentation from Power BI PBIP/TMDL semantic models — instantly, in your browser.**
 
-A free, open-source browser-based tool that parses your TMDL files and generates professional documentation — including model overviews, measure catalogs with DAX, relationship diagrams, visual usage mapping, and more.
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-▶%20Try%20It%20Now-blue?style=for-the-badge)](https://jonathanjihwankim.github.io/pbip-documenter/)
+[![GitHub Sponsors](https://img.shields.io/badge/Sponsor-❤-ea4aaa?style=for-the-badge)](https://github.com/sponsors/JonathanJihwanKim)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-☕-orange?style=for-the-badge)](https://buymeacoffee.com/jihwankim)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 
-[![GitHub Sponsors](https://img.shields.io/badge/Sponsor-❤-ea4aaa?style=flat-square)](https://github.com/sponsors/JonathanJihwanKim)
-[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-☕-orange?style=flat-square)](https://buymeacoffee.com/jihwankim)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
+<!-- TODO: Add a screenshot here showing the app with a parsed model (e.g. relationship diagram view or model overview). A single compelling image dramatically increases engagement. -->
 
-## Features
+## What You Get
 
-### Core Documentation
-- **Model Overview** — database name, compatibility level, culture, table/column/measure counts
-- **Table Inventory** — columns with data types, descriptions, format strings, hidden status
-- **Measure Catalog** — DAX expressions with syntax highlighting, display folders, format strings, referenced columns/measures
-- **Relationships** — from/to columns, cardinality, cross-filter direction, active/inactive status
-- **Roles** — role names, permissions, RLS filter expressions per table
-- **Expressions** — shared/parameter M expressions
+Point the tool at your PBIP project folder and get instant, professional documentation:
 
-### Visual Features
-- **Relationship Diagram** — SVG visualization of table relationships with cardinality indicators
-- **Visual Usage Map** — shows which report visuals use each measure/column (requires Report folder)
+- **Full model documentation** — tables, columns, measures with DAX syntax highlighting, and cross-references
+- **Interactive relationship diagram** — SVG visualization with pan/zoom, showing all table connections
+- **Visual usage mapping** — see exactly which report visuals use each measure and column
+- **Page layout minimaps** — pixel-accurate SVG previews of visual positions on each report page
+- **Field parameter & calculation group detection** — automatically identified and annotated
+- **Export as self-contained HTML or Markdown** — ready for wikis, Git repos, or printing to PDF
 
-### Export Formats
-- **Markdown** (.md) — single file with full documentation
-- **HTML** (.html) — styled, print-to-PDF friendly, DAX syntax highlighted
-- **JSON** (.json) — machine-readable metadata export
-- **SVG** (.svg) — relationship diagram export
+> Your files never leave your browser. All parsing happens client-side — nothing is uploaded anywhere.
 
 ## Quick Start
 
-1. Open the tool: [jonathanjihwankim.github.io/pbip-documenter](https://jonathanjihwankim.github.io/pbip-documenter/)
-2. Click **Open PBIP Folder**
-3. Select your PBIP project folder (containing `.SemanticModel` and optionally `.Report`)
-4. Browse the parsed model in the sidebar
-5. Download documentation in your preferred format
+1. Open the tool: **[jonathanjihwankim.github.io/pbip-documenter](https://jonathanjihwankim.github.io/pbip-documenter/)**
+2. Click **Open Project Folder** and select your PBIP project folder
+3. The tool auto-discovers your `.SemanticModel` and `.Report` folders (if multiple models exist, a discovery panel lets you choose)
+4. Browse the parsed model using the sidebar — tables, measures, relationships, visuals, and more
+5. Download documentation:
+   - **Full Report (.html)** — self-contained with embedded diagrams, collapsible sections, and DAX highlighting
+   - **Full Report (.md)** — clean Markdown with ASCII layout grids, ideal for Git repos and wikis
+   - Each format offers three scopes: **All**, **Semantic Model Only**, or **Visuals Only**
 
-> **Note:** Your files never leave your browser. All parsing happens client-side.
+## Features
+
+### Semantic Model Documentation
+- **Model Overview** — database name, compatibility level, culture, and aggregate counts
+- **Table Inventory** — columns with data types, descriptions, format strings, hidden status
+- **Measure Catalog** — DAX expressions with syntax highlighting, display folders, format strings, and automatic cross-reference extraction (which columns and measures each formula uses)
+- **Relationships** — from/to columns, cardinality, cross-filter direction, active/inactive status
+- **Roles** — role names, permission levels, RLS filter expressions per table
+- **Expressions** — shared and parameter M expressions
+
+### Report Analysis
+- **Visual Field Mapping** — every visual's fields organized by role (Values, Category, Series, Filters, Tooltips)
+- **Page Layout Minimap** — SVG canvas showing actual visual positions, color-coded by type (tables, charts, slicers, cards); hover for names, click to jump to details
+- **Visual Usage Map** — two views: "By Visual" (which fields each visual uses) and "By Field" (which visuals use each field)
+
+### Smart Detection
+- **Field Parameters** — automatically detected via NAMEOF/SWITCH patterns in expressions; available fields listed as clickable chips
+- **Calculation Groups** — identified and rendered with individual calc item cards and collapsible DAX expressions
+
+### Interactive Diagrams
+- **Relationship Diagram** — SVG with pan, zoom, and zoom-to-fit controls; shows only relationship-participating columns; disconnected tables displayed as compact standalone cards
+- **Visual Usage Diagram** — SVG mapping of fields to the visuals that consume them
+
+### Export
+- **HTML** — fully self-contained file with embedded CSS, SVG diagrams, DAX syntax highlighting, collapsible sections, table of contents with anchor links
+- **Markdown** — clean document with ASCII page layout grids, fenced DAX code blocks, structured tables, and visual field breakdowns
 
 ## Browser Support
 
@@ -65,7 +87,7 @@ MyProject/
 │       │   └── ...
 │       └── roles/ (optional)
 │           └── Reader.tmdl
-├── MyProject.Report/ (optional, for visual usage)
+├── MyProject.Report/ (optional, for visual analysis)
 │   └── definition/
 │       └── pages/
 │           └── Page1/
@@ -75,6 +97,15 @@ MyProject/
 │                       └── visual.json
 ```
 
+## Support This Project
+
+Built and maintained by **Jihwan Kim** ([Microsoft MVP](https://github.com/JonathanJihwanKim)). If this tool saves you time documenting your Power BI models, consider supporting its continued development:
+
+<a href="https://buymeacoffee.com/jihwankim"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-☕%20One--time%20support-orange?style=for-the-badge" alt="Buy Me a Coffee" /></a>
+<a href="https://github.com/sponsors/JonathanJihwanKim"><img src="https://img.shields.io/badge/GitHub%20Sponsors-❤%20Monthly%20sponsorship-ea4aaa?style=for-the-badge" alt="GitHub Sponsors" /></a>
+
+Even a one-time coffee helps keep this tool free, maintained, and improving.
+
 ## Also by Jihwan Kim
 
 | Tool | Description |
@@ -82,13 +113,6 @@ MyProject/
 | [PBIR Visual Manager](https://jonathanjihwankim.github.io/isHiddenInViewMode/) | Manage visual properties in Power BI PBIR reports |
 | [PBIP Impact Analyzer](https://jonathanjihwankim.github.io/pbip-impact-analyzer/) | Analyze dependencies and safely refactor semantic models |
 | **PBIP Documenter** | Generate documentation from TMDL (you are here) |
-
-## Support This Tool
-
-If this tool saves you time, consider supporting development:
-
-- [**GitHub Sponsors**](https://github.com/sponsors/JonathanJihwanKim) — monthly sponsorship
-- [**Buy Me a Coffee**](https://buymeacoffee.com/jihwankim) — one-time support
 
 ## License
 
