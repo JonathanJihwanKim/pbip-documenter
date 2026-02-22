@@ -290,7 +290,7 @@ class TMDLParser {
     _detectObjectType(line) {
         const types = ['column', 'measure', 'hierarchy', 'partition', 'calculationGroup', 'calculationItem', 'level', 'role'];
         for (const type of types) {
-            if (line.startsWith(type + ' ') || line.startsWith(type + '\t')) {
+            if (line === type || line.startsWith(type + ' ') || line.startsWith(type + '\t')) {
                 return type;
             }
         }

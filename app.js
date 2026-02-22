@@ -1147,7 +1147,7 @@ class App {
             }
             html += '</div>';
 
-            // Add expandable details for field param / calc group tables referenced by this visual
+            // Show field param / calc group details for tables referenced by this visual
             if (this.docGenerator && visual.fields) {
                 const seenTables = new Set();
                 for (const field of visual.fields) {
@@ -1157,19 +1157,28 @@ class App {
 
                     const fpItems = this.docGenerator._getFieldParameterItems(t);
                     if (fpItems !== null && fpItems.length > 0) {
-                        html += `<details class="visual-special-detail"><summary>Available fields in '${this._esc(t)}' (${fpItems.length})</summary><div class="fp-items-list">`;
+                        html += `<div class="visual-special-block fp-block">
+                            <div class="visual-special-header"><span class="badge badge-field-param">Field Parameter</span> <strong>'${this._esc(t)}'</strong> — ${fpItems.length} available field${fpItems.length !== 1 ? 's' : ''}:</div>
+                            <div class="fp-items-list">`;
                         for (const item of fpItems) {
                             html += `<span class="fp-item-chip">'${this._esc(item.table)}'[${this._esc(item.column)}]</span>`;
                         }
-                        html += `</div></details>`;
+                        html += `</div></div>`;
                     } else {
                         const cgItems = this.docGenerator._getCalculationGroupItems(t);
-                        if (cgItems !== null) {
-                            html += `<details class="visual-special-detail"><summary>Calculation items in '${this._esc(t)}' (${cgItems.length})</summary><div class="calc-items-list">`;
+                        if (cgItems !== null && cgItems.length > 0) {
+                            html += `<div class="visual-special-block cg-block">
+                                <div class="visual-special-header"><span class="badge badge-calc">Calc Group</span> <strong>'${this._esc(t)}'</strong> — ${cgItems.length} item${cgItems.length !== 1 ? 's' : ''}:</div>
+                                <div class="calc-items-list">`;
                             for (const item of cgItems) {
-                                html += `<span class="fp-item-chip">${this._esc(item.name)}</span>`;
+                                html += `<div class="cg-item">
+                                    <span class="fp-item-chip">${this._esc(item.name)}</span>`;
+                                if (item.expression) {
+                                    html += `<details class="cg-expr-detail"><summary>Expression</summary><pre class="cg-expr-code">${this._esc(item.expression)}</pre></details>`;
+                                }
+                                html += `</div>`;
                             }
-                            html += `</div></details>`;
+                            html += `</div></div>`;
                         }
                     }
                 }

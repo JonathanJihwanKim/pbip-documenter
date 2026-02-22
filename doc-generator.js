@@ -449,6 +449,8 @@ class DocGenerator {
                 if (visual.fields && visual.fields.length > 0) {
                     lines.push('| Role | Field | Notes |');
                     lines.push('|------|-------|-------|');
+                    const fpTablesSeen = new Set();
+                    const cgTablesSeen = new Set();
                     for (const f of visual.fields) {
                         const role = this._normalizeRoleForReport(f.projectionName);
                         const tableName = f.table || f.entity || '';
@@ -457,15 +459,46 @@ class DocGenerator {
                         const fpItems = this._getFieldParameterItems(tableName);
                         if (fpItems !== null) {
                             notes = `Field Param (${fpItems.length} field${fpItems.length !== 1 ? 's' : ''})`;
+                            fpTablesSeen.add(tableName);
                         } else {
                             const cgItems = this._getCalculationGroupItems(tableName);
                             if (cgItems !== null) {
                                 notes = `Calc Group (${cgItems.length} item${cgItems.length !== 1 ? 's' : ''})`;
+                                cgTablesSeen.add(tableName);
                             }
                         }
                         lines.push(`| ${role} | ${this._escMd(tableName)}[${this._escMd(name)}] | ${notes} |`);
                     }
                     lines.push('');
+
+                    // Field parameter details
+                    for (const tbl of fpTablesSeen) {
+                        const fpItems = this._getFieldParameterItems(tbl);
+                        if (fpItems && fpItems.length > 0) {
+                            lines.push(`> **Field Parameter: '${this._escMd(tbl)}'** — ${fpItems.length} available field${fpItems.length !== 1 ? 's' : ''}:`);
+                            lines.push(`> ${fpItems.map(i => `\`'${i.table}'[${i.column}]\``).join(', ')}`);
+                            lines.push('');
+                        }
+                    }
+
+                    // Calculation group details
+                    for (const tbl of cgTablesSeen) {
+                        const cgItems = this._getCalculationGroupItems(tbl);
+                        if (cgItems && cgItems.length > 0) {
+                            lines.push(`> **Calculation Group: '${this._escMd(tbl)}'** — ${cgItems.length} item${cgItems.length !== 1 ? 's' : ''}:`);
+                            for (const item of cgItems) {
+                                lines.push(`> - **${this._escMd(item.name)}**`);
+                                if (item.expression) {
+                                    lines.push(`>   \`\`\`dax`);
+                                    for (const exprLine of item.expression.split('\n')) {
+                                        lines.push(`>   ${exprLine}`);
+                                    }
+                                    lines.push(`>   \`\`\``);
+                                }
+                            }
+                            lines.push('');
+                        }
+                    }
                 } else {
                     lines.push('*No data fields*');
                     lines.push('');
@@ -1479,6 +1512,8 @@ ${rects}
 
                         if (visual.fields && visual.fields.length > 0) {
                             const roleGroups = {};
+                            const fpTablesSeen = new Set();
+                            const cgTablesSeen = new Set();
                             for (const f of visual.fields) {
                                 const role = this._normalizeRoleForReport(f.projectionName);
                                 if (!roleGroups[role]) roleGroups[role] = [];
@@ -1493,16 +1528,49 @@ ${rects}
                                     html += `<span class="field-chip-report ${cssClass}">${this._escHtml(t)}[${this._escHtml(n)}]</span>`;
                                     const fpItems = this._getFieldParameterItems(t);
                                     if (fpItems !== null) {
-                                        html += ` <span class="badge" style="background:#e3f2fd;color:#1565c0;font-size:10px" title="${fpItems.length > 0 ? fpItems.map(i => `'${i.table}'[${i.column}]`).join(', ') : 'Field Parameter'}">Field Param&thinsp;(${fpItems.length})</span>`;
+                                        html += ` <span class="badge" style="background:#e3f2fd;color:#1565c0;font-size:10px">Field Param&thinsp;(${fpItems.length})</span>`;
+                                        fpTablesSeen.add(t);
                                     } else {
                                         const cgItems = this._getCalculationGroupItems(t);
                                         if (cgItems !== null) {
-                                            html += ` <span class="badge" style="background:#e8f5e9;color:#2e7d32;font-size:10px" title="${cgItems.map(i => i.name).join(', ')}">Calc Group&thinsp;(${cgItems.length})</span>`;
+                                            html += ` <span class="badge" style="background:#e8f5e9;color:#2e7d32;font-size:10px">Calc Group&thinsp;(${cgItems.length})</span>`;
+                                            cgTablesSeen.add(t);
                                         }
                                     }
                                     html += ' ';
                                 }
                                 html += `</div>`;
+                            }
+
+                            // Field parameter detail blocks
+                            for (const tbl of fpTablesSeen) {
+                                const fpItems = this._getFieldParameterItems(tbl);
+                                if (fpItems && fpItems.length > 0) {
+                                    html += `<div style="margin:6px 0;padding:6px 10px;background:#e3f2fd;border-left:3px solid #1565c0;border-radius:4px;font-size:12px">
+<strong>Field Parameter: '${this._escHtml(tbl)}'</strong> — ${fpItems.length} available field${fpItems.length !== 1 ? 's' : ''}:<br>`;
+                                    for (const item of fpItems) {
+                                        html += `<span style="display:inline-block;background:#fff;border:1px solid #bbdefb;border-radius:3px;padding:1px 6px;margin:2px;font-family:monospace;font-size:11px">'${this._escHtml(item.table)}'[${this._escHtml(item.column)}]</span>`;
+                                    }
+                                    html += `</div>`;
+                                }
+                            }
+
+                            // Calculation group detail blocks
+                            for (const tbl of cgTablesSeen) {
+                                const cgItems = this._getCalculationGroupItems(tbl);
+                                if (cgItems && cgItems.length > 0) {
+                                    html += `<div style="margin:6px 0;padding:6px 10px;background:#e8f5e9;border-left:3px solid #2e7d32;border-radius:4px;font-size:12px">
+<strong>Calculation Group: '${this._escHtml(tbl)}'</strong> — ${cgItems.length} item${cgItems.length !== 1 ? 's' : ''}:`;
+                                    for (const item of cgItems) {
+                                        html += `<div style="margin:4px 0"><span style="display:inline-block;background:#fff;border:1px solid #c8e6c9;border-radius:3px;padding:1px 6px;font-family:monospace;font-size:11px">${this._escHtml(item.name)}</span>`;
+                                        if (item.expression) {
+                                            html += `<details style="margin-top:2px"><summary style="font-size:11px;color:#555;cursor:pointer">Expression</summary>
+<div class="dax-block" style="margin:4px 0;font-size:11px">${this._highlightDAX(item.expression)}</div></details>`;
+                                        }
+                                        html += `</div>`;
+                                    }
+                                    html += `</div>`;
+                                }
                             }
                         } else {
                             html += `<p style="font-size:12px;color:var(--text-secondary);font-style:italic">No data fields</p>`;
@@ -1556,19 +1624,29 @@ ${rects}
 
     /**
      * Returns NAMEOF field items for a field parameter table, or null if not a field parameter.
+     * Checks both column expressions and partition sources for NAMEOF/SWITCH patterns.
      * Returns [] if detected as field param (via SWITCH) but no NAMEOF references found.
      */
     _getFieldParameterItems(tableName) {
         const table = this.model.tables.find(t => t.name === tableName);
         if (!table) return null;
-        const isFieldParam = table.columns.some(c => c.expression && /NAMEOF|SWITCH/i.test(c.expression));
-        if (!isFieldParam) return null;
-        const items = [];
+
+        // Collect all expression texts from columns and partitions
+        const allExpressions = [];
         for (const col of table.columns) {
-            if (col.expression) {
-                const matches = [...col.expression.matchAll(/NAMEOF\s*\(\s*'([^']+)'\[([^\]]+)\]\s*\)/gi)];
-                for (const m of matches) items.push({ table: m[1], column: m[2] });
-            }
+            if (col.expression) allExpressions.push(col.expression);
+        }
+        for (const part of table.partitions) {
+            if (part.source) allExpressions.push(part.source);
+        }
+
+        const isFieldParam = allExpressions.some(expr => /NAMEOF|SWITCH/i.test(expr));
+        if (!isFieldParam) return null;
+
+        const items = [];
+        for (const expr of allExpressions) {
+            const matches = [...expr.matchAll(/NAMEOF\s*\(\s*'([^']+)'\[([^\]]+)\]\s*\)/gi)];
+            for (const m of matches) items.push({ table: m[1], column: m[2] });
         }
         return items;
     }

@@ -600,15 +600,60 @@ tr:hover {
     margin-top: 4px;
 }
 
-.visual-special-detail {
-    margin-top: 8px;
+.visual-special-block {
+    margin-top: 10px;
+    padding: 8px 12px;
+    border-radius: 4px;
     font-size: 12px;
 }
 
-.visual-special-detail summary {
+.visual-special-block.fp-block {
+    background: #e3f2fd;
+    border-left: 3px solid #1565c0;
+}
+
+.visual-special-block.cg-block {
+    background: #e8f5e9;
+    border-left: 3px solid #2e7d32;
+}
+
+.visual-special-header {
+    margin-bottom: 6px;
+    font-size: 12px;
+}
+
+.visual-special-block .calc-items-list {
+    flex-direction: column;
+    gap: 6px;
+}
+
+.cg-item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.cg-expr-detail {
+    font-size: 11px;
+}
+
+.cg-expr-detail summary {
     cursor: pointer;
     color: var(--text-secondary);
-    font-size: 12px;
+    font-size: 11px;
+}
+
+.cg-expr-code {
+    margin: 4px 0 0;
+    padding: 6px 8px;
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    font-size: 11px;
+    white-space: pre-wrap;
+    overflow-x: auto;
 }
 
 /* ── DOWNLOAD BAR ── */
