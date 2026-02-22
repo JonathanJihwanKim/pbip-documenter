@@ -591,6 +591,35 @@ class App {
             html += `<p><span class="badge badge-hidden">Hidden Table</span></p>`;
         }
 
+        // Field Parameter detection
+        if (this.docGenerator) {
+            const fpItems = this.docGenerator._getFieldParameterItems(table.name);
+            if (fpItems !== null) {
+                html += `<p><span class="badge badge-field-param">Field Parameter</span> This table is a dynamic field selector.</p>`;
+                if (fpItems.length > 0) {
+                    html += `<div class="fp-items-container"><strong>Available fields (${fpItems.length}):</strong><div class="fp-items-list">`;
+                    for (const item of fpItems) {
+                        html += `<span class="fp-item-chip">'${this._esc(item.table)}'[${this._esc(item.column)}]</span>`;
+                    }
+                    html += `</div></div>`;
+                }
+            }
+        }
+
+        // Calculation Group
+        if (table.calculationGroup && table.calculationGroup.items.length > 0) {
+            html += `<h3>Calculation Group <span class="badge badge-calc">Calc Group</span></h3>`;
+            html += `<p style="font-size:13px;color:var(--text-secondary);margin-bottom:8px">${table.calculationGroup.items.length} calculation item(s)</p>`;
+            for (const item of table.calculationGroup.items) {
+                html += `<div class="calc-item-card">
+                    <h4>${this._esc(item.name)} <span class="badge badge-calc">Calc Item</span></h4>`;
+                if (item.expression) {
+                    html += `<details><summary>Expression</summary><div class="dax-block">${this._esc(item.expression)}</div></details>`;
+                }
+                html += `</div>`;
+            }
+        }
+
         // Columns
         if (table.columns.length > 0) {
             html += `<h3>Columns (${table.columns.length})</h3>`;
@@ -1100,10 +1129,51 @@ class App {
                     html += `<button type="button" class="field-chip" data-role="${this._esc(role)}"
                         data-table="${this._esc(tableName)}"
                         data-field="${this._esc(fieldName)}">${this._esc(tableName)}[${this._esc(fieldName)}]</button>`;
+
+                    // Annotate field param / calc group tables
+                    if (this.docGenerator && tableName) {
+                        const fpItems = this.docGenerator._getFieldParameterItems(tableName);
+                        if (fpItems !== null) {
+                            html += `<span class="badge badge-field-param" title="${fpItems.map(i => "'" + i.table + "'[" + i.column + "]").join(', ')}">Field Param (${fpItems.length})</span>`;
+                        } else {
+                            const cgItems = this.docGenerator._getCalculationGroupItems(tableName);
+                            if (cgItems !== null) {
+                                html += `<span class="badge badge-calc" title="${cgItems.map(i => i.name).join(', ')}">Calc Group (${cgItems.length})</span>`;
+                            }
+                        }
+                    }
                 }
                 html += '</div></div>';
             }
             html += '</div>';
+
+            // Add expandable details for field param / calc group tables referenced by this visual
+            if (this.docGenerator && visual.fields) {
+                const seenTables = new Set();
+                for (const field of visual.fields) {
+                    const t = field.table || field.entity || '';
+                    if (!t || seenTables.has(t)) continue;
+                    seenTables.add(t);
+
+                    const fpItems = this.docGenerator._getFieldParameterItems(t);
+                    if (fpItems !== null && fpItems.length > 0) {
+                        html += `<details class="visual-special-detail"><summary>Available fields in '${this._esc(t)}' (${fpItems.length})</summary><div class="fp-items-list">`;
+                        for (const item of fpItems) {
+                            html += `<span class="fp-item-chip">'${this._esc(item.table)}'[${this._esc(item.column)}]</span>`;
+                        }
+                        html += `</div></details>`;
+                    } else {
+                        const cgItems = this.docGenerator._getCalculationGroupItems(t);
+                        if (cgItems !== null) {
+                            html += `<details class="visual-special-detail"><summary>Calculation items in '${this._esc(t)}' (${cgItems.length})</summary><div class="calc-items-list">`;
+                            for (const item of cgItems) {
+                                html += `<span class="fp-item-chip">${this._esc(item.name)}</span>`;
+                            }
+                            html += `</div></details>`;
+                        }
+                    }
+                }
+            }
         }
 
         html += '</div>';

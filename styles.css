@@ -543,6 +543,73 @@ tr:hover {
 .badge-table { background: #e8eaf6; color: #283593; }
 .badge-active { background: #e8f5e9; color: #2e7d32; }
 .badge-inactive { background: #fce4ec; color: #c62828; }
+.badge-field-param { background: #e3f2fd; color: #1565c0; }
+.badge-calc { background: #e8f5e9; color: #2e7d32; }
+
+/* ── FIELD PARAM & CALC GROUP (in-app) ── */
+.fp-items-container {
+    margin: 8px 0;
+    padding: 8px 12px;
+    background: #e3f2fd;
+    border-radius: var(--radius);
+    font-size: 13px;
+}
+
+.fp-items-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+}
+
+.fp-item-chip {
+    display: inline-block;
+    background: #fff;
+    border: 1px solid #bbdefb;
+    border-radius: 3px;
+    padding: 1px 6px;
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    font-size: 12px;
+}
+
+.calc-item-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-left: 4px solid #2e7d32;
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    margin: 8px 0;
+}
+
+.calc-item-card h4 {
+    font-size: 14px;
+    color: var(--primary);
+    margin-bottom: 4px;
+}
+
+.calc-item-card details summary {
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.calc-items-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.visual-special-detail {
+    margin-top: 8px;
+    font-size: 12px;
+}
+
+.visual-special-detail summary {
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-size: 12px;
+}
 
 /* ── DOWNLOAD BAR ── */
 .download-bar {
