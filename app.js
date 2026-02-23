@@ -34,15 +34,15 @@ class App {
         document.getElementById('downloadFullReport').addEventListener('click', () => {
             document.getElementById('htmlOptions').classList.toggle('open');
         });
-        document.getElementById('downloadHTMLAll').addEventListener('click', () => this.downloadFullReport('all'));
-        document.getElementById('downloadHTMLModel').addEventListener('click', () => this.downloadFullReport('model'));
-        document.getElementById('downloadHTMLVisual').addEventListener('click', () => this.downloadFullReport('visuals'));
+        document.getElementById('downloadHTMLAll').addEventListener('click', (e) => this.downloadFullReport('all', e.currentTarget));
+        document.getElementById('downloadHTMLModel').addEventListener('click', (e) => this.downloadFullReport('model', e.currentTarget));
+        document.getElementById('downloadHTMLVisual').addEventListener('click', (e) => this.downloadFullReport('visuals', e.currentTarget));
         document.getElementById('downloadMD').addEventListener('click', () => {
             document.getElementById('mdOptions').classList.toggle('open');
         });
-        document.getElementById('downloadMDAll').addEventListener('click', () => this.downloadMarkdown('all'));
-        document.getElementById('downloadMDModel').addEventListener('click', () => this.downloadMarkdown('model'));
-        document.getElementById('downloadMDVisual').addEventListener('click', () => this.downloadMarkdown('visuals'));
+        document.getElementById('downloadMDAll').addEventListener('click', (e) => this.downloadMarkdown('all', e.currentTarget));
+        document.getElementById('downloadMDModel').addEventListener('click', (e) => this.downloadMarkdown('model', e.currentTarget));
+        document.getElementById('downloadMDVisual').addEventListener('click', (e) => this.downloadMarkdown('visuals', e.currentTarget));
 
         // Sidebar navigation
         document.querySelectorAll('.sidebar-header').forEach(header => {
@@ -56,6 +56,15 @@ class App {
         document.getElementById('sidebarTableList').addEventListener('click', (e) => {
             const item = e.target.closest('.sidebar-item[data-table]');
             if (item) this.showTableDetail(item.dataset.table);
+            const loadMore = e.target.closest('.btn-sidebar-load-more');
+            if (loadMore && this._remainingSidebarTables) {
+                const tableList = document.getElementById('sidebarTableList');
+                loadMore.insertAdjacentHTML('beforebegin', this._remainingSidebarTables
+                    .map(t => `<div class="sidebar-item" data-table="${this._esc(t.name)}">${this._esc(t.name)}</div>`)
+                    .join(''));
+                loadMore.remove();
+                this._remainingSidebarTables = null;
+            }
         });
         document.getElementById('sidebarPageList').addEventListener('click', (e) => {
             const item = e.target.closest('.sidebar-item[data-page-id]');
@@ -554,11 +563,22 @@ class App {
             pageSectionEl.classList.add('hidden');
         }
 
-        // Table list
+        // Table list (chunked rendering: first 50 immediately, rest on demand)
+        const SIDEBAR_INITIAL_BATCH = 50;
         const tableList = document.getElementById('sidebarTableList');
-        tableList.innerHTML = m.tables
-            .map(t => `<div class="sidebar-item" data-table="${this._esc(t.name)}">${this._esc(t.name)}</div>`)
-            .join('');
+        const tables = m.tables;
+        if (tables.length > SIDEBAR_INITIAL_BATCH) {
+            this._remainingSidebarTables = tables.slice(SIDEBAR_INITIAL_BATCH);
+            tableList.innerHTML = tables.slice(0, SIDEBAR_INITIAL_BATCH)
+                .map(t => `<div class="sidebar-item" data-table="${this._esc(t.name)}">${this._esc(t.name)}</div>`)
+                .join('') +
+                `<button class="btn-sidebar-load-more">Show ${this._remainingSidebarTables.length} more tables</button>`;
+        } else {
+            this._remainingSidebarTables = null;
+            tableList.innerHTML = tables
+                .map(t => `<div class="sidebar-item" data-table="${this._esc(t.name)}">${this._esc(t.name)}</div>`)
+                .join('');
+        }
 
         // Collapse/expand table list based on saved state or table count
         const tablesSection = tableList.closest('.sidebar-section');
@@ -594,6 +614,20 @@ class App {
             document.querySelectorAll('.sidebar-item').forEach(item => item.classList.remove('search-hidden'));
             countEl.classList.add('hidden');
             return;
+        }
+
+        // Force-load remaining tables before searching (ensures all items are in DOM)
+        if (this._remainingSidebarTables) {
+            const tableList = document.getElementById('sidebarTableList');
+            const loadMoreBtn = tableList.querySelector('.btn-sidebar-load-more');
+            const html = this._remainingSidebarTables
+                .map(t => `<div class="sidebar-item" data-table="${this._esc(t.name)}">${this._esc(t.name)}</div>`)
+                .join('');
+            if (loadMoreBtn) {
+                loadMoreBtn.insertAdjacentHTML('beforebegin', html);
+                loadMoreBtn.remove();
+            }
+            this._remainingSidebarTables = null;
         }
 
         // Build measure lookup (table sidebar items that have matching measures)
@@ -661,7 +695,9 @@ class App {
         if (section === 'measures') this.renderMeasureCatalog();
         if (section === 'relationships' && !this._diagramRendered) {
             this._diagramRendered = true;
-            this.renderRelationshipDiagram();
+            const diagEl = document.getElementById('relationshipsDiagram');
+            if (diagEl) diagEl.innerHTML = '<div class="loading"><div class="spinner"></div>Building diagram…</div>';
+            requestAnimationFrame(() => requestAnimationFrame(() => this.renderRelationshipDiagram()));
         }
         if (section === 'roles') this.renderRoles();
         if (section === 'expressions') this.renderExpressions();
@@ -1418,37 +1454,53 @@ class App {
     // DOWNLOADS
     // ──────────────────────────────────────────────
 
-    downloadMarkdown(scope = 'all') {
+    downloadMarkdown(scope = 'all', btn = null) {
         if (!this.docGenerator) return;
         if (scope === 'visuals' && (!this.visualData || this.visualData.pages.length === 0)) {
             this.showToast('No report data — include a report folder to export visuals', 'error');
             return;
         }
-        const md = this.docGenerator.generateMarkdown(scope, this.visualData);
-        const suffixMap = { all: '', model: '-model', visuals: '-visuals' };
-        const name = (this.parsedModel.database?.name || 'model') + '-documentation' + (suffixMap[scope] || '') + '.md';
-        this._downloadFile(md, name, 'text/markdown');
-        this.showToast('Markdown downloaded');
-        document.getElementById('mdOptions')?.classList.remove('open');
+        const originalHTML = btn ? btn.innerHTML : null;
+        if (btn) { btn.innerHTML = 'Generating…'; btn.disabled = true; }
+        requestAnimationFrame(() => {
+            try {
+                const md = this.docGenerator.generateMarkdown(scope, this.visualData);
+                const suffixMap = { all: '', model: '-model', visuals: '-visuals' };
+                const name = (this.parsedModel.database?.name || 'model') + '-documentation' + (suffixMap[scope] || '') + '.md';
+                this._downloadFile(md, name, 'text/markdown');
+                this.showToast('Markdown downloaded');
+            } finally {
+                if (btn) { btn.innerHTML = originalHTML; btn.disabled = false; }
+                document.getElementById('mdOptions')?.classList.remove('open');
+            }
+        });
     }
 
-    downloadFullReport(scope = 'all') {
+    downloadFullReport(scope = 'all', btn = null) {
         if (!this.docGenerator) return;
         if (scope === 'visuals' && (!this.visualData || this.visualData.pages.length === 0)) {
             this.showToast('No report data — include a report folder to export visuals', 'error');
             return;
         }
-        if (!this.diagramRenderer) this.renderRelationshipDiagram();
-        const html = this.docGenerator.generateFullReport(
-            this.visualData,
-            this.diagramRenderer,
-            scope
-        );
-        const suffixMap = { all: '', model: '-model', visuals: '-visuals' };
-        const name = (this.parsedModel.database?.name || 'model') + '-full-report' + (suffixMap[scope] || '') + '.html';
-        this._downloadFile(html, name, 'text/html');
-        this.showToast('Full report downloaded');
-        document.getElementById('htmlOptions')?.classList.remove('open');
+        const originalHTML = btn ? btn.innerHTML : null;
+        if (btn) { btn.innerHTML = 'Generating…'; btn.disabled = true; }
+        requestAnimationFrame(() => {
+            try {
+                if (!this.diagramRenderer) this.renderRelationshipDiagram();
+                const html = this.docGenerator.generateFullReport(
+                    this.visualData,
+                    this.diagramRenderer,
+                    scope
+                );
+                const suffixMap = { all: '', model: '-model', visuals: '-visuals' };
+                const name = (this.parsedModel.database?.name || 'model') + '-full-report' + (suffixMap[scope] || '') + '.html';
+                this._downloadFile(html, name, 'text/html');
+                this.showToast('Full report downloaded');
+            } finally {
+                if (btn) { btn.innerHTML = originalHTML; btn.disabled = false; }
+                document.getElementById('htmlOptions')?.classList.remove('open');
+            }
+        });
     }
 
     _downloadFile(content, filename, mimeType) {

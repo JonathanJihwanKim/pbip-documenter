@@ -201,6 +201,23 @@ body {
     font-weight: 600;
 }
 
+.btn-sidebar-load-more {
+    display: block;
+    width: 100%;
+    padding: 6px 12px;
+    background: none;
+    border: none;
+    border-left: 3px solid transparent;
+    text-align: left;
+    font-size: 13px;
+    color: var(--primary);
+    cursor: pointer;
+}
+
+.btn-sidebar-load-more:hover {
+    background: var(--bg);
+}
+
 .sidebar-badge {
     display: inline-block;
     padding: 1px 6px;
@@ -730,6 +747,11 @@ tr:hover {
 .btn-download-sub:hover {
     background: #e8eaf6;
     border-color: var(--primary);
+}
+
+.btn-download-sub:disabled {
+    opacity: 0.6;
+    cursor: wait;
 }
 
 .btn-download {
