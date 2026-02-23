@@ -621,40 +621,53 @@ class DiagramRenderer {
             if (zoomReset) zoomReset.removeEventListener('click', onZoomReset);
         };
 
+        // Build lookup maps once for efficient hover highlighting
+        const nodeElMap = new Map();
+        const relsByTable = new Map();
+        const allNodeEls = [...svg.querySelectorAll('.table-node')];
+        const allRelEls = [...svg.querySelectorAll('.rel-line')];
+
+        allNodeEls.forEach(el => nodeElMap.set(el.dataset.tableName, el));
+        allRelEls.forEach(lineEl => {
+            const from = lineEl.dataset.from;
+            const to = lineEl.dataset.to;
+            if (!relsByTable.has(from)) relsByTable.set(from, []);
+            if (!relsByTable.has(to)) relsByTable.set(to, []);
+            relsByTable.get(from).push(lineEl);
+            relsByTable.get(to).push(lineEl);
+        });
+
         // Hover-to-highlight
-        svg.querySelectorAll('.table-node').forEach(nodeEl => {
+        allNodeEls.forEach(nodeEl => {
             const name = nodeEl.dataset.tableName;
+            const myRels = relsByTable.get(name) || [];
+            const myRelSet = new Set(myRels);
 
             nodeEl.addEventListener('mouseenter', () => {
                 const connectedTables = new Set([name]);
 
-                svg.querySelectorAll('.rel-line').forEach(lineEl => {
-                    const from = lineEl.dataset.from;
-                    const to = lineEl.dataset.to;
-                    if (from === name || to === name) {
+                for (const lineEl of allRelEls) {
+                    if (myRelSet.has(lineEl)) {
                         lineEl.classList.add('highlighted');
-                        connectedTables.add(from);
-                        connectedTables.add(to);
+                        connectedTables.add(lineEl.dataset.from);
+                        connectedTables.add(lineEl.dataset.to);
                     } else {
                         lineEl.classList.add('dimmed');
                     }
-                });
+                }
 
-                svg.querySelectorAll('.table-node').forEach(n => {
-                    const nName = n.dataset.tableName;
+                for (const [nName, nEl] of nodeElMap) {
                     if (connectedTables.has(nName)) {
-                        n.classList.add('highlighted');
+                        nEl.classList.add('highlighted');
                     } else {
-                        n.classList.add('dimmed');
+                        nEl.classList.add('dimmed');
                     }
-                });
+                }
             });
 
             nodeEl.addEventListener('mouseleave', () => {
-                svg.querySelectorAll('.table-node').forEach(n =>
-                    n.classList.remove('highlighted', 'dimmed'));
-                svg.querySelectorAll('.rel-line').forEach(l =>
-                    l.classList.remove('highlighted', 'dimmed'));
+                for (const el of allNodeEls) el.classList.remove('highlighted', 'dimmed');
+                for (const el of allRelEls) el.classList.remove('highlighted', 'dimmed');
             });
 
             // Double-click to navigate to table detail

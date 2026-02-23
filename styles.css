@@ -1503,6 +1503,26 @@ tr:hover {
     border-color: var(--primary);
 }
 
+.btn-load-more-measures {
+    display: block;
+    width: 100%;
+    padding: 12px;
+    margin: 16px 0;
+    background: var(--bg);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+    font-size: 14px;
+    color: var(--primary);
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.btn-load-more-measures:hover {
+    background: var(--surface);
+    border-color: var(--primary);
+}
+
 /* ── WARNING BANNER ── */
 .warning-banner {
     display: flex;

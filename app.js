@@ -13,6 +13,7 @@ class App {
         this.measureRefs = null;
         this.docGenerator = null;
         this.diagramRenderer = null;
+        this._diagramRendered = false;
 
         this.parseErrors = [];
 
@@ -49,6 +50,16 @@ class App {
                 const section = header.dataset.section;
                 this.showSection(section);
             });
+        });
+
+        // Sidebar delegated click handlers (one listener per list, not per item)
+        document.getElementById('sidebarTableList').addEventListener('click', (e) => {
+            const item = e.target.closest('.sidebar-item[data-table]');
+            if (item) this.showTableDetail(item.dataset.table);
+        });
+        document.getElementById('sidebarPageList').addEventListener('click', (e) => {
+            const item = e.target.closest('.sidebar-item[data-page-id]');
+            if (item) this.showPageDetail(item.dataset.pageId);
         });
 
         // Sidebar search
@@ -352,8 +363,8 @@ class App {
             document.getElementById('downloadBar').classList.remove('hidden');
             document.getElementById('appBody').classList.remove('hidden');
 
-            // Pre-render relationship diagram
-            this.renderRelationshipDiagram();
+            // Diagram rendering is deferred until the relationships section is shown
+            this._diagramRendered = false;
 
             // Show warning banner if there were parse errors
             if (this.parseErrors.length > 0) {
@@ -536,31 +547,18 @@ class App {
             pageSectionEl.classList.remove('hidden');
             document.getElementById('sidebarPageCount').textContent = this.visualData.pages.length;
             const pageList = document.getElementById('sidebarPageList');
-            pageList.innerHTML = '';
-            for (const page of this.visualData.pages) {
-                const item = document.createElement('div');
-                item.className = 'sidebar-item';
-                item.textContent = page.displayName;
-                item.dataset.pageId = page.id;
-                item.addEventListener('click', () => this.showPageDetail(page.id));
-                pageList.appendChild(item);
-            }
+            pageList.innerHTML = this.visualData.pages
+                .map(p => `<div class="sidebar-item" data-page-id="${this._esc(p.id)}">${this._esc(p.displayName)}</div>`)
+                .join('');
         } else {
             pageSectionEl.classList.add('hidden');
         }
 
         // Table list
         const tableList = document.getElementById('sidebarTableList');
-        tableList.innerHTML = '';
-
-        for (const table of m.tables) {
-            const item = document.createElement('div');
-            item.className = 'sidebar-item';
-            item.textContent = table.name;
-            item.dataset.table = table.name;
-            item.addEventListener('click', () => this.showTableDetail(table.name));
-            tableList.appendChild(item);
-        }
+        tableList.innerHTML = m.tables
+            .map(t => `<div class="sidebar-item" data-table="${this._esc(t.name)}">${this._esc(t.name)}</div>`)
+            .join('');
 
         // Collapse/expand table list based on saved state or table count
         const tablesSection = tableList.closest('.sidebar-section');
@@ -661,6 +659,10 @@ class App {
         if (section === 'report-pages') this.renderReportPagesOverview();
         if (section === 'tables') this.renderTables();
         if (section === 'measures') this.renderMeasureCatalog();
+        if (section === 'relationships' && !this._diagramRendered) {
+            this._diagramRendered = true;
+            this.renderRelationshipDiagram();
+        }
         if (section === 'roles') this.renderRoles();
         if (section === 'expressions') this.renderExpressions();
         if (section === 'visual-usage') this.renderVisualUsageView();
@@ -845,7 +847,6 @@ class App {
 
     renderMeasureCatalog() {
         const m = this.parsedModel;
-        let html = '';
 
         // Group by display folder
         const byFolder = {};
@@ -858,7 +859,35 @@ class App {
         }
 
         const folders = Object.keys(byFolder).sort();
+        const measuresEl = document.getElementById('measuresContent');
 
+        const INITIAL_BATCH = 5;
+        const initialFolders = folders.slice(0, INITIAL_BATCH);
+        const remainingFolders = folders.slice(INITIAL_BATCH);
+
+        let html = this._renderFolderGroup(initialFolders, byFolder);
+
+        if (remainingFolders.length > 0) {
+            const remaining = remainingFolders.reduce((sum, f) => sum + byFolder[f].length, 0);
+            html += `<button type="button" class="btn-load-more-measures">Load ${remaining} more measure${remaining !== 1 ? 's' : ''} (${remainingFolders.length} folder${remainingFolders.length !== 1 ? 's' : ''})</button>`;
+        }
+
+        measuresEl.innerHTML = html;
+        this._bindDaxToggles(measuresEl);
+
+        const loadMore = measuresEl.querySelector('.btn-load-more-measures');
+        if (loadMore) {
+            loadMore.addEventListener('click', () => {
+                const additionalHtml = this._renderFolderGroup(remainingFolders, byFolder);
+                loadMore.insertAdjacentHTML('beforebegin', additionalHtml);
+                loadMore.remove();
+                this._bindDaxToggles(measuresEl);
+            });
+        }
+    }
+
+    _renderFolderGroup(folders, byFolder) {
+        let html = '';
         for (const folder of folders) {
             const measures = byFolder[folder];
             if (measures.length > 20) {
@@ -874,10 +903,7 @@ class App {
                 }
             }
         }
-
-        const measuresEl = document.getElementById('measuresContent');
-        measuresEl.innerHTML = html;
-        this._bindDaxToggles(measuresEl);
+        return html;
     }
 
     renderRoles() {
@@ -1007,8 +1033,9 @@ class App {
                 html += this._renderVisualCard(visual);
             }
         }
-        document.getElementById('reportPageContent').innerHTML = html;
-        this._bindFieldChips();
+        const reportPageContent = document.getElementById('reportPageContent');
+        reportPageContent.innerHTML = html;
+        this._bindFieldChips(reportPageContent);
         this._bindLayoutDiagramInteractions();
     }
 
@@ -1070,17 +1097,18 @@ class App {
             }
             html += '</div></div>';
         }
-        document.getElementById('visualUsageByVisual').innerHTML = html;
+        const byVisualEl = document.getElementById('visualUsageByVisual');
+        byVisualEl.innerHTML = html;
 
         // Bind page group collapse
-        document.querySelectorAll('.page-group-header').forEach(header => {
+        byVisualEl.querySelectorAll('.page-group-header').forEach(header => {
             header.addEventListener('click', () => {
                 header.classList.toggle('collapsed');
                 header.nextElementSibling.classList.toggle('collapsed');
             });
         });
 
-        this._bindFieldChips();
+        this._bindFieldChips(byVisualEl);
     }
 
     _renderPageLayoutDiagram(page, visualsWithPosition) {
@@ -1313,14 +1341,17 @@ class App {
         return projectionName.charAt(0).toUpperCase() + projectionName.slice(1);
     }
 
-    _bindFieldChips() {
-        document.querySelectorAll('.field-chip[data-table]').forEach(chip => {
-            chip.addEventListener('click', () => {
-                const tableName = chip.dataset.table;
-                if (tableName && this.parsedModel.tables.find(t => t.name === tableName)) {
-                    this.showTableDetail(tableName);
-                }
-            });
+    _bindFieldChips(container) {
+        const root = container || document;
+        if (root._fieldChipBound) return;
+        root._fieldChipBound = true;
+        root.addEventListener('click', (e) => {
+            const chip = e.target.closest('.field-chip[data-table]');
+            if (!chip) return;
+            const tableName = chip.dataset.table;
+            if (tableName && this.parsedModel.tables.find(t => t.name === tableName)) {
+                this.showTableDetail(tableName);
+            }
         });
     }
 
@@ -1407,6 +1438,7 @@ class App {
             this.showToast('No report data — include a report folder to export visuals', 'error');
             return;
         }
+        if (!this.diagramRenderer) this.renderRelationshipDiagram();
         const html = this.docGenerator.generateFullReport(
             this.visualData,
             this.diagramRenderer,
@@ -1436,16 +1468,17 @@ class App {
     // ──────────────────────────────────────────────
 
     _bindDaxToggles(container) {
-        (container || document).querySelectorAll('.btn-dax-toggle').forEach(btn => {
-            if (btn.dataset.bound) return;
-            btn.dataset.bound = 'true';
-            btn.addEventListener('click', () => {
-                const block = document.getElementById(btn.dataset.target);
-                if (!block) return;
-                const isTruncated = block.classList.contains('truncated');
-                block.classList.toggle('truncated');
-                btn.textContent = isTruncated ? 'Show less' : 'Show more';
-            });
+        const root = container || document;
+        if (root._daxToggleBound) return;
+        root._daxToggleBound = true;
+        root.addEventListener('click', (e) => {
+            const btn = e.target.closest('.btn-dax-toggle');
+            if (!btn) return;
+            const block = document.getElementById(btn.dataset.target);
+            if (!block) return;
+            const isTruncated = block.classList.contains('truncated');
+            block.classList.toggle('truncated');
+            btn.textContent = isTruncated ? 'Show less' : 'Show more';
         });
     }
 
