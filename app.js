@@ -70,6 +70,21 @@ class App {
             const item = e.target.closest('.sidebar-item[data-page-id]');
             if (item) this.showPageDetail(item.dataset.pageId);
         });
+        document.getElementById('tableDetailContent').addEventListener('click', (e) => {
+            const btn = e.target.closest('.btn-load-more-measures');
+            if (btn && this._remainingMeasures) {
+                let moreHtml = '';
+                for (const measure of this._remainingMeasures.measures) {
+                    moreHtml += this._renderMeasureCard(measure, this._remainingMeasures.tableName);
+                }
+                const temp = document.createElement('div');
+                temp.innerHTML = moreHtml;
+                btn.before(...temp.childNodes);
+                btn.remove();
+                this._bindDaxToggles(document.getElementById('tableDetailContent'));
+                this._remainingMeasures = null;
+            }
+        });
 
         // Sidebar search
         const searchInput = document.getElementById('sidebarSearchInput');
@@ -776,9 +791,16 @@ class App {
 
         // Measures
         if (table.measures.length > 0) {
+            const MEASURES_INITIAL_BATCH = 20;
             html += `<h3>Measures (${table.measures.length})</h3>`;
-            for (const measure of table.measures) {
+            const initialMeasures = table.measures.slice(0, MEASURES_INITIAL_BATCH);
+            for (const measure of initialMeasures) {
                 html += this._renderMeasureCard(measure, table.name);
+            }
+            if (table.measures.length > MEASURES_INITIAL_BATCH) {
+                const remaining = table.measures.length - MEASURES_INITIAL_BATCH;
+                html += `<button type="button" class="btn-load-more-measures" data-table="${this._esc(table.name)}">Load ${remaining} more measure${remaining !== 1 ? 's' : ''}</button>`;
+                this._remainingMeasures = { tableName: table.name, measures: table.measures.slice(MEASURES_INITIAL_BATCH) };
             }
         }
 
