@@ -387,6 +387,28 @@ class App {
             document.getElementById('downloadBar').classList.remove('hidden');
             document.getElementById('appBody').classList.remove('hidden');
 
+            // Show inline sponsor banner (once ever per browser)
+            if (!localStorage.getItem('pbip-doc-banner-dismissed')) {
+                const banner = document.getElementById('sponsorBanner');
+                if (banner) {
+                    banner.classList.remove('hidden');
+                    document.getElementById('sponsorBannerClose').addEventListener('click', () => {
+                        banner.classList.add('hidden');
+                        localStorage.setItem('pbip-doc-banner-dismissed', '1');
+                    });
+                }
+            }
+
+            // Pulse animation on coffee button (first visit only)
+            if (!localStorage.getItem('pbip-doc-visited')) {
+                localStorage.setItem('pbip-doc-visited', '1');
+                const coffeeBtn = document.querySelector('.btn-sponsor-coffee');
+                if (coffeeBtn) {
+                    coffeeBtn.classList.add('pulse');
+                    coffeeBtn.addEventListener('animationend', () => coffeeBtn.classList.remove('pulse'));
+                }
+            }
+
             // Diagram rendering is deferred until the relationships section is shown
             this._diagramRendered = false;
 
@@ -1507,6 +1529,7 @@ class App {
                 const name = (this.parsedModel.database?.name || 'model') + '-documentation' + (suffixMap[scope] || '') + '.md';
                 this._downloadFile(md, name, 'text/markdown');
                 this.showToast('Markdown downloaded');
+                this._showValueMomentToast();
             } finally {
                 if (btn) { btn.innerHTML = originalHTML; btn.disabled = false; }
                 document.getElementById('mdOptions')?.classList.remove('open');
@@ -1534,6 +1557,7 @@ class App {
                 const name = (this.parsedModel.database?.name || 'model') + '-full-report' + (suffixMap[scope] || '') + '.html';
                 this._downloadFile(html, name, 'text/html');
                 this.showToast('Full report downloaded');
+                this._showValueMomentToast();
             } finally {
                 if (btn) { btn.innerHTML = originalHTML; btn.disabled = false; }
                 document.getElementById('htmlOptions')?.classList.remove('open');
@@ -1600,11 +1624,22 @@ class App {
         });
     }
 
-    showToast(message, type = '') {
+    _showValueMomentToast() {
+        if (!this.parsedModel) return;
+        const m = this.parsedModel;
+        const tables = m.tables.length;
+        const measures = m.tables.reduce((sum, t) => sum + t.measures.length, 0);
+        if (tables < 10 && measures < 20) return;
+        setTimeout(() => {
+            this.showToast(`Documented ${tables} tables and ${measures} measures in one click. Consider supporting development.`, '', 8000);
+        }, 5000);
+    }
+
+    showToast(message, type = '', duration = 4000) {
         const toast = document.getElementById('toast');
         toast.textContent = message;
         toast.className = 'toast' + (type === 'error' ? ' error' : '');
-        setTimeout(() => toast.classList.add('hidden'), 4000);
+        setTimeout(() => toast.classList.add('hidden'), duration);
     }
 
     showLoading(show, message) {

@@ -24,11 +24,11 @@
             <span class="header-subtitle">TMDL Documentation Generator</span>
         </div>
         <div class="header-right">
-            <a href="https://github.com/sponsors/JonathanJihwanKim" target="_blank" class="btn-sponsor btn-sponsor-github">
+            <a href="https://github.com/sponsors/JonathanJihwanKim?o=header" target="_blank" class="btn-sponsor btn-sponsor-github" title="Help keep this tool free">
                 <span class="material-symbols-outlined" style="font-size:16px">volunteer_activism</span>
                 Sponsor
             </a>
-            <a href="https://buymeacoffee.com/jihwankim" target="_blank" class="btn-sponsor btn-sponsor-coffee">
+            <a href="https://buymeacoffee.com/jihwankim?o=header" target="_blank" class="btn-sponsor btn-sponsor-coffee" title="Support with a one-time coffee">
                 <span class="material-symbols-outlined" style="font-size:16px">local_cafe</span>
                 Buy Me a Coffee
             </a>
@@ -124,6 +124,15 @@
                 <div class="stat-label">Visuals</div>
                 <div class="stat-hint" id="statVisualsHint"></div>
             </div>
+        </div>
+
+        <!-- Inline Sponsor Banner -->
+        <div id="sponsorBanner" class="sponsor-banner hidden">
+            <span class="sponsor-banner-text">Built by a solo developer. If this saves you time, consider
+                <a href="https://github.com/sponsors/JonathanJihwanKim?o=banner" target="_blank">sponsoring</a> or
+                <a href="https://buymeacoffee.com/jihwankim?o=banner" target="_blank">buying a coffee</a>.
+            </span>
+            <button type="button" id="sponsorBannerClose" class="sponsor-banner-close" title="Dismiss">&times;</button>
         </div>
 
         <!-- Download Bar -->
@@ -351,12 +360,12 @@
         <div class="footer-links">
             <a href="https://github.com/JonathanJihwanKim/pbip-documenter" target="_blank">GitHub</a>
             <span class="footer-divider">|</span>
-            <a href="https://github.com/sponsors/JonathanJihwanKim" target="_blank">
+            <a href="https://github.com/sponsors/JonathanJihwanKim?o=footer" target="_blank">
                 <span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle">volunteer_activism</span>
                 Sponsor
             </a>
             <span class="footer-divider">|</span>
-            <a href="https://buymeacoffee.com/jihwankim" target="_blank">
+            <a href="https://buymeacoffee.com/jihwankim?o=footer" target="_blank">
                 <span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle">local_cafe</span>
                 Buy Me a Coffee
             </a>
@@ -372,10 +381,10 @@
     <!-- Sponsor Toast -->
     <div id="sponsor-toast" class="sponsor-toast hidden">
         <div class="sponsor-toast-content">
-            <span class="sponsor-toast-text">This tool just saved you time. If it's useful, consider supporting development.</span>
+            <span class="sponsor-toast-text" id="sponsor-toast-text">This tool just saved you time. If it's useful, consider supporting development.</span>
             <div class="sponsor-toast-actions">
-                <a href="https://buymeacoffee.com/jihwankim" target="_blank" class="btn-sponsor-toast">Buy me a coffee</a>
-                <a href="https://github.com/sponsors/JonathanJihwanKim" target="_blank" class="btn-sponsor-toast-secondary">Sponsor on GitHub</a>
+                <a href="https://buymeacoffee.com/jihwankim?o=toast" target="_blank" class="btn-sponsor-toast">Buy me a coffee</a>
+                <a href="https://github.com/sponsors/JonathanJihwanKim?o=toast" target="_blank" class="btn-sponsor-toast-secondary">Sponsor on GitHub</a>
             </div>
             <button id="sponsor-toast-close" class="sponsor-toast-close" title="Dismiss">&times;</button>
         </div>
@@ -412,21 +421,38 @@
     <!-- Sponsor Toast Script -->
     <script>
     (function() {
-        const STORAGE_KEY = 'pbip-documenter-sponsor-toast-shown';
+        const DL_COUNT_KEY = 'pbip-doc-sponsor-dl-count';
+        const SESSION_KEY = 'pbip-doc-sponsor-session';
         function showSponsorToast() {
-            if (sessionStorage.getItem(STORAGE_KEY)) return;
-            const toast = document.getElementById('sponsor-toast');
+            // Increment download counter
+            var count = parseInt(localStorage.getItem(DL_COUNT_KEY) || '0', 10) + 1;
+            localStorage.setItem(DL_COUNT_KEY, String(count));
+            // Show on 1st download of each session AND every 3rd download thereafter
+            var shownThisSession = sessionStorage.getItem(SESSION_KEY);
+            var shouldShow = !shownThisSession || (count % 3 === 0);
+            if (!shouldShow) return;
+            sessionStorage.setItem(SESSION_KEY, '1');
+            var toast = document.getElementById('sponsor-toast');
             if (!toast) return;
+            // Dynamic copy with stats
+            var tables = document.getElementById('statTables');
+            var measures = document.getElementById('statMeasures');
+            var columns = document.getElementById('statColumns');
+            var textEl = document.getElementById('sponsor-toast-text');
+            if (textEl && tables && measures) {
+                var t = tables.textContent, m = measures.textContent, c = columns.textContent;
+                textEl.innerHTML = 'You just documented <strong>' + t + ' tables, ' + m + ' measures</strong>, and <strong>' + c + ' columns</strong>. This tool is free and built by one developer.';
+            }
             toast.classList.remove('hidden');
-            sessionStorage.setItem(STORAGE_KEY, '1');
+            toast.classList.add('slide-up');
             document.getElementById('sponsor-toast-close').addEventListener('click', function() {
                 toast.classList.add('hidden');
             });
-            setTimeout(function() { toast.classList.add('hidden'); }, 30000);
+            setTimeout(function() { toast.classList.add('hidden'); }, 45000);
         }
         // Hook into download buttons
         ['downloadHTMLAll', 'downloadHTMLModel', 'downloadHTMLVisual', 'downloadMDAll', 'downloadMDModel', 'downloadMDVisual'].forEach(function(id) {
-            const btn = document.getElementById(id);
+            var btn = document.getElementById(id);
             if (btn) {
                 btn.addEventListener('click', function() {
                     setTimeout(showSponsorToast, 2000);

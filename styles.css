@@ -959,6 +959,67 @@ tr:hover {
     color: var(--text);
 }
 
+/* ── INLINE SPONSOR BANNER ── */
+.sponsor-banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    background: #fffbee;
+    border: 1px solid #ffe082;
+    border-left: 4px solid var(--accent);
+    border-radius: var(--radius);
+    margin-bottom: 16px;
+    font-size: 13px;
+    color: var(--text);
+}
+
+.sponsor-banner a {
+    color: var(--primary);
+    font-weight: 600;
+    text-decoration: underline;
+}
+
+.sponsor-banner a:hover {
+    color: var(--primary-light);
+}
+
+.sponsor-banner-close {
+    margin-left: auto;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 18px;
+    color: var(--text-secondary);
+    line-height: 1;
+    padding: 0 2px;
+    flex-shrink: 0;
+}
+
+.sponsor-banner-close:hover {
+    color: var(--text);
+}
+
+/* ── SPONSOR PULSE ── */
+@keyframes sponsor-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(200, 150, 50, 0); }
+    50% { box-shadow: 0 0 8px 4px rgba(200, 150, 50, 0.4); }
+}
+
+.btn-sponsor-coffee.pulse {
+    animation: sponsor-pulse 2s ease-in-out 3;
+}
+
+/* ── SPONSOR TOAST SLIDE-UP ── */
+.sponsor-toast.slide-up {
+    animation: sponsorSlideUp 0.3s ease forwards;
+}
+
+@keyframes sponsorSlideUp {
+    from { transform: translateY(30px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
 /* ── FOOTER ── */
 .app-footer {
     padding: 16px 24px;

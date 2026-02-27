@@ -3,11 +3,12 @@
 **Generate comprehensive documentation from Power BI PBIP/TMDL semantic models — instantly, in your browser.**
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-▶%20Try%20It%20Now-blue?style=for-the-badge)](https://jonathanjihwankim.github.io/pbip-documenter/)
-[![GitHub Sponsors](https://img.shields.io/badge/Sponsor-❤-ea4aaa?style=for-the-badge)](https://github.com/sponsors/JonathanJihwanKim)
+[![GitHub Sponsors](https://img.shields.io/badge/Sponsor_from_7_EUR/mo-❤-ea4aaa?style=for-the-badge)](https://github.com/sponsors/JonathanJihwanKim)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-☕-orange?style=for-the-badge)](https://buymeacoffee.com/jihwankim)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 
-<!-- TODO: Add a screenshot here showing the app with a parsed model (e.g. relationship diagram view or model overview). A single compelling image dramatically increases engagement. -->
+<!-- TODO: Capture a screenshot of the app with a real model loaded (relationship diagram or model overview), save as docs/screenshot.png, and uncomment below -->
+<!-- ![PBIP Documenter Screenshot](docs/screenshot.png) -->
 
 ## What You Get
 
@@ -99,10 +100,14 @@ MyProject/
 
 ## Support This Project
 
-Built and maintained by **Jihwan Kim** ([Microsoft MVP](https://github.com/JonathanJihwanKim)). If this tool saves you time documenting your Power BI models, consider supporting its continued development:
+This is a **solo project**, built and maintained by **Jihwan Kim** ([Microsoft MVP](https://github.com/JonathanJihwanKim)). It's **free forever** — no paywalls, no premium tiers. If this tool saves you time documenting your Power BI models, consider supporting its continued development. Your support directly funds new features and maintenance.
 
 <a href="https://buymeacoffee.com/jihwankim"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-☕%20One--time%20support-orange?style=for-the-badge" alt="Buy Me a Coffee" /></a>
-<a href="https://github.com/sponsors/JonathanJihwanKim"><img src="https://img.shields.io/badge/GitHub%20Sponsors-❤%20Monthly%20sponsorship-ea4aaa?style=for-the-badge" alt="GitHub Sponsors" /></a>
+<a href="https://github.com/sponsors/JonathanJihwanKim"><img src="https://img.shields.io/badge/GitHub%20Sponsors-❤%20Monthly%20from%207%20EUR-ea4aaa?style=for-the-badge" alt="GitHub Sponsors" /></a>
+
+### Sponsors
+
+Be the first sponsor! Your name will appear here.
 
 Even a one-time coffee helps keep this tool free, maintained, and improving.
 
