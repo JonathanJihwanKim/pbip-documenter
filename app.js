@@ -767,7 +767,13 @@ class App {
                 html += `<div class="calc-item-card">
                     <h4>${this._esc(item.name)} <span class="badge badge-calc">Calc Item</span></h4>`;
                 if (item.expression) {
-                    html += `<details><summary>Expression</summary><div class="dax-block">${this._esc(item.expression)}</div></details>`;
+                    const lines = item.expression.split('\n');
+                    const shouldTruncate = lines.length > 5;
+                    const daxId = `dax-${Math.random().toString(36).substr(2, 9)}`;
+                    html += `<details><summary>Expression</summary>` +
+                        `<div class="dax-block${shouldTruncate ? ' truncated' : ''}" id="${daxId}">${this._esc(item.expression)}</div>` +
+                        (shouldTruncate ? `<button type="button" class="btn-dax-toggle" data-target="${daxId}">Show more</button>` : '') +
+                        `</details>`;
                 }
                 html += `</div>`;
             }
@@ -819,7 +825,11 @@ class App {
             for (const p of table.partitions) {
                 html += `<p><strong>${this._esc(p.name)}</strong> — mode: ${p.mode || 'default'}</p>`;
                 if (p.source) {
-                    html += `<div class="dax-block">${this._esc(p.source)}</div>`;
+                    const lines = p.source.split('\n');
+                    const shouldTruncate = lines.length > 5;
+                    const daxId = `dax-${Math.random().toString(36).substr(2, 9)}`;
+                    html += `<div class="dax-block${shouldTruncate ? ' truncated' : ''}" id="${daxId}">${this._esc(p.source)}</div>`;
+                    if (shouldTruncate) html += `<button type="button" class="btn-dax-toggle" data-target="${daxId}">Show more</button>`;
                 }
             }
         }
@@ -1000,12 +1010,18 @@ class App {
                 html += `<h3>${this._esc(expr.name)}</h3>`;
                 if (expr.kind) html += `<p><strong>Kind:</strong> ${expr.kind}</p>`;
                 if (expr.expression) {
-                    html += `<div class="dax-block">${this._esc(expr.expression)}</div>`;
+                    const lines = expr.expression.split('\n');
+                    const shouldTruncate = lines.length > 5;
+                    const daxId = `dax-${Math.random().toString(36).substr(2, 9)}`;
+                    html += `<div class="dax-block${shouldTruncate ? ' truncated' : ''}" id="${daxId}">${this._esc(expr.expression)}</div>`;
+                    if (shouldTruncate) html += `<button type="button" class="btn-dax-toggle" data-target="${daxId}">Show more</button>`;
                 }
             }
         }
 
-        document.getElementById('expressionsContent').innerHTML = html;
+        const expressionsEl = document.getElementById('expressionsContent');
+        expressionsEl.innerHTML = html;
+        this._bindDaxToggles(expressionsEl);
     }
 
     renderRelationshipDiagram() {
