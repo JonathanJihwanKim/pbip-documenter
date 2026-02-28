@@ -265,6 +265,13 @@ class LineageDiagramRenderer {
         const colPositions = [];
 
         for (const col of columns) {
+            if (col.items.length === 0) {
+                col._visibleCount = 0;
+                col._overflow = 0;
+                colPositions.push({ x: -1, items: [] });
+                continue;
+            }
+
             const visibleCount = Math.min(col.items.length, MAX_VISIBLE);
             col._visibleCount = visibleCount;
             col._overflow = col.items.length - visibleCount;
@@ -324,7 +331,6 @@ class LineageDiagramRenderer {
         for (let ci = 0; ci < columns.length; ci++) {
             const col = columns[ci];
             if (col.items.length === 0) {
-                x += layout.colWidth + layout.colGap;
                 continue;
             }
 

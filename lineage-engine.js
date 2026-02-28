@@ -39,11 +39,11 @@ class LineageEngine {
         for (const source of this.dataSources) {
             const id = `source:${MExpressionParser._sourceKey(source)}`;
             this.nodes.set(id, {
+                ...source,
                 id,
                 type: 'dataSource',
                 name: this._formatSourceName(source),
-                sourceType: source.type,
-                ...source
+                sourceType: source.type
             });
         }
 

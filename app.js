@@ -384,6 +384,7 @@ class App {
                 this.measureRefs
             );
             this.lineageEngine.buildGraph();
+            this._bindTraceButtonDelegation();
 
             // Create doc generator
             this.docGenerator = new DocGenerator(
@@ -522,6 +523,7 @@ class App {
                 this.measureRefs
             );
             this.lineageEngine.buildGraph();
+            this._bindTraceButtonDelegation();
 
             // Create doc generator
             this.docGenerator = new DocGenerator(
@@ -1214,6 +1216,32 @@ class App {
         this._bindDaxToggles(expressionsEl);
     }
 
+    _bindTraceButtonDelegation() {
+        if (this._traceDelegationBound) return;
+        this._traceDelegationBound = true;
+        document.getElementById('mainContent').addEventListener('click', (e) => {
+            const traceBtn = e.target.closest('.btn-trace-lineage[data-page][data-visual]');
+            if (!traceBtn) return;
+            const pageName = traceBtn.dataset.page;
+            const visualName = traceBtn.dataset.visual;
+            this.showSection('lineage');
+            // Switch to trace view
+            const toggle = document.getElementById('lineageToggle');
+            toggle.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.remove('active'));
+            toggle.querySelector('[data-view="trace"]').classList.add('active');
+            document.getElementById('lineageFullView').classList.add('hidden');
+            document.getElementById('lineageTraceView').classList.remove('hidden');
+            document.getElementById('lineageImpactView').classList.add('hidden');
+            // Set select and render
+            this._populateVisualSelect();
+            const sel = document.getElementById('lineageVisualSelect');
+            sel.value = `${pageName}|||${visualName}`;
+            const container = document.getElementById('lineageTraceDiagram');
+            const renderer = new LineageDiagramRenderer(container, this.lineageEngine);
+            renderer.renderVisualTrace(container, pageName, visualName);
+        });
+    }
+
     renderLineageView() {
         if (!this.lineageEngine) return;
 
@@ -1256,28 +1284,6 @@ class App {
                 renderer.renderMeasureImpact(container, measureName);
             });
 
-            // Trace button delegation (from visual cards)
-            document.getElementById('mainContent').addEventListener('click', (e) => {
-                const traceBtn = e.target.closest('.btn-trace-lineage[data-page][data-visual]');
-                if (!traceBtn) return;
-                const pageName = traceBtn.dataset.page;
-                const visualName = traceBtn.dataset.visual;
-                this.showSection('lineage');
-                // Switch to trace view
-                const toggle = document.getElementById('lineageToggle');
-                toggle.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.remove('active'));
-                toggle.querySelector('[data-view="trace"]').classList.add('active');
-                document.getElementById('lineageFullView').classList.add('hidden');
-                document.getElementById('lineageTraceView').classList.remove('hidden');
-                document.getElementById('lineageImpactView').classList.add('hidden');
-                // Set select and render
-                this._populateVisualSelect();
-                const sel = document.getElementById('lineageVisualSelect');
-                sel.value = `${pageName}|||${visualName}`;
-                const container = document.getElementById('lineageTraceDiagram');
-                const renderer = new LineageDiagramRenderer(container, this.lineageEngine);
-                renderer.renderVisualTrace(container, pageName, visualName);
-            });
         }
 
         // Render full lineage on first visit
