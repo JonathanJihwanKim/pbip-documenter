@@ -36,6 +36,8 @@ class App {
         document.getElementById('changeFolderBtn').addEventListener('click', () => this.openFolder());
         const sampleBtn = document.getElementById('btnSampleData');
         if (sampleBtn) sampleBtn.addEventListener('click', () => this.loadSampleData());
+        const exportSampleBtn = document.getElementById('btnExportSampleData');
+        if (exportSampleBtn) exportSampleBtn.addEventListener('click', () => this.exportSampleData());
         document.getElementById('downloadFullReport').addEventListener('click', () => {
             document.getElementById('htmlOptions').classList.toggle('open');
         });
@@ -454,6 +456,40 @@ class App {
     // DEMO / SAMPLE DATA MODE
     // ──────────────────────────────────────────────
 
+    exportSampleData() {
+        if (!this.parsedModel) {
+            this.showToast('Open a PBIP folder first, then export.', 'error');
+            return;
+        }
+        const modelName = this.parsedModel.database?.name || this.parsedModel.model?.name || 'sample';
+        const totalMeasures = this.parsedModel.tables.reduce((s, t) => s + t.measures.length, 0);
+        const totalVisuals = this.visualData?.visuals?.length || 0;
+
+        const output = JSON.stringify({
+            parsedModel: this.parsedModel,
+            measureRefs: this.measureRefs || {},
+            visualData: this.visualData || null,
+            fieldUsageMap: this.visualData?.fieldUsageMap || {},
+            _meta: {
+                exportedAt: new Date().toISOString(),
+                modelName,
+                tables: this.parsedModel.tables.length,
+                measures: totalMeasures,
+                visuals: totalVisuals,
+                note: 'Pre-parsed demo data for pbip-documenter sample mode'
+            }
+        }, null, 2);
+
+        const blob = new Blob([output], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'contoso.json';
+        a.click();
+        URL.revokeObjectURL(a.href);
+
+        this.showToast(`Downloaded contoso.json — place it in the samples/ folder to enable demo mode.`, 'success');
+    }
+
     async loadSampleData() {
         const btn = document.getElementById('btnSampleData');
         const origLabel = btn ? btn.innerHTML : '';
@@ -466,8 +502,9 @@ class App {
             const resp = await fetch('samples/contoso.json');
             if (!resp.ok) {
                 throw new Error(
-                    `Sample data not found (${resp.status}). ` +
-                    `Open scripts/generate-sample.html in Chrome to generate it first.`
+                    `Sample data not found. To set it up: open your Contoso PBIP folder normally, ` +
+                    `then click "Export as demo data" in the download bar to download contoso.json, ` +
+                    `and place it in the samples/ folder.`
                 );
             }
             const data = await resp.json();
@@ -530,7 +567,10 @@ class App {
             this._diagramRendered = false;
 
         } catch (err) {
-            this.showToast('Could not load sample data: ' + err.message, 'error');
+            const msg = err.name === 'TypeError' && err.message.includes('fetch')
+                ? 'Sample data not ready. Open your Contoso folder → click "Export as demo data" in the download bar → save as samples/contoso.json.'
+                : 'Could not load sample data: ' + err.message;
+            this.showToast(msg, 'error');
             console.error('loadSampleData error:', err);
         } finally {
             if (btn) {

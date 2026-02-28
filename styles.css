@@ -330,6 +330,25 @@ body {
     transform: translate(1px, 1px);
 }
 
+.btn-export-sample {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border-light);
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all var(--transition);
+}
+
+.btn-export-sample:hover {
+    color: var(--primary);
+    border-color: var(--primary);
+}
+
 .btn-sample-data {
     display: inline-flex;
     align-items: center;

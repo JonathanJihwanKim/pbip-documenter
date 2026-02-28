@@ -1,0 +1,3081 @@
+{
+  "parsedModel": {
+    "database": {
+      "name": "",
+      "compatibilityLevel": "1702"
+    },
+    "model": {
+      "name": "Model",
+      "culture": "en-US",
+      "defaultPowerBIDataSourceVersion": "powerBI_V3"
+    },
+    "tables": [
+      {
+        "name": "currencyexchange",
+        "description": null,
+        "isHidden": false,
+        "columns": [
+          {
+            "name": "Date",
+            "description": null,
+            "dataType": "dateTime",
+            "formatString": "Long Date",
+            "isHidden": false,
+            "sourceColumn": "Date",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "FromCurrency",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "FromCurrency",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "ToCurrency",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "ToCurrency",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "Exchange",
+            "description": null,
+            "dataType": "double",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "Exchange",
+            "summarizeBy": "sum",
+            "expression": null
+          }
+        ],
+        "measures": [],
+        "hierarchies": [],
+        "partitions": [
+          {
+            "name": "currencyexchange",
+            "mode": null,
+            "source": "m\n\t\tmode: import\r\n\t\tsource =\r\n\t\t\t\tlet\r\n\t\t\t\t    Source = Sql.Database(\"77oajh3wezeejnmdlu54fth3om-fauoi4qioy3exagkarwjglds2y.datawarehouse.fabric.microsoft.com\", \"Lakehouse_Contoso\"),\r\n\t\t\t\t    dbo_currencyexchange = Source{[Schema=\"dbo\",Item=\"currencyexchange\"]}[Data]\r\n\t\t\t\tin\r\n\t\t\t\t    dbo_currencyexchange\r",
+            "sourceType": null
+          }
+        ],
+        "calculationGroup": null
+      },
+      {
+        "name": "customer",
+        "description": null,
+        "isHidden": false,
+        "columns": [
+          {
+            "name": "CustomerKey",
+            "description": null,
+            "dataType": "int64",
+            "formatString": "0",
+            "isHidden": false,
+            "sourceColumn": "CustomerKey",
+            "summarizeBy": "count",
+            "expression": null
+          },
+          {
+            "name": "GeoAreaKey",
+            "description": null,
+            "dataType": "int64",
+            "formatString": "0",
+            "isHidden": false,
+            "sourceColumn": "GeoAreaKey",
+            "summarizeBy": "count",
+            "expression": null
+          },
+          {
+            "name": "StartDT",
+            "description": null,
+            "dataType": "dateTime",
+            "formatString": "Long Date",
+            "isHidden": false,
+            "sourceColumn": "StartDT",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "EndDT",
+            "description": null,
+            "dataType": "dateTime",
+            "formatString": "Long Date",
+            "isHidden": false,
+            "sourceColumn": "EndDT",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "Continent",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "Continent",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "Gender",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "Gender",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "Title",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "Title",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "GivenName",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "GivenName",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "MiddleInitial",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "MiddleInitial",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "Surname",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "Surname",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "StreetAddress",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "StreetAddress",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "City",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "City",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "State",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "State",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "StateFull",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "StateFull",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "ZipCode",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "ZipCode",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "Country",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "Country",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "CountryFull",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "CountryFull",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "Birthday",
+            "description": null,
+            "dataType": "dateTime",
+            "formatString": "Long Date",
+            "isHidden": false,
+            "sourceColumn": "Birthday",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "Age",
+            "description": null,
+            "dataType": "int64",
+            "formatString": "0",
+            "isHidden": false,
+            "sourceColumn": "Age",
+            "summarizeBy": "sum",
+            "expression": null
+          },
+          {
+            "name": "Occupation",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "Occupation",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "Company",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "Company",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "Vehicle",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "Vehicle",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "Latitude",
+            "description": null,
+            "dataType": "double",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "Latitude",
+            "summarizeBy": "sum",
+            "expression": null
+          },
+          {
+            "name": "Longitude",
+            "description": null,
+            "dataType": "double",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "Longitude",
+            "summarizeBy": "sum",
+            "expression": null
+          }
+        ],
+        "measures": [],
+        "hierarchies": [],
+        "partitions": [
+          {
+            "name": "customer",
+            "mode": null,
+            "source": "m\n\t\tmode: import\r\n\t\tsource =\r\n\t\t\t\tlet\r\n\t\t\t\t    Source = Sql.Database(\"77oajh3wezeejnmdlu54fth3om-fauoi4qioy3exagkarwjglds2y.datawarehouse.fabric.microsoft.com\", \"Lakehouse_Contoso\"),\r\n\t\t\t\t    dbo_customer = Source{[Schema=\"dbo\",Item=\"customer\"]}[Data]\r\n\t\t\t\tin\r\n\t\t\t\t    dbo_customer\r",
+            "sourceType": null
+          }
+        ],
+        "calculationGroup": null
+      },
+      {
+        "name": "date",
+        "description": null,
+        "isHidden": false,
+        "columns": [
+          {
+            "name": "Date",
+            "description": null,
+            "dataType": "dateTime",
+            "formatString": "Long Date",
+            "isHidden": false,
+            "sourceColumn": "Date",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "DateKey",
+            "description": null,
+            "dataType": "int64",
+            "formatString": "0",
+            "isHidden": false,
+            "sourceColumn": "DateKey",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "Year",
+            "description": null,
+            "dataType": "int64",
+            "formatString": "0",
+            "isHidden": false,
+            "sourceColumn": "Year",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "YearQuarter",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "YearQuarter",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "YearQuarterNumber",
+            "description": null,
+            "dataType": "int64",
+            "formatString": "0",
+            "isHidden": false,
+            "sourceColumn": "YearQuarterNumber",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "Quarter",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "Quarter",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "YearMonth",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "YearMonth",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "YearMonthShort",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "YearMonthShort",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "YearMonthNumber",
+            "description": null,
+            "dataType": "int64",
+            "formatString": "0",
+            "isHidden": false,
+            "sourceColumn": "YearMonthNumber",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "Month",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "Month",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "MonthShort",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "MonthShort",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "MonthNumber",
+            "description": null,
+            "dataType": "int64",
+            "formatString": "0",
+            "isHidden": false,
+            "sourceColumn": "MonthNumber",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "DayofWeek",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "DayofWeek",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "DayofWeekShort",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "DayofWeekShort",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "DayofWeekNumber",
+            "description": null,
+            "dataType": "int64",
+            "formatString": "0",
+            "isHidden": false,
+            "sourceColumn": "DayofWeekNumber",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "WorkingDay",
+            "description": null,
+            "dataType": "int64",
+            "formatString": "0",
+            "isHidden": false,
+            "sourceColumn": "WorkingDay",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "WorkingDayNumber",
+            "description": null,
+            "dataType": "int64",
+            "formatString": "0",
+            "isHidden": false,
+            "sourceColumn": "WorkingDayNumber",
+            "summarizeBy": "none",
+            "expression": null
+          }
+        ],
+        "measures": [],
+        "hierarchies": [],
+        "partitions": [
+          {
+            "name": "date",
+            "mode": null,
+            "source": "m\n\t\tmode: import\r\n\t\tsource =\r\n\t\t\t\tlet\r\n\t\t\t\t    Source = Sql.Database(\"77oajh3wezeejnmdlu54fth3om-fauoi4qioy3exagkarwjglds2y.datawarehouse.fabric.microsoft.com\", \"Lakehouse_Contoso\"),\r\n\t\t\t\t    dbo_date = Source{[Schema=\"dbo\",Item=\"date\"]}[Data]\r\n\t\t\t\tin\r\n\t\t\t\t    dbo_date\r",
+            "sourceType": null
+          }
+        ],
+        "calculationGroup": null
+      },
+      {
+        "name": "Internal Measures",
+        "description": null,
+        "isHidden": false,
+        "columns": [],
+        "measures": [
+          {
+            "name": "SPLY Number of Customers",
+            "description": null,
+            "expression": "\tTimeIntel.PeriodCompare([Number of Customers], 'date'[Date], 1, \"year\")\r\nformatString: 0\r\nlineageTag: 93482cc6-ab8e-4a7b-9329-e9c225507a50\r",
+            "displayFolder": null,
+            "formatString": null,
+            "dataCategory": null
+          },
+          {
+            "name": "Total Sales",
+            "description": null,
+            "expression": "SUMX(sales, sales[Quantity] * sales[UnitPrice])\n\t\tlineageTag: 74ad0a37-c17e-4237-aadf-af5a2bf02505\r",
+            "displayFolder": null,
+            "formatString": null,
+            "dataCategory": null
+          }
+        ],
+        "hierarchies": [],
+        "partitions": [
+          {
+            "name": "Internal Measures",
+            "mode": null,
+            "source": "m\n\t\tmode: import\r\n\t\tsource =\r\n\t\t\t\tlet\r\n\t\t\t\t    Source = Table.FromRows(Json.Document(Binary.Decompress(Binary.FromText(\"i44FAA==\", BinaryEncoding.Base64), Compression.Deflate)), let _t = ((type nullable text) meta [Serialized.Text = true]) in type table [Column1 = _t]),\r\n\t\t\t\t    #\"Removed Columns\" = Table.RemoveColumns(Source,{\"Column1\"})\r\n\t\t\t\tin\r\n\t\t\t\t    #\"Removed Columns\"\r",
+            "sourceType": null
+          }
+        ],
+        "calculationGroup": null
+      },
+      {
+        "name": "Measure",
+        "description": null,
+        "isHidden": false,
+        "columns": [
+          {
+            "name": "Measure",
+            "description": null,
+            "dataType": null,
+            "formatString": null,
+            "isHidden": true,
+            "sourceColumn": "[Measure]",
+            "summarizeBy": null,
+            "expression": null
+          }
+        ],
+        "measures": [
+          {
+            "name": "Number of Orders",
+            "description": null,
+            "expression": "DISTINCTCOUNT(sales[OrderKey])\n\t\tlineageTag: e48d1c20-bf62-41ae-bc0e-b01513b22270\r",
+            "displayFolder": null,
+            "formatString": null,
+            "dataCategory": null
+          },
+          {
+            "name": "Total Quantity",
+            "description": null,
+            "expression": "SUM(sales[Quantity])\n\t\tlineageTag: edad3d59-6467-41fd-b7df-76d3a1d1b5e6\r",
+            "displayFolder": null,
+            "formatString": null,
+            "dataCategory": null
+          },
+          {
+            "name": "Number of Customers",
+            "description": null,
+            "expression": "DISTINCTCOUNT(sales[CustomerKey])\n\t\tlineageTag: df317859-3dec-46c8-8dd5-238d11c9c9dd\r",
+            "displayFolder": null,
+            "formatString": null,
+            "dataCategory": null
+          },
+          {
+            "name": "Total Cost",
+            "description": null,
+            "expression": "SUMX(sales, sales[Quantity] * sales[UnitCost])\n\t\tlineageTag: 97dccee8-f4d9-41a6-a0f8-6a5e5ed6df6f\r",
+            "displayFolder": null,
+            "formatString": null,
+            "dataCategory": null
+          },
+          {
+            "name": "Number of Stores",
+            "description": null,
+            "expression": "DISTINCTCOUNT(sales[StoreKey])\n\t\tlineageTag: 6938c631-dceb-4b47-8b10-aa30f202a3b0\r",
+            "displayFolder": null,
+            "formatString": null,
+            "dataCategory": null
+          },
+          {
+            "name": "Number of Products Sold",
+            "description": null,
+            "expression": "DISTINCTCOUNT(sales[ProductKey])\n\t\tlineageTag: 9a8ac9ea-f0ea-48ea-81b1-1ce0187aeb50\r",
+            "displayFolder": null,
+            "formatString": null,
+            "dataCategory": null
+          },
+          {
+            "name": "SPLY Number of Orders",
+            "description": null,
+            "expression": "\tTimeIntel.PeriodCompare([Number of Orders],'date'[Date],1,\"Year\")\r\nformatString: 0\r\nlineageTag: 400911be-52d8-4836-9e84-c3399da16771\r",
+            "displayFolder": null,
+            "formatString": null,
+            "dataCategory": null
+          },
+          {
+            "name": "Number of Orders YoY",
+            "description": null,
+            "expression": "\tTimeIntel.PeriodVariance([Number of Orders], 'date'[Date], 1, \"year\", \"absolute\")\r\nlineageTag: 5fb5b889-8aef-4f72-8e20-f0492a240d76\r\nannotation PBI_FormatHint = {\"isGeneralNumber\":true}\r",
+            "displayFolder": null,
+            "formatString": null,
+            "dataCategory": null
+          }
+        ],
+        "hierarchies": [],
+        "partitions": [
+          {
+            "name": "Measure",
+            "mode": null,
+            "source": "calculated\n\t\tmode: import\r\n\t\tsource = ROW(\"Measure\", 1)\r",
+            "sourceType": null
+          }
+        ],
+        "calculationGroup": null
+      },
+      {
+        "name": "prm_measures",
+        "description": null,
+        "isHidden": false,
+        "columns": [
+          {
+            "name": "prm_measures",
+            "description": null,
+            "dataType": null,
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "[Value1]",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "prm_measures Fields",
+            "description": null,
+            "dataType": null,
+            "formatString": null,
+            "isHidden": true,
+            "sourceColumn": "[Value2]",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "prm_measures Order",
+            "description": null,
+            "dataType": null,
+            "formatString": "0",
+            "isHidden": true,
+            "sourceColumn": "[Value3]",
+            "summarizeBy": "sum",
+            "expression": null
+          }
+        ],
+        "measures": [],
+        "hierarchies": [],
+        "partitions": [
+          {
+            "name": "prm_measures",
+            "mode": null,
+            "source": "calculated\n\t\tmode: import\r\n\t\tsource =\r\n\t\t\t\t{\r\n\t\t\t\t    (\"Number of Orders\", NAMEOF('Measure'[Number of Orders]), 0),\r\n\t\t\t\t    (\"Total Cost\", NAMEOF('Measure'[Total Cost]), 1),\r\n\t\t\t\t    (\"Total Quantity\", NAMEOF('Measure'[Total Quantity]), 2)\r\n\t\t\t\t}\r",
+            "sourceType": null
+          }
+        ],
+        "calculationGroup": null
+      },
+      {
+        "name": "product",
+        "description": null,
+        "isHidden": false,
+        "columns": [
+          {
+            "name": "ProductKey",
+            "description": null,
+            "dataType": "int64",
+            "formatString": "0",
+            "isHidden": false,
+            "sourceColumn": "ProductKey",
+            "summarizeBy": "count",
+            "expression": null
+          },
+          {
+            "name": "ProductCode",
+            "description": null,
+            "dataType": "int64",
+            "formatString": "0",
+            "isHidden": false,
+            "sourceColumn": "ProductCode",
+            "summarizeBy": "count",
+            "expression": null
+          },
+          {
+            "name": "ProductName",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "ProductName",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "Manufacturer",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "Manufacturer",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "Brand",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "Brand",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "Color",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "Color",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "WeightUnit",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "WeightUnit",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "Weight",
+            "description": null,
+            "dataType": "double",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "Weight",
+            "summarizeBy": "sum",
+            "expression": null
+          },
+          {
+            "name": "Cost",
+            "description": null,
+            "dataType": "double",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "Cost",
+            "summarizeBy": "sum",
+            "expression": null
+          },
+          {
+            "name": "Price",
+            "description": null,
+            "dataType": "double",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "Price",
+            "summarizeBy": "sum",
+            "expression": null
+          },
+          {
+            "name": "CategoryKey",
+            "description": null,
+            "dataType": "int64",
+            "formatString": "0",
+            "isHidden": false,
+            "sourceColumn": "CategoryKey",
+            "summarizeBy": "count",
+            "expression": null
+          },
+          {
+            "name": "CategoryName",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "CategoryName",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "SubCategoryKey",
+            "description": null,
+            "dataType": "int64",
+            "formatString": "0",
+            "isHidden": false,
+            "sourceColumn": "SubCategoryKey",
+            "summarizeBy": "count",
+            "expression": null
+          },
+          {
+            "name": "SubCategoryName",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "SubCategoryName",
+            "summarizeBy": "none",
+            "expression": null
+          }
+        ],
+        "measures": [],
+        "hierarchies": [],
+        "partitions": [
+          {
+            "name": "product",
+            "mode": null,
+            "source": "m\n\t\tmode: import\r\n\t\tsource =\r\n\t\t\t\tlet\r\n\t\t\t\t    Source = Sql.Database(\"77oajh3wezeejnmdlu54fth3om-fauoi4qioy3exagkarwjglds2y.datawarehouse.fabric.microsoft.com\", \"Lakehouse_Contoso\"),\r\n\t\t\t\t    dbo_product = Source{[Schema=\"dbo\",Item=\"product\"]}[Data]\r\n\t\t\t\tin\r\n\t\t\t\t    dbo_product\r",
+            "sourceType": null
+          }
+        ],
+        "calculationGroup": null
+      },
+      {
+        "name": "sales",
+        "description": null,
+        "isHidden": false,
+        "columns": [
+          {
+            "name": "OrderKey",
+            "description": null,
+            "dataType": "int64",
+            "formatString": "0",
+            "isHidden": false,
+            "sourceColumn": "OrderKey",
+            "summarizeBy": "count",
+            "expression": null
+          },
+          {
+            "name": "LineNumber",
+            "description": null,
+            "dataType": "int64",
+            "formatString": "0",
+            "isHidden": false,
+            "sourceColumn": "LineNumber",
+            "summarizeBy": "sum",
+            "expression": null
+          },
+          {
+            "name": "OrderDate",
+            "description": null,
+            "dataType": "dateTime",
+            "formatString": "Long Date",
+            "isHidden": false,
+            "sourceColumn": "OrderDate",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "DeliveryDate",
+            "description": null,
+            "dataType": "dateTime",
+            "formatString": "Long Date",
+            "isHidden": false,
+            "sourceColumn": "DeliveryDate",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "CustomerKey",
+            "description": null,
+            "dataType": "int64",
+            "formatString": "0",
+            "isHidden": false,
+            "sourceColumn": "CustomerKey",
+            "summarizeBy": "count",
+            "expression": null
+          },
+          {
+            "name": "StoreKey",
+            "description": null,
+            "dataType": "int64",
+            "formatString": "0",
+            "isHidden": false,
+            "sourceColumn": "StoreKey",
+            "summarizeBy": "count",
+            "expression": null
+          },
+          {
+            "name": "ProductKey",
+            "description": null,
+            "dataType": "int64",
+            "formatString": "0",
+            "isHidden": false,
+            "sourceColumn": "ProductKey",
+            "summarizeBy": "count",
+            "expression": null
+          },
+          {
+            "name": "Quantity",
+            "description": null,
+            "dataType": "int64",
+            "formatString": "0",
+            "isHidden": false,
+            "sourceColumn": "Quantity",
+            "summarizeBy": "sum",
+            "expression": null
+          },
+          {
+            "name": "UnitPrice",
+            "description": null,
+            "dataType": "double",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "UnitPrice",
+            "summarizeBy": "sum",
+            "expression": null
+          },
+          {
+            "name": "NetPrice",
+            "description": null,
+            "dataType": "double",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "NetPrice",
+            "summarizeBy": "sum",
+            "expression": null
+          },
+          {
+            "name": "UnitCost",
+            "description": null,
+            "dataType": "double",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "UnitCost",
+            "summarizeBy": "sum",
+            "expression": null
+          },
+          {
+            "name": "CurrencyCode",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "CurrencyCode",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "ExchangeRate",
+            "description": null,
+            "dataType": "double",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "ExchangeRate",
+            "summarizeBy": "sum",
+            "expression": null
+          }
+        ],
+        "measures": [],
+        "hierarchies": [],
+        "partitions": [
+          {
+            "name": "sales",
+            "mode": null,
+            "source": "m\n\t\tmode: import\r\n\t\tsource =\r\n\t\t\t\tlet\r\n\t\t\t\t    Source = Sql.Database(\"77oajh3wezeejnmdlu54fth3om-fauoi4qioy3exagkarwjglds2y.datawarehouse.fabric.microsoft.com\", \"Lakehouse_Contoso\"),\r\n\t\t\t\t    dbo_sales = Source{[Schema=\"dbo\",Item=\"sales\"]}[Data],\r\n\t\t\t\t    #\"Filtered Rows\" = Table.SelectRows(dbo_sales, each List.Contains(filter_country, [StoreKey])),\r\n\t\t\t\t    Filter_or_not = if data_model_filter = 1 then #\"Filtered Rows\" else dbo_sales\r\n\t\t\t\tin\r\n\t\t\t\t    Filter_or_not\r",
+            "sourceType": null
+          }
+        ],
+        "calculationGroup": null
+      },
+      {
+        "name": "store",
+        "description": null,
+        "isHidden": false,
+        "columns": [
+          {
+            "name": "StoreKey",
+            "description": null,
+            "dataType": "int64",
+            "formatString": "0",
+            "isHidden": false,
+            "sourceColumn": "StoreKey",
+            "summarizeBy": "count",
+            "expression": null
+          },
+          {
+            "name": "StoreCode",
+            "description": null,
+            "dataType": "int64",
+            "formatString": "0",
+            "isHidden": false,
+            "sourceColumn": "StoreCode",
+            "summarizeBy": "count",
+            "expression": null
+          },
+          {
+            "name": "GeoAreaKey",
+            "description": null,
+            "dataType": "int64",
+            "formatString": "0",
+            "isHidden": false,
+            "sourceColumn": "GeoAreaKey",
+            "summarizeBy": "count",
+            "expression": null
+          },
+          {
+            "name": "CountryCode",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "CountryCode",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "CountryName",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "CountryName",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "State",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "State",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "OpenDate",
+            "description": null,
+            "dataType": "dateTime",
+            "formatString": "Long Date",
+            "isHidden": false,
+            "sourceColumn": "OpenDate",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "CloseDate",
+            "description": null,
+            "dataType": "dateTime",
+            "formatString": "Long Date",
+            "isHidden": false,
+            "sourceColumn": "CloseDate",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "Description",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "Description",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "SquareMeters",
+            "description": null,
+            "dataType": "int64",
+            "formatString": "0",
+            "isHidden": false,
+            "sourceColumn": "SquareMeters",
+            "summarizeBy": "sum",
+            "expression": null
+          },
+          {
+            "name": "Status",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "Status",
+            "summarizeBy": "none",
+            "expression": null
+          }
+        ],
+        "measures": [],
+        "hierarchies": [],
+        "partitions": [
+          {
+            "name": "store",
+            "mode": null,
+            "source": "m\n\t\tmode: import\r\n\t\tsource =\r\n\t\t\t\tlet\r\n\t\t\t\t    Source = Sql.Database(\"77oajh3wezeejnmdlu54fth3om-fauoi4qioy3exagkarwjglds2y.datawarehouse.fabric.microsoft.com\", \"Lakehouse_Contoso\"),\r\n\t\t\t\t    dbo_store = Source{[Schema=\"dbo\",Item=\"store\"]}[Data]\r\n\t\t\t\tin\r\n\t\t\t\t    dbo_store\r",
+            "sourceType": null
+          }
+        ],
+        "calculationGroup": null
+      },
+      {
+        "name": "This Year Last Year",
+        "description": null,
+        "isHidden": false,
+        "columns": [
+          {
+            "name": "This Year vs. Last Year",
+            "description": null,
+            "dataType": "string",
+            "formatString": null,
+            "isHidden": false,
+            "sourceColumn": "Name",
+            "summarizeBy": "none",
+            "expression": null
+          },
+          {
+            "name": "Ordinal",
+            "description": null,
+            "dataType": "int64",
+            "formatString": "0",
+            "isHidden": false,
+            "sourceColumn": "Ordinal",
+            "summarizeBy": "sum",
+            "expression": null
+          }
+        ],
+        "measures": [],
+        "hierarchies": [],
+        "partitions": [],
+        "calculationGroup": {
+          "items": [
+            {
+              "name": "This Year",
+              "expression": "SELECTEDMEASURE()"
+            },
+            {
+              "name": "Last Year",
+              "expression": "CALCULATE( SELECTEDMEASURE(), SAMEPERIODLASTYEAR('date'[Date]))"
+            }
+          ]
+        }
+      }
+    ],
+    "relationships": [
+      {
+        "id": "date_sales_orderdate",
+        "fromTable": "sales",
+        "fromColumn": "OrderDate",
+        "toTable": "date",
+        "toColumn": "Date",
+        "fromCardinality": null,
+        "toCardinality": null,
+        "crossFilteringBehavior": null,
+        "isActive": true
+      },
+      {
+        "id": "product_sales",
+        "fromTable": "sales",
+        "fromColumn": "ProductKey",
+        "toTable": "product",
+        "toColumn": "ProductKey",
+        "fromCardinality": null,
+        "toCardinality": null,
+        "crossFilteringBehavior": null,
+        "isActive": true
+      },
+      {
+        "id": "customer_sales",
+        "fromTable": "sales",
+        "fromColumn": "CustomerKey",
+        "toTable": "customer",
+        "toColumn": "CustomerKey",
+        "fromCardinality": null,
+        "toCardinality": null,
+        "crossFilteringBehavior": null,
+        "isActive": true
+      },
+      {
+        "id": "store_sales",
+        "fromTable": "sales",
+        "fromColumn": "StoreKey",
+        "toTable": "store",
+        "toColumn": "StoreKey",
+        "fromCardinality": null,
+        "toCardinality": null,
+        "crossFilteringBehavior": null,
+        "isActive": true
+      }
+    ],
+    "roles": [],
+    "expressions": [
+      {
+        "name": "data_model_filter",
+        "kind": null,
+        "expression": "1 meta [IsParameterQuery=true, Type=\"Number\", IsParameterQueryRequired=true]\nlineageTag: 956c50c8-27ef-4275-be37-d3488faf89a6\nannotation PBI_NavigationStepName = Navigation\nannotation PBI_ResultType = Number"
+      },
+      {
+        "name": "filter_country",
+        "kind": null,
+        "expression": "let\nSource = store,\n#\"Filtered Rows\" = Table.SelectRows(Source, each ([CountryName] = \"Netherlands\")),\nStoreKey = #\"Filtered Rows\"[StoreKey]\nin\nStoreKey\nlineageTag: ea9e0a81-8548-41bc-b30d-0ae9190772dc\nannotation PBI_NavigationStepName = Navigation\nannotation PBI_ResultType = List"
+      }
+    ]
+  },
+  "measureRefs": {
+    "SPLY Number of Customers": {
+      "measureRefs": [
+        "Number of Customers"
+      ],
+      "columnRefs": [
+        {
+          "table": "date",
+          "column": "Date"
+        }
+      ],
+      "tableRefs": [],
+      "table": "Internal Measures"
+    },
+    "Total Sales": {
+      "measureRefs": [],
+      "columnRefs": [
+        {
+          "table": "sales",
+          "column": "Quantity"
+        },
+        {
+          "table": "sales",
+          "column": "UnitPrice"
+        }
+      ],
+      "tableRefs": [],
+      "table": "Internal Measures"
+    },
+    "Number of Orders": {
+      "measureRefs": [],
+      "columnRefs": [
+        {
+          "table": "sales",
+          "column": "OrderKey"
+        }
+      ],
+      "tableRefs": [],
+      "table": "Measure"
+    },
+    "Total Quantity": {
+      "measureRefs": [],
+      "columnRefs": [
+        {
+          "table": "sales",
+          "column": "Quantity"
+        }
+      ],
+      "tableRefs": [],
+      "table": "Measure"
+    },
+    "Number of Customers": {
+      "measureRefs": [],
+      "columnRefs": [
+        {
+          "table": "sales",
+          "column": "CustomerKey"
+        }
+      ],
+      "tableRefs": [],
+      "table": "Measure"
+    },
+    "Total Cost": {
+      "measureRefs": [],
+      "columnRefs": [
+        {
+          "table": "sales",
+          "column": "Quantity"
+        },
+        {
+          "table": "sales",
+          "column": "UnitCost"
+        }
+      ],
+      "tableRefs": [],
+      "table": "Measure"
+    },
+    "Number of Stores": {
+      "measureRefs": [],
+      "columnRefs": [
+        {
+          "table": "sales",
+          "column": "StoreKey"
+        }
+      ],
+      "tableRefs": [],
+      "table": "Measure"
+    },
+    "Number of Products Sold": {
+      "measureRefs": [],
+      "columnRefs": [
+        {
+          "table": "sales",
+          "column": "ProductKey"
+        }
+      ],
+      "tableRefs": [],
+      "table": "Measure"
+    },
+    "SPLY Number of Orders": {
+      "measureRefs": [
+        "Number of Orders"
+      ],
+      "columnRefs": [
+        {
+          "table": "date",
+          "column": "Date"
+        }
+      ],
+      "tableRefs": [],
+      "table": "Measure"
+    },
+    "Number of Orders YoY": {
+      "measureRefs": [
+        "Number of Orders"
+      ],
+      "columnRefs": [
+        {
+          "table": "date",
+          "column": "Date"
+        }
+      ],
+      "tableRefs": [],
+      "table": "Measure"
+    }
+  },
+  "visualData": {
+    "pages": [
+      {
+        "id": "43c89f02456a2074915c",
+        "name": "43c89f02456a2074915c",
+        "displayName": "Landing Page",
+        "pageWidth": 1280,
+        "pageHeight": 720,
+        "visuals": [
+          {
+            "visualType": "clusteredColumnChart",
+            "visualName": "clusteredColumnChart",
+            "pageName": "Landing Page",
+            "fields": [
+              {
+                "type": "column",
+                "table": "date",
+                "column": "Date",
+                "name": "Date",
+                "projectionName": "Category"
+              },
+              {
+                "type": "measure",
+                "table": "Measure",
+                "entity": "Measure",
+                "name": "Number of Orders",
+                "projectionName": "Y"
+              }
+            ],
+            "position": {
+              "x": 767.7676950998185,
+              "y": 69.69147005444646,
+              "z": 3,
+              "height": 209.07441016333937,
+              "width": 346.13430127041744,
+              "tabOrder": 2
+            },
+            "visualId": "363b1417392159a4e7b6",
+            "pageId": "43c89f02456a2074915c"
+          },
+          {
+            "visualType": "tableEx",
+            "visualName": "tableEx",
+            "pageName": "Landing Page",
+            "fields": [
+              {
+                "type": "column",
+                "table": "date",
+                "column": "YearMonth",
+                "name": "YearMonth",
+                "projectionName": "Values"
+              },
+              {
+                "type": "measure",
+                "table": "Measure",
+                "entity": "Measure",
+                "name": "Number of Orders",
+                "projectionName": "Values"
+              },
+              {
+                "type": "measure",
+                "table": "Measure",
+                "entity": "Measure",
+                "name": "SPLY Number of Orders",
+                "projectionName": "Values"
+              },
+              {
+                "type": "measure",
+                "table": "Measure",
+                "entity": "Measure",
+                "name": "Number of Orders YoY",
+                "projectionName": "Values"
+              },
+              {
+                "type": "measure",
+                "table": "Measure",
+                "entity": "Measure",
+                "name": "Number of Customers",
+                "projectionName": "Values"
+              },
+              {
+                "type": "measure",
+                "table": "Internal Measures",
+                "entity": "Internal Measures",
+                "name": "SPLY Number of Customers",
+                "projectionName": "Values"
+              },
+              {
+                "type": "measure",
+                "table": "Internal Measures",
+                "entity": "Internal Measures",
+                "name": "Total Sales",
+                "projectionName": "Values"
+              }
+            ],
+            "position": {
+              "x": 85.79890880748246,
+              "y": 367.1395167575993,
+              "z": 0,
+              "height": 304.2868277474669,
+              "width": 1123.3671083398285,
+              "tabOrder": 0
+            },
+            "visualId": "8dd95b8d0e2ea207aa3d",
+            "pageId": "43c89f02456a2074915c"
+          },
+          {
+            "visualType": "slicer",
+            "visualName": "slicer",
+            "pageName": "Landing Page",
+            "fields": [
+              {
+                "type": "column",
+                "table": "customer",
+                "column": "Gender",
+                "name": "Gender",
+                "projectionName": "Values"
+              }
+            ],
+            "position": {
+              "x": 98.76851130163678,
+              "y": 26.936866718628213,
+              "z": 1,
+              "height": 304.2868277474669,
+              "width": 227.46687451286047,
+              "tabOrder": 1
+            },
+            "visualId": "8f9809a829968be1dd6d",
+            "pageId": "43c89f02456a2074915c"
+          },
+          {
+            "visualType": "actionButton",
+            "visualName": "actionButton",
+            "pageName": "Landing Page",
+            "fields": [
+              {
+                "type": "column",
+                "table": "store",
+                "column": "CountryName",
+                "name": "CountryName",
+                "projectionName": "visualObjects"
+              }
+            ],
+            "position": {
+              "x": 457.9267342166796,
+              "y": 69.83632112236944,
+              "z": 2,
+              "height": 97.77084957131721,
+              "width": 168.60483242400622
+            },
+            "visualId": "e99cb5fd841402e56875",
+            "pageId": "43c89f02456a2074915c"
+          }
+        ]
+      },
+      {
+        "id": "43eb9eb32ca503831335",
+        "name": "43eb9eb32ca503831335",
+        "displayName": "field parameter and calculation group",
+        "pageWidth": 1280,
+        "pageHeight": 720,
+        "visuals": [
+          {
+            "visualType": "slicer",
+            "visualName": "slicer",
+            "pageName": "field parameter and calculation group",
+            "fields": [
+              {
+                "type": "column",
+                "table": "prm_measures",
+                "column": "prm_measures",
+                "name": "prm_measures",
+                "projectionName": "Values"
+              }
+            ],
+            "position": {
+              "x": 895.535390199637,
+              "y": 68.52994555353902,
+              "z": 0,
+              "height": 149.8366606170599,
+              "width": 226.497277676951,
+              "tabOrder": 0
+            },
+            "visualId": "05877a3c9a03f0e0ecd8",
+            "pageId": "43eb9eb32ca503831335"
+          },
+          {
+            "visualType": "pivotTable",
+            "visualName": "prm orders cost quantity",
+            "pageName": "field parameter and calculation group",
+            "fields": [
+              {
+                "type": "column",
+                "table": "This Year Last Year",
+                "column": "This Year vs. Last Year",
+                "name": "This Year vs. Last Year",
+                "projectionName": "Columns"
+              },
+              {
+                "type": "column",
+                "table": "date",
+                "column": "Year",
+                "name": "Year",
+                "projectionName": "Rows"
+              },
+              {
+                "type": "measure",
+                "table": "Measure",
+                "entity": "Measure",
+                "name": "Number of Orders",
+                "projectionName": "Values"
+              },
+              {
+                "type": "column",
+                "table": "prm_measures",
+                "column": "prm_measures",
+                "name": "prm_measures",
+                "projectionName": "Values"
+              }
+            ],
+            "position": {
+              "x": 895.535390199637,
+              "y": 248.56624319419237,
+              "z": 1,
+              "height": 432.08711433756804,
+              "width": 354.2649727767695,
+              "tabOrder": 1
+            },
+            "visualId": "fffa0f95499eb9d4e940",
+            "pageId": "43eb9eb32ca503831335"
+          }
+        ]
+      },
+      {
+        "id": "d63a41a1b73529ab0be0",
+        "name": "d63a41a1b73529ab0be0",
+        "displayName": "Page 1",
+        "pageWidth": 1280,
+        "pageHeight": 720,
+        "visuals": [
+          {
+            "visualType": "actionButton",
+            "visualName": "Country description",
+            "pageName": "Page 1",
+            "fields": [
+              {
+                "type": "column",
+                "table": "store",
+                "column": "CountryName",
+                "name": "CountryName",
+                "projectionName": "visualObjects"
+              }
+            ],
+            "position": {
+              "x": 457.9267342166796,
+              "y": 69.83632112236944,
+              "z": 3,
+              "height": 97.77084957131721,
+              "width": 168.60483242400622,
+              "tabOrder": 1000
+            },
+            "visualId": "0c446ad9d08d72187a1e",
+            "pageId": "d63a41a1b73529ab0be0"
+          },
+          {
+            "visualType": "slicer",
+            "visualName": "slicer",
+            "pageName": "Page 1",
+            "fields": [
+              {
+                "type": "column",
+                "table": "prm_measures",
+                "column": "prm_measures",
+                "name": "prm_measures",
+                "projectionName": "Values"
+              }
+            ],
+            "position": {
+              "x": 18.028169014084508,
+              "y": 179.38028169014083,
+              "z": 4,
+              "height": 149.6338028169014,
+              "width": 227.1549295774648,
+              "tabOrder": 1001
+            },
+            "visualId": "2560eefe6fe28e81696b",
+            "pageId": "d63a41a1b73529ab0be0"
+          },
+          {
+            "visualType": "clusteredColumnChart",
+            "visualName": "clusteredColumnChart",
+            "pageName": "Page 1",
+            "fields": [
+              {
+                "type": "column",
+                "table": "date",
+                "column": "Date",
+                "name": "Date",
+                "projectionName": "Category"
+              },
+              {
+                "type": "measure",
+                "table": "Internal Measures",
+                "entity": "Internal Measures",
+                "name": "Total Sales",
+                "projectionName": "Y"
+              }
+            ],
+            "position": {
+              "x": 687.3889321901792,
+              "y": 74.82462977396726,
+              "z": 1,
+              "height": 209.50896336710832,
+              "width": 592.6110678098207,
+              "tabOrder": 1
+            },
+            "visualId": "5e6cd50e928a24917985",
+            "pageId": "d63a41a1b73529ab0be0"
+          },
+          {
+            "visualType": "clusteredColumnChart",
+            "visualName": "prm orders cost quantity",
+            "pageName": "Page 1",
+            "fields": [
+              {
+                "type": "column",
+                "table": "date",
+                "column": "Year",
+                "name": "Year",
+                "projectionName": "Category"
+              },
+              {
+                "type": "measure",
+                "table": "Measure",
+                "entity": "Measure",
+                "name": "Total Quantity",
+                "projectionName": "Y"
+              },
+              {
+                "type": "column",
+                "table": "prm_measures",
+                "column": "prm_measures",
+                "name": "prm_measures",
+                "projectionName": "Y"
+              }
+            ],
+            "position": {
+              "x": 245,
+              "y": 179,
+              "z": 5,
+              "height": 150,
+              "width": 442,
+              "tabOrder": 1002
+            },
+            "visualId": "825cfc3bfa263833fdbb",
+            "pageId": "d63a41a1b73529ab0be0"
+          },
+          {
+            "visualType": "slicer",
+            "visualName": "Country slicer",
+            "pageName": "Page 1",
+            "fields": [
+              {
+                "type": "column",
+                "table": "customer",
+                "column": "Gender",
+                "name": "Gender",
+                "projectionName": "Values"
+              }
+            ],
+            "position": {
+              "x": 99.15492957746478,
+              "y": 27.04225352112676,
+              "z": 2,
+              "height": 117.1830985915493,
+              "width": 227.1549295774648,
+              "tabOrder": 2
+            },
+            "visualId": "c1332354625d5d6e3670",
+            "pageId": "d63a41a1b73529ab0be0"
+          },
+          {
+            "visualType": "pivotTable",
+            "visualName": "Table Visualization",
+            "pageName": "Page 1",
+            "fields": [
+              {
+                "type": "column",
+                "table": "product",
+                "column": "Brand",
+                "name": "Brand",
+                "projectionName": "Columns"
+              },
+              {
+                "type": "column",
+                "table": "store",
+                "column": "CountryName",
+                "name": "CountryName",
+                "projectionName": "Rows"
+              },
+              {
+                "type": "column",
+                "table": "store",
+                "column": "State",
+                "name": "State",
+                "projectionName": "Rows"
+              },
+              {
+                "type": "measure",
+                "table": "Measure",
+                "entity": "Measure",
+                "name": "Number of Orders",
+                "projectionName": "Values"
+              },
+              {
+                "type": "measure",
+                "table": "Measure",
+                "entity": "Measure",
+                "name": "Number of Customers",
+                "projectionName": "Values"
+              },
+              {
+                "type": "measure",
+                "table": "Internal Measures",
+                "entity": "Internal Measures",
+                "name": "Total Sales",
+                "projectionName": "Values"
+              }
+            ],
+            "position": {
+              "x": 33.52085354025218,
+              "y": 335.2085354025218,
+              "z": 0,
+              "height": 376.1784675072745,
+              "width": 1204.2677012609117,
+              "tabOrder": 0
+            },
+            "visualId": "d70eb553d64027103080",
+            "pageId": "d63a41a1b73529ab0be0"
+          }
+        ]
+      },
+      {
+        "id": "f2a34872059916265400",
+        "name": "f2a34872059916265400",
+        "displayName": "Global Overview",
+        "pageWidth": 1280,
+        "pageHeight": 720,
+        "visuals": [
+          {
+            "visualType": "pivotTable",
+            "visualName": "pivotTable",
+            "pageName": "Global Overview",
+            "fields": [
+              {
+                "type": "column",
+                "table": "product",
+                "column": "Brand",
+                "name": "Brand",
+                "projectionName": "Columns"
+              },
+              {
+                "type": "column",
+                "table": "store",
+                "column": "CountryName",
+                "name": "CountryName",
+                "projectionName": "Rows"
+              },
+              {
+                "type": "column",
+                "table": "store",
+                "column": "State",
+                "name": "State",
+                "projectionName": "Rows"
+              },
+              {
+                "type": "measure",
+                "table": "Measure",
+                "entity": "Measure",
+                "name": "Number of Orders",
+                "projectionName": "Values"
+              },
+              {
+                "type": "measure",
+                "table": "Measure",
+                "entity": "Measure",
+                "name": "Number of Customers",
+                "projectionName": "Values"
+              },
+              {
+                "type": "measure",
+                "table": "Internal Measures",
+                "entity": "Internal Measures",
+                "name": "Total Sales",
+                "projectionName": "Values"
+              }
+            ],
+            "position": {
+              "x": 33.92049883086516,
+              "y": 335.21434138737334,
+              "z": 0,
+              "height": 212.501948558067,
+              "width": 1204.177708495713,
+              "tabOrder": 0
+            },
+            "visualId": "15e3229e004c090ea6c0",
+            "pageId": "f2a34872059916265400"
+          },
+          {
+            "visualType": "slicer",
+            "visualName": "slicer",
+            "pageName": "Global Overview",
+            "fields": [
+              {
+                "type": "column",
+                "table": "customer",
+                "column": "Gender",
+                "name": "Gender",
+                "projectionName": "Values"
+              }
+            ],
+            "position": {
+              "x": 45.93598448108633,
+              "y": 40.96993210475267,
+              "z": 1,
+              "height": 269.4083414161009,
+              "width": 227.1968962172648,
+              "tabOrder": 1
+            },
+            "visualId": "511751f63404d011562b",
+            "pageId": "f2a34872059916265400"
+          },
+          {
+            "visualType": "barChart",
+            "visualName": "barChart",
+            "pageName": "Global Overview",
+            "fields": [
+              {
+                "type": "column",
+                "table": "customer",
+                "column": "Gender",
+                "name": "Gender",
+                "projectionName": "Category"
+              },
+              {
+                "type": "measure",
+                "table": "Internal Measures",
+                "entity": "Internal Measures",
+                "name": "Total Sales",
+                "projectionName": "Y"
+              }
+            ],
+            "position": {
+              "x": 782.1667965705377,
+              "y": 69.83632112236944,
+              "z": 3,
+              "height": 210.50662509742787,
+              "width": 481.87061574434915,
+              "tabOrder": 3
+            },
+            "visualId": "af98c5db0afa46b3a761",
+            "pageId": "f2a34872059916265400"
+          },
+          {
+            "visualType": "clusteredColumnChart",
+            "visualName": "clusteredColumnChart",
+            "pageName": "Global Overview",
+            "fields": [
+              {
+                "type": "column",
+                "table": "date",
+                "column": "Date",
+                "name": "Date",
+                "projectionName": "Category"
+              },
+              {
+                "type": "measure",
+                "table": "Internal Measures",
+                "entity": "Internal Measures",
+                "name": "Total Sales",
+                "projectionName": "Y"
+              }
+            ],
+            "position": {
+              "x": 8.978955572876071,
+              "y": 69.83632112236944,
+              "z": 2,
+              "height": 209.50896336710832,
+              "width": 753.2346063912704,
+              "tabOrder": 2
+            },
+            "visualId": "dd18ae2500ec2617c01e",
+            "pageId": "f2a34872059916265400"
+          }
+        ]
+      }
+    ],
+    "visuals": [
+      {
+        "visualType": "clusteredColumnChart",
+        "visualName": "clusteredColumnChart",
+        "pageName": "Landing Page",
+        "fields": [
+          {
+            "type": "column",
+            "table": "date",
+            "column": "Date",
+            "name": "Date",
+            "projectionName": "Category"
+          },
+          {
+            "type": "measure",
+            "table": "Measure",
+            "entity": "Measure",
+            "name": "Number of Orders",
+            "projectionName": "Y"
+          }
+        ],
+        "position": {
+          "x": 767.7676950998185,
+          "y": 69.69147005444646,
+          "z": 3,
+          "height": 209.07441016333937,
+          "width": 346.13430127041744,
+          "tabOrder": 2
+        },
+        "visualId": "363b1417392159a4e7b6",
+        "pageId": "43c89f02456a2074915c"
+      },
+      {
+        "visualType": "tableEx",
+        "visualName": "tableEx",
+        "pageName": "Landing Page",
+        "fields": [
+          {
+            "type": "column",
+            "table": "date",
+            "column": "YearMonth",
+            "name": "YearMonth",
+            "projectionName": "Values"
+          },
+          {
+            "type": "measure",
+            "table": "Measure",
+            "entity": "Measure",
+            "name": "Number of Orders",
+            "projectionName": "Values"
+          },
+          {
+            "type": "measure",
+            "table": "Measure",
+            "entity": "Measure",
+            "name": "SPLY Number of Orders",
+            "projectionName": "Values"
+          },
+          {
+            "type": "measure",
+            "table": "Measure",
+            "entity": "Measure",
+            "name": "Number of Orders YoY",
+            "projectionName": "Values"
+          },
+          {
+            "type": "measure",
+            "table": "Measure",
+            "entity": "Measure",
+            "name": "Number of Customers",
+            "projectionName": "Values"
+          },
+          {
+            "type": "measure",
+            "table": "Internal Measures",
+            "entity": "Internal Measures",
+            "name": "SPLY Number of Customers",
+            "projectionName": "Values"
+          },
+          {
+            "type": "measure",
+            "table": "Internal Measures",
+            "entity": "Internal Measures",
+            "name": "Total Sales",
+            "projectionName": "Values"
+          }
+        ],
+        "position": {
+          "x": 85.79890880748246,
+          "y": 367.1395167575993,
+          "z": 0,
+          "height": 304.2868277474669,
+          "width": 1123.3671083398285,
+          "tabOrder": 0
+        },
+        "visualId": "8dd95b8d0e2ea207aa3d",
+        "pageId": "43c89f02456a2074915c"
+      },
+      {
+        "visualType": "slicer",
+        "visualName": "slicer",
+        "pageName": "Landing Page",
+        "fields": [
+          {
+            "type": "column",
+            "table": "customer",
+            "column": "Gender",
+            "name": "Gender",
+            "projectionName": "Values"
+          }
+        ],
+        "position": {
+          "x": 98.76851130163678,
+          "y": 26.936866718628213,
+          "z": 1,
+          "height": 304.2868277474669,
+          "width": 227.46687451286047,
+          "tabOrder": 1
+        },
+        "visualId": "8f9809a829968be1dd6d",
+        "pageId": "43c89f02456a2074915c"
+      },
+      {
+        "visualType": "actionButton",
+        "visualName": "actionButton",
+        "pageName": "Landing Page",
+        "fields": [
+          {
+            "type": "column",
+            "table": "store",
+            "column": "CountryName",
+            "name": "CountryName",
+            "projectionName": "visualObjects"
+          }
+        ],
+        "position": {
+          "x": 457.9267342166796,
+          "y": 69.83632112236944,
+          "z": 2,
+          "height": 97.77084957131721,
+          "width": 168.60483242400622
+        },
+        "visualId": "e99cb5fd841402e56875",
+        "pageId": "43c89f02456a2074915c"
+      },
+      {
+        "visualType": "slicer",
+        "visualName": "slicer",
+        "pageName": "field parameter and calculation group",
+        "fields": [
+          {
+            "type": "column",
+            "table": "prm_measures",
+            "column": "prm_measures",
+            "name": "prm_measures",
+            "projectionName": "Values"
+          }
+        ],
+        "position": {
+          "x": 895.535390199637,
+          "y": 68.52994555353902,
+          "z": 0,
+          "height": 149.8366606170599,
+          "width": 226.497277676951,
+          "tabOrder": 0
+        },
+        "visualId": "05877a3c9a03f0e0ecd8",
+        "pageId": "43eb9eb32ca503831335"
+      },
+      {
+        "visualType": "pivotTable",
+        "visualName": "prm orders cost quantity",
+        "pageName": "field parameter and calculation group",
+        "fields": [
+          {
+            "type": "column",
+            "table": "This Year Last Year",
+            "column": "This Year vs. Last Year",
+            "name": "This Year vs. Last Year",
+            "projectionName": "Columns"
+          },
+          {
+            "type": "column",
+            "table": "date",
+            "column": "Year",
+            "name": "Year",
+            "projectionName": "Rows"
+          },
+          {
+            "type": "measure",
+            "table": "Measure",
+            "entity": "Measure",
+            "name": "Number of Orders",
+            "projectionName": "Values"
+          },
+          {
+            "type": "column",
+            "table": "prm_measures",
+            "column": "prm_measures",
+            "name": "prm_measures",
+            "projectionName": "Values"
+          }
+        ],
+        "position": {
+          "x": 895.535390199637,
+          "y": 248.56624319419237,
+          "z": 1,
+          "height": 432.08711433756804,
+          "width": 354.2649727767695,
+          "tabOrder": 1
+        },
+        "visualId": "fffa0f95499eb9d4e940",
+        "pageId": "43eb9eb32ca503831335"
+      },
+      {
+        "visualType": "actionButton",
+        "visualName": "Country description",
+        "pageName": "Page 1",
+        "fields": [
+          {
+            "type": "column",
+            "table": "store",
+            "column": "CountryName",
+            "name": "CountryName",
+            "projectionName": "visualObjects"
+          }
+        ],
+        "position": {
+          "x": 457.9267342166796,
+          "y": 69.83632112236944,
+          "z": 3,
+          "height": 97.77084957131721,
+          "width": 168.60483242400622,
+          "tabOrder": 1000
+        },
+        "visualId": "0c446ad9d08d72187a1e",
+        "pageId": "d63a41a1b73529ab0be0"
+      },
+      {
+        "visualType": "slicer",
+        "visualName": "slicer",
+        "pageName": "Page 1",
+        "fields": [
+          {
+            "type": "column",
+            "table": "prm_measures",
+            "column": "prm_measures",
+            "name": "prm_measures",
+            "projectionName": "Values"
+          }
+        ],
+        "position": {
+          "x": 18.028169014084508,
+          "y": 179.38028169014083,
+          "z": 4,
+          "height": 149.6338028169014,
+          "width": 227.1549295774648,
+          "tabOrder": 1001
+        },
+        "visualId": "2560eefe6fe28e81696b",
+        "pageId": "d63a41a1b73529ab0be0"
+      },
+      {
+        "visualType": "clusteredColumnChart",
+        "visualName": "clusteredColumnChart",
+        "pageName": "Page 1",
+        "fields": [
+          {
+            "type": "column",
+            "table": "date",
+            "column": "Date",
+            "name": "Date",
+            "projectionName": "Category"
+          },
+          {
+            "type": "measure",
+            "table": "Internal Measures",
+            "entity": "Internal Measures",
+            "name": "Total Sales",
+            "projectionName": "Y"
+          }
+        ],
+        "position": {
+          "x": 687.3889321901792,
+          "y": 74.82462977396726,
+          "z": 1,
+          "height": 209.50896336710832,
+          "width": 592.6110678098207,
+          "tabOrder": 1
+        },
+        "visualId": "5e6cd50e928a24917985",
+        "pageId": "d63a41a1b73529ab0be0"
+      },
+      {
+        "visualType": "clusteredColumnChart",
+        "visualName": "prm orders cost quantity",
+        "pageName": "Page 1",
+        "fields": [
+          {
+            "type": "column",
+            "table": "date",
+            "column": "Year",
+            "name": "Year",
+            "projectionName": "Category"
+          },
+          {
+            "type": "measure",
+            "table": "Measure",
+            "entity": "Measure",
+            "name": "Total Quantity",
+            "projectionName": "Y"
+          },
+          {
+            "type": "column",
+            "table": "prm_measures",
+            "column": "prm_measures",
+            "name": "prm_measures",
+            "projectionName": "Y"
+          }
+        ],
+        "position": {
+          "x": 245,
+          "y": 179,
+          "z": 5,
+          "height": 150,
+          "width": 442,
+          "tabOrder": 1002
+        },
+        "visualId": "825cfc3bfa263833fdbb",
+        "pageId": "d63a41a1b73529ab0be0"
+      },
+      {
+        "visualType": "slicer",
+        "visualName": "Country slicer",
+        "pageName": "Page 1",
+        "fields": [
+          {
+            "type": "column",
+            "table": "customer",
+            "column": "Gender",
+            "name": "Gender",
+            "projectionName": "Values"
+          }
+        ],
+        "position": {
+          "x": 99.15492957746478,
+          "y": 27.04225352112676,
+          "z": 2,
+          "height": 117.1830985915493,
+          "width": 227.1549295774648,
+          "tabOrder": 2
+        },
+        "visualId": "c1332354625d5d6e3670",
+        "pageId": "d63a41a1b73529ab0be0"
+      },
+      {
+        "visualType": "pivotTable",
+        "visualName": "Table Visualization",
+        "pageName": "Page 1",
+        "fields": [
+          {
+            "type": "column",
+            "table": "product",
+            "column": "Brand",
+            "name": "Brand",
+            "projectionName": "Columns"
+          },
+          {
+            "type": "column",
+            "table": "store",
+            "column": "CountryName",
+            "name": "CountryName",
+            "projectionName": "Rows"
+          },
+          {
+            "type": "column",
+            "table": "store",
+            "column": "State",
+            "name": "State",
+            "projectionName": "Rows"
+          },
+          {
+            "type": "measure",
+            "table": "Measure",
+            "entity": "Measure",
+            "name": "Number of Orders",
+            "projectionName": "Values"
+          },
+          {
+            "type": "measure",
+            "table": "Measure",
+            "entity": "Measure",
+            "name": "Number of Customers",
+            "projectionName": "Values"
+          },
+          {
+            "type": "measure",
+            "table": "Internal Measures",
+            "entity": "Internal Measures",
+            "name": "Total Sales",
+            "projectionName": "Values"
+          }
+        ],
+        "position": {
+          "x": 33.52085354025218,
+          "y": 335.2085354025218,
+          "z": 0,
+          "height": 376.1784675072745,
+          "width": 1204.2677012609117,
+          "tabOrder": 0
+        },
+        "visualId": "d70eb553d64027103080",
+        "pageId": "d63a41a1b73529ab0be0"
+      },
+      {
+        "visualType": "pivotTable",
+        "visualName": "pivotTable",
+        "pageName": "Global Overview",
+        "fields": [
+          {
+            "type": "column",
+            "table": "product",
+            "column": "Brand",
+            "name": "Brand",
+            "projectionName": "Columns"
+          },
+          {
+            "type": "column",
+            "table": "store",
+            "column": "CountryName",
+            "name": "CountryName",
+            "projectionName": "Rows"
+          },
+          {
+            "type": "column",
+            "table": "store",
+            "column": "State",
+            "name": "State",
+            "projectionName": "Rows"
+          },
+          {
+            "type": "measure",
+            "table": "Measure",
+            "entity": "Measure",
+            "name": "Number of Orders",
+            "projectionName": "Values"
+          },
+          {
+            "type": "measure",
+            "table": "Measure",
+            "entity": "Measure",
+            "name": "Number of Customers",
+            "projectionName": "Values"
+          },
+          {
+            "type": "measure",
+            "table": "Internal Measures",
+            "entity": "Internal Measures",
+            "name": "Total Sales",
+            "projectionName": "Values"
+          }
+        ],
+        "position": {
+          "x": 33.92049883086516,
+          "y": 335.21434138737334,
+          "z": 0,
+          "height": 212.501948558067,
+          "width": 1204.177708495713,
+          "tabOrder": 0
+        },
+        "visualId": "15e3229e004c090ea6c0",
+        "pageId": "f2a34872059916265400"
+      },
+      {
+        "visualType": "slicer",
+        "visualName": "slicer",
+        "pageName": "Global Overview",
+        "fields": [
+          {
+            "type": "column",
+            "table": "customer",
+            "column": "Gender",
+            "name": "Gender",
+            "projectionName": "Values"
+          }
+        ],
+        "position": {
+          "x": 45.93598448108633,
+          "y": 40.96993210475267,
+          "z": 1,
+          "height": 269.4083414161009,
+          "width": 227.1968962172648,
+          "tabOrder": 1
+        },
+        "visualId": "511751f63404d011562b",
+        "pageId": "f2a34872059916265400"
+      },
+      {
+        "visualType": "barChart",
+        "visualName": "barChart",
+        "pageName": "Global Overview",
+        "fields": [
+          {
+            "type": "column",
+            "table": "customer",
+            "column": "Gender",
+            "name": "Gender",
+            "projectionName": "Category"
+          },
+          {
+            "type": "measure",
+            "table": "Internal Measures",
+            "entity": "Internal Measures",
+            "name": "Total Sales",
+            "projectionName": "Y"
+          }
+        ],
+        "position": {
+          "x": 782.1667965705377,
+          "y": 69.83632112236944,
+          "z": 3,
+          "height": 210.50662509742787,
+          "width": 481.87061574434915,
+          "tabOrder": 3
+        },
+        "visualId": "af98c5db0afa46b3a761",
+        "pageId": "f2a34872059916265400"
+      },
+      {
+        "visualType": "clusteredColumnChart",
+        "visualName": "clusteredColumnChart",
+        "pageName": "Global Overview",
+        "fields": [
+          {
+            "type": "column",
+            "table": "date",
+            "column": "Date",
+            "name": "Date",
+            "projectionName": "Category"
+          },
+          {
+            "type": "measure",
+            "table": "Internal Measures",
+            "entity": "Internal Measures",
+            "name": "Total Sales",
+            "projectionName": "Y"
+          }
+        ],
+        "position": {
+          "x": 8.978955572876071,
+          "y": 69.83632112236944,
+          "z": 2,
+          "height": 209.50896336710832,
+          "width": 753.2346063912704,
+          "tabOrder": 2
+        },
+        "visualId": "dd18ae2500ec2617c01e",
+        "pageId": "f2a34872059916265400"
+      }
+    ],
+    "fieldUsageMap": {
+      "column|date|Date": [
+        {
+          "visualName": "clusteredColumnChart",
+          "visualType": "clusteredColumnChart",
+          "pageName": "Landing Page",
+          "projectionName": "Category"
+        },
+        {
+          "visualName": "clusteredColumnChart",
+          "visualType": "clusteredColumnChart",
+          "pageName": "Page 1",
+          "projectionName": "Category"
+        },
+        {
+          "visualName": "clusteredColumnChart",
+          "visualType": "clusteredColumnChart",
+          "pageName": "Global Overview",
+          "projectionName": "Category"
+        }
+      ],
+      "measure|Measure|Number of Orders": [
+        {
+          "visualName": "clusteredColumnChart",
+          "visualType": "clusteredColumnChart",
+          "pageName": "Landing Page",
+          "projectionName": "Y"
+        },
+        {
+          "visualName": "tableEx",
+          "visualType": "tableEx",
+          "pageName": "Landing Page",
+          "projectionName": "Values"
+        },
+        {
+          "visualName": "prm orders cost quantity",
+          "visualType": "pivotTable",
+          "pageName": "field parameter and calculation group",
+          "projectionName": "Values"
+        },
+        {
+          "visualName": "Table Visualization",
+          "visualType": "pivotTable",
+          "pageName": "Page 1",
+          "projectionName": "Values"
+        },
+        {
+          "visualName": "pivotTable",
+          "visualType": "pivotTable",
+          "pageName": "Global Overview",
+          "projectionName": "Values"
+        }
+      ],
+      "column|date|YearMonth": [
+        {
+          "visualName": "tableEx",
+          "visualType": "tableEx",
+          "pageName": "Landing Page",
+          "projectionName": "Values"
+        }
+      ],
+      "measure|Measure|SPLY Number of Orders": [
+        {
+          "visualName": "tableEx",
+          "visualType": "tableEx",
+          "pageName": "Landing Page",
+          "projectionName": "Values"
+        }
+      ],
+      "measure|Measure|Number of Orders YoY": [
+        {
+          "visualName": "tableEx",
+          "visualType": "tableEx",
+          "pageName": "Landing Page",
+          "projectionName": "Values"
+        }
+      ],
+      "measure|Measure|Number of Customers": [
+        {
+          "visualName": "tableEx",
+          "visualType": "tableEx",
+          "pageName": "Landing Page",
+          "projectionName": "Values"
+        },
+        {
+          "visualName": "Table Visualization",
+          "visualType": "pivotTable",
+          "pageName": "Page 1",
+          "projectionName": "Values"
+        },
+        {
+          "visualName": "pivotTable",
+          "visualType": "pivotTable",
+          "pageName": "Global Overview",
+          "projectionName": "Values"
+        }
+      ],
+      "measure|Internal Measures|SPLY Number of Customers": [
+        {
+          "visualName": "tableEx",
+          "visualType": "tableEx",
+          "pageName": "Landing Page",
+          "projectionName": "Values"
+        }
+      ],
+      "measure|Internal Measures|Total Sales": [
+        {
+          "visualName": "tableEx",
+          "visualType": "tableEx",
+          "pageName": "Landing Page",
+          "projectionName": "Values"
+        },
+        {
+          "visualName": "clusteredColumnChart",
+          "visualType": "clusteredColumnChart",
+          "pageName": "Page 1",
+          "projectionName": "Y"
+        },
+        {
+          "visualName": "Table Visualization",
+          "visualType": "pivotTable",
+          "pageName": "Page 1",
+          "projectionName": "Values"
+        },
+        {
+          "visualName": "pivotTable",
+          "visualType": "pivotTable",
+          "pageName": "Global Overview",
+          "projectionName": "Values"
+        },
+        {
+          "visualName": "barChart",
+          "visualType": "barChart",
+          "pageName": "Global Overview",
+          "projectionName": "Y"
+        },
+        {
+          "visualName": "clusteredColumnChart",
+          "visualType": "clusteredColumnChart",
+          "pageName": "Global Overview",
+          "projectionName": "Y"
+        }
+      ],
+      "column|customer|Gender": [
+        {
+          "visualName": "slicer",
+          "visualType": "slicer",
+          "pageName": "Landing Page",
+          "projectionName": "Values"
+        },
+        {
+          "visualName": "Country slicer",
+          "visualType": "slicer",
+          "pageName": "Page 1",
+          "projectionName": "Values"
+        },
+        {
+          "visualName": "slicer",
+          "visualType": "slicer",
+          "pageName": "Global Overview",
+          "projectionName": "Values"
+        },
+        {
+          "visualName": "barChart",
+          "visualType": "barChart",
+          "pageName": "Global Overview",
+          "projectionName": "Category"
+        }
+      ],
+      "column|store|CountryName": [
+        {
+          "visualName": "actionButton",
+          "visualType": "actionButton",
+          "pageName": "Landing Page",
+          "projectionName": "visualObjects"
+        },
+        {
+          "visualName": "Country description",
+          "visualType": "actionButton",
+          "pageName": "Page 1",
+          "projectionName": "visualObjects"
+        },
+        {
+          "visualName": "Table Visualization",
+          "visualType": "pivotTable",
+          "pageName": "Page 1",
+          "projectionName": "Rows"
+        },
+        {
+          "visualName": "pivotTable",
+          "visualType": "pivotTable",
+          "pageName": "Global Overview",
+          "projectionName": "Rows"
+        }
+      ],
+      "column|prm_measures|prm_measures": [
+        {
+          "visualName": "slicer",
+          "visualType": "slicer",
+          "pageName": "field parameter and calculation group",
+          "projectionName": "Values"
+        },
+        {
+          "visualName": "prm orders cost quantity",
+          "visualType": "pivotTable",
+          "pageName": "field parameter and calculation group",
+          "projectionName": "Values"
+        },
+        {
+          "visualName": "slicer",
+          "visualType": "slicer",
+          "pageName": "Page 1",
+          "projectionName": "Values"
+        },
+        {
+          "visualName": "prm orders cost quantity",
+          "visualType": "clusteredColumnChart",
+          "pageName": "Page 1",
+          "projectionName": "Y"
+        }
+      ],
+      "column|This Year Last Year|This Year vs. Last Year": [
+        {
+          "visualName": "prm orders cost quantity",
+          "visualType": "pivotTable",
+          "pageName": "field parameter and calculation group",
+          "projectionName": "Columns"
+        }
+      ],
+      "column|date|Year": [
+        {
+          "visualName": "prm orders cost quantity",
+          "visualType": "pivotTable",
+          "pageName": "field parameter and calculation group",
+          "projectionName": "Rows"
+        },
+        {
+          "visualName": "prm orders cost quantity",
+          "visualType": "clusteredColumnChart",
+          "pageName": "Page 1",
+          "projectionName": "Category"
+        }
+      ],
+      "measure|Measure|Total Quantity": [
+        {
+          "visualName": "prm orders cost quantity",
+          "visualType": "clusteredColumnChart",
+          "pageName": "Page 1",
+          "projectionName": "Y"
+        }
+      ],
+      "column|product|Brand": [
+        {
+          "visualName": "Table Visualization",
+          "visualType": "pivotTable",
+          "pageName": "Page 1",
+          "projectionName": "Columns"
+        },
+        {
+          "visualName": "pivotTable",
+          "visualType": "pivotTable",
+          "pageName": "Global Overview",
+          "projectionName": "Columns"
+        }
+      ],
+      "column|store|State": [
+        {
+          "visualName": "Table Visualization",
+          "visualType": "pivotTable",
+          "pageName": "Page 1",
+          "projectionName": "Rows"
+        },
+        {
+          "visualName": "pivotTable",
+          "visualType": "pivotTable",
+          "pageName": "Global Overview",
+          "projectionName": "Rows"
+        }
+      ]
+    }
+  },
+  "fieldUsageMap": {
+    "column|date|Date": [
+      {
+        "visualName": "clusteredColumnChart",
+        "visualType": "clusteredColumnChart",
+        "pageName": "Landing Page",
+        "projectionName": "Category"
+      },
+      {
+        "visualName": "clusteredColumnChart",
+        "visualType": "clusteredColumnChart",
+        "pageName": "Page 1",
+        "projectionName": "Category"
+      },
+      {
+        "visualName": "clusteredColumnChart",
+        "visualType": "clusteredColumnChart",
+        "pageName": "Global Overview",
+        "projectionName": "Category"
+      }
+    ],
+    "measure|Measure|Number of Orders": [
+      {
+        "visualName": "clusteredColumnChart",
+        "visualType": "clusteredColumnChart",
+        "pageName": "Landing Page",
+        "projectionName": "Y"
+      },
+      {
+        "visualName": "tableEx",
+        "visualType": "tableEx",
+        "pageName": "Landing Page",
+        "projectionName": "Values"
+      },
+      {
+        "visualName": "prm orders cost quantity",
+        "visualType": "pivotTable",
+        "pageName": "field parameter and calculation group",
+        "projectionName": "Values"
+      },
+      {
+        "visualName": "Table Visualization",
+        "visualType": "pivotTable",
+        "pageName": "Page 1",
+        "projectionName": "Values"
+      },
+      {
+        "visualName": "pivotTable",
+        "visualType": "pivotTable",
+        "pageName": "Global Overview",
+        "projectionName": "Values"
+      }
+    ],
+    "column|date|YearMonth": [
+      {
+        "visualName": "tableEx",
+        "visualType": "tableEx",
+        "pageName": "Landing Page",
+        "projectionName": "Values"
+      }
+    ],
+    "measure|Measure|SPLY Number of Orders": [
+      {
+        "visualName": "tableEx",
+        "visualType": "tableEx",
+        "pageName": "Landing Page",
+        "projectionName": "Values"
+      }
+    ],
+    "measure|Measure|Number of Orders YoY": [
+      {
+        "visualName": "tableEx",
+        "visualType": "tableEx",
+        "pageName": "Landing Page",
+        "projectionName": "Values"
+      }
+    ],
+    "measure|Measure|Number of Customers": [
+      {
+        "visualName": "tableEx",
+        "visualType": "tableEx",
+        "pageName": "Landing Page",
+        "projectionName": "Values"
+      },
+      {
+        "visualName": "Table Visualization",
+        "visualType": "pivotTable",
+        "pageName": "Page 1",
+        "projectionName": "Values"
+      },
+      {
+        "visualName": "pivotTable",
+        "visualType": "pivotTable",
+        "pageName": "Global Overview",
+        "projectionName": "Values"
+      }
+    ],
+    "measure|Internal Measures|SPLY Number of Customers": [
+      {
+        "visualName": "tableEx",
+        "visualType": "tableEx",
+        "pageName": "Landing Page",
+        "projectionName": "Values"
+      }
+    ],
+    "measure|Internal Measures|Total Sales": [
+      {
+        "visualName": "tableEx",
+        "visualType": "tableEx",
+        "pageName": "Landing Page",
+        "projectionName": "Values"
+      },
+      {
+        "visualName": "clusteredColumnChart",
+        "visualType": "clusteredColumnChart",
+        "pageName": "Page 1",
+        "projectionName": "Y"
+      },
+      {
+        "visualName": "Table Visualization",
+        "visualType": "pivotTable",
+        "pageName": "Page 1",
+        "projectionName": "Values"
+      },
+      {
+        "visualName": "pivotTable",
+        "visualType": "pivotTable",
+        "pageName": "Global Overview",
+        "projectionName": "Values"
+      },
+      {
+        "visualName": "barChart",
+        "visualType": "barChart",
+        "pageName": "Global Overview",
+        "projectionName": "Y"
+      },
+      {
+        "visualName": "clusteredColumnChart",
+        "visualType": "clusteredColumnChart",
+        "pageName": "Global Overview",
+        "projectionName": "Y"
+      }
+    ],
+    "column|customer|Gender": [
+      {
+        "visualName": "slicer",
+        "visualType": "slicer",
+        "pageName": "Landing Page",
+        "projectionName": "Values"
+      },
+      {
+        "visualName": "Country slicer",
+        "visualType": "slicer",
+        "pageName": "Page 1",
+        "projectionName": "Values"
+      },
+      {
+        "visualName": "slicer",
+        "visualType": "slicer",
+        "pageName": "Global Overview",
+        "projectionName": "Values"
+      },
+      {
+        "visualName": "barChart",
+        "visualType": "barChart",
+        "pageName": "Global Overview",
+        "projectionName": "Category"
+      }
+    ],
+    "column|store|CountryName": [
+      {
+        "visualName": "actionButton",
+        "visualType": "actionButton",
+        "pageName": "Landing Page",
+        "projectionName": "visualObjects"
+      },
+      {
+        "visualName": "Country description",
+        "visualType": "actionButton",
+        "pageName": "Page 1",
+        "projectionName": "visualObjects"
+      },
+      {
+        "visualName": "Table Visualization",
+        "visualType": "pivotTable",
+        "pageName": "Page 1",
+        "projectionName": "Rows"
+      },
+      {
+        "visualName": "pivotTable",
+        "visualType": "pivotTable",
+        "pageName": "Global Overview",
+        "projectionName": "Rows"
+      }
+    ],
+    "column|prm_measures|prm_measures": [
+      {
+        "visualName": "slicer",
+        "visualType": "slicer",
+        "pageName": "field parameter and calculation group",
+        "projectionName": "Values"
+      },
+      {
+        "visualName": "prm orders cost quantity",
+        "visualType": "pivotTable",
+        "pageName": "field parameter and calculation group",
+        "projectionName": "Values"
+      },
+      {
+        "visualName": "slicer",
+        "visualType": "slicer",
+        "pageName": "Page 1",
+        "projectionName": "Values"
+      },
+      {
+        "visualName": "prm orders cost quantity",
+        "visualType": "clusteredColumnChart",
+        "pageName": "Page 1",
+        "projectionName": "Y"
+      }
+    ],
+    "column|This Year Last Year|This Year vs. Last Year": [
+      {
+        "visualName": "prm orders cost quantity",
+        "visualType": "pivotTable",
+        "pageName": "field parameter and calculation group",
+        "projectionName": "Columns"
+      }
+    ],
+    "column|date|Year": [
+      {
+        "visualName": "prm orders cost quantity",
+        "visualType": "pivotTable",
+        "pageName": "field parameter and calculation group",
+        "projectionName": "Rows"
+      },
+      {
+        "visualName": "prm orders cost quantity",
+        "visualType": "clusteredColumnChart",
+        "pageName": "Page 1",
+        "projectionName": "Category"
+      }
+    ],
+    "measure|Measure|Total Quantity": [
+      {
+        "visualName": "prm orders cost quantity",
+        "visualType": "clusteredColumnChart",
+        "pageName": "Page 1",
+        "projectionName": "Y"
+      }
+    ],
+    "column|product|Brand": [
+      {
+        "visualName": "Table Visualization",
+        "visualType": "pivotTable",
+        "pageName": "Page 1",
+        "projectionName": "Columns"
+      },
+      {
+        "visualName": "pivotTable",
+        "visualType": "pivotTable",
+        "pageName": "Global Overview",
+        "projectionName": "Columns"
+      }
+    ],
+    "column|store|State": [
+      {
+        "visualName": "Table Visualization",
+        "visualType": "pivotTable",
+        "pageName": "Page 1",
+        "projectionName": "Rows"
+      },
+      {
+        "visualName": "pivotTable",
+        "visualType": "pivotTable",
+        "pageName": "Global Overview",
+        "projectionName": "Rows"
+      }
+    ]
+  },
+  "_meta": {
+    "exportedAt": "2026-02-28T03:37:14.526Z",
+    "modelName": "Model",
+    "tables": 10,
+    "measures": 10,
+    "visuals": 16,
+    "note": "Pre-parsed demo data for pbip-documenter sample mode"
+  }
+}
