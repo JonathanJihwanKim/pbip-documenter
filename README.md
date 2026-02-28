@@ -2,13 +2,25 @@
 
 **Generate comprehensive documentation from Power BI PBIP/TMDL semantic models — instantly, in your browser.**
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-▶%20Try%20It%20Now-blue?style=for-the-badge)](https://jonathanjihwankim.github.io/pbip-documenter/)
+[![Try It Now](https://img.shields.io/badge/Try%20It%20Now-▶%20Live%20Demo-1a3a5c?style=for-the-badge&logo=powerbi)](https://jonathanjihwankim.github.io/pbip-documenter/)
 [![Fund This Tool](https://img.shields.io/badge/Fund_This_Tool-❤_from_7_EUR/mo-ea4aaa?style=for-the-badge)](https://github.com/sponsors/JonathanJihwanKim)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-☕-orange?style=for-the-badge)](https://buymeacoffee.com/jihwankim)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 
+> **No PBIP file?** [Try the live demo with Contoso sample data](https://jonathanjihwankim.github.io/pbip-documenter/) — no setup required.
+
 <!-- TODO: Capture a screenshot of the app with a real model loaded (relationship diagram or model overview), save as docs/screenshot.png, and uncomment below -->
 <!-- ![PBIP Documenter Screenshot](docs/screenshot.png) -->
+
+### Manual documentation vs. PBIP Documenter
+
+| | Manual | PBIP Documenter |
+|---|---|---|
+| 10 tables, 11 measures, 15 visuals | ~45 minutes | **< 10 seconds** |
+| Visual lineage tracing | Not feasible | Built-in |
+| Relationship diagrams | Draw by hand | Auto-generated SVG |
+| Keeps up with model changes | Start over | Re-run instantly |
+| Privacy | Varies | 100% client-side |
 
 ## What You Get
 

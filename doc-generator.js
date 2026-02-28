@@ -92,8 +92,9 @@ class DocGenerator {
 
         // Footer
         lines.push('---');
-        lines.push(`*Generated with [pbip-documenter](https://github.com/JonathanJihwanKim/pbip-documenter) — free, open-source TMDL documentation with visual lineage.*`);
-        lines.push(`*Support: [Sponsor](https://github.com/sponsors/JonathanJihwanKim?o=doc) | [Buy Me a Coffee](https://buymeacoffee.com/jihwankim?o=doc)*`);
+        lines.push('');
+        lines.push(`> **Generated with [PBIP Documenter](https://jonathanjihwankim.github.io/pbip-documenter/)** — free, open-source tool for Power BI semantic model documentation with visual lineage.`);
+        lines.push(`> Support development: [Sponsor on GitHub](https://github.com/sponsors/JonathanJihwanKim?o=doc) | [Buy Me a Coffee](https://buymeacoffee.com/jihwankim?o=doc)`);
 
         return lines.join('\n');
     }
@@ -129,8 +130,9 @@ class DocGenerator {
 
         // Footer
         lines.push('---');
-        lines.push(`*Generated with [pbip-documenter](https://github.com/JonathanJihwanKim/pbip-documenter) — free, open-source TMDL documentation.*`);
-        lines.push(`*Support: [Sponsor](https://github.com/sponsors/JonathanJihwanKim?o=doc) | [Buy Me a Coffee](https://buymeacoffee.com/jihwankim?o=doc)*`);
+        lines.push('');
+        lines.push(`> **Generated with [PBIP Documenter](https://jonathanjihwankim.github.io/pbip-documenter/)** — free, open-source tool for Power BI semantic model documentation.`);
+        lines.push(`> Support development: [Sponsor on GitHub](https://github.com/sponsors/JonathanJihwanKim?o=doc) | [Buy Me a Coffee](https://buymeacoffee.com/jihwankim?o=doc)`);
 
         return lines.join('\n');
     }
@@ -172,8 +174,9 @@ class DocGenerator {
 
         // Footer
         lines.push('---');
-        lines.push(`*Generated with [pbip-documenter](https://github.com/JonathanJihwanKim/pbip-documenter) — free, open-source TMDL documentation.*`);
-        lines.push(`*Support: [Sponsor](https://github.com/sponsors/JonathanJihwanKim?o=doc) | [Buy Me a Coffee](https://buymeacoffee.com/jihwankim?o=doc)*`);
+        lines.push('');
+        lines.push(`> **Generated with [PBIP Documenter](https://jonathanjihwankim.github.io/pbip-documenter/)** — free, open-source tool for Power BI semantic model documentation.`);
+        lines.push(`> Support development: [Sponsor on GitHub](https://github.com/sponsors/JonathanJihwanKim?o=doc) | [Buy Me a Coffee](https://buymeacoffee.com/jihwankim?o=doc)`);
 
         return lines.join('\n');
     }
@@ -1006,11 +1009,15 @@ blockquote {
             }
         }
 
-        // Footer
-        html += `<div class="footer">
-    <p>Generated with <a href="https://jonathanjihwankim.github.io/pbip-documenter/" target="_blank">PBIP Documenter</a> — free browser tool for Power BI semantic model documentation.</p>
-    <p>If this saved you time, please consider <a href="https://github.com/sponsors/JonathanJihwanKim?o=doc" target="_blank">❤️ sponsoring on GitHub</a> or <a href="https://buymeacoffee.com/jihwankim?o=doc" target="_blank">☕ buying a coffee</a> to support ongoing development.</p>
-    <p><a href="https://github.com/JonathanJihwanKim/pbip-impact-analyzer" target="_blank">PBIP Impact Analyzer</a> | <a href="https://jonathanjihwankim.github.io/isHiddenInViewMode/" target="_blank">PBIR Visual Manager</a></p>
+        // Footer — styled sponsor card
+        html += `<div class="footer" style="margin-top:40px;padding:20px 24px;background:#fffbee;border:1px solid #ffe082;border-left:4px solid #c89632;border-radius:2px;">
+    <p style="margin:0 0 8px;font-weight:700;">Generated with <a href="https://jonathanjihwankim.github.io/pbip-documenter/" target="_blank" style="color:#1a3a5c;">PBIP Documenter</a> — free, open-source tool for Power BI documentation.</p>
+    <p style="margin:0 0 12px;font-size:13px;color:#666;">Used by Power BI teams worldwide. Try it at <a href="https://jonathanjihwankim.github.io/pbip-documenter/?o=doc" target="_blank" style="color:#1a3a5c;">jonathanjihwankim.github.io/pbip-documenter</a></p>
+    <p style="margin:0 0 8px;">
+        <a href="https://github.com/sponsors/JonathanJihwanKim?o=doc" target="_blank" style="display:inline-block;padding:6px 14px;background:#c89632;color:#1a3a5c;text-decoration:none;font-weight:600;font-size:13px;border-radius:2px;margin-right:8px;">Sponsor on GitHub</a>
+        <a href="https://buymeacoffee.com/jihwankim?o=doc" target="_blank" style="display:inline-block;padding:6px 14px;background:#fff;color:#1a3a5c;text-decoration:none;font-weight:600;font-size:13px;border:1px solid #1a3a5c;border-radius:2px;">Buy a Coffee</a>
+    </p>
+    <p style="margin:8px 0 0;font-size:12px;"><a href="https://github.com/JonathanJihwanKim/pbip-impact-analyzer" target="_blank">PBIP Impact Analyzer</a> | <a href="https://jonathanjihwankim.github.io/isHiddenInViewMode/" target="_blank">PBIR Visual Manager</a></p>
 </div>
 </body>
 </html>`;
@@ -1707,11 +1714,15 @@ ${rects}
             }
         }
 
-        // Footer
-        html += `<div class="footer">
-    <p>Generated with <a href="https://jonathanjihwankim.github.io/pbip-documenter/" target="_blank">PBIP Documenter</a> — free browser tool for Power BI semantic model documentation.</p>
-    <p>If this saved you time, please consider <a href="https://github.com/sponsors/JonathanJihwanKim?o=doc" target="_blank">❤️ sponsoring on GitHub</a> or <a href="https://buymeacoffee.com/jihwankim?o=doc" target="_blank">☕ buying a coffee</a> to support ongoing development.</p>
-    <p><a href="https://github.com/JonathanJihwanKim/pbip-impact-analyzer" target="_blank">PBIP Impact Analyzer</a> | <a href="https://jonathanjihwankim.github.io/isHiddenInViewMode/" target="_blank">PBIR Visual Manager</a></p>
+        // Footer — styled sponsor card
+        html += `<div class="footer" style="margin-top:40px;padding:20px 24px;background:#fffbee;border:1px solid #ffe082;border-left:4px solid #c89632;border-radius:2px;">
+    <p style="margin:0 0 8px;font-weight:700;">Generated with <a href="https://jonathanjihwankim.github.io/pbip-documenter/" target="_blank" style="color:#1a3a5c;">PBIP Documenter</a> — free, open-source tool for Power BI documentation.</p>
+    <p style="margin:0 0 12px;font-size:13px;color:#666;">Used by Power BI teams worldwide. Try it at <a href="https://jonathanjihwankim.github.io/pbip-documenter/?o=doc" target="_blank" style="color:#1a3a5c;">jonathanjihwankim.github.io/pbip-documenter</a></p>
+    <p style="margin:0 0 8px;">
+        <a href="https://github.com/sponsors/JonathanJihwanKim?o=doc" target="_blank" style="display:inline-block;padding:6px 14px;background:#c89632;color:#1a3a5c;text-decoration:none;font-weight:600;font-size:13px;border-radius:2px;margin-right:8px;">Sponsor on GitHub</a>
+        <a href="https://buymeacoffee.com/jihwankim?o=doc" target="_blank" style="display:inline-block;padding:6px 14px;background:#fff;color:#1a3a5c;text-decoration:none;font-weight:600;font-size:13px;border:1px solid #1a3a5c;border-radius:2px;">Buy a Coffee</a>
+    </p>
+    <p style="margin:8px 0 0;font-size:12px;"><a href="https://github.com/JonathanJihwanKim/pbip-impact-analyzer" target="_blank">PBIP Impact Analyzer</a> | <a href="https://jonathanjihwankim.github.io/isHiddenInViewMode/" target="_blank">PBIR Visual Manager</a></p>
 </div>
 </body>
 </html>`;

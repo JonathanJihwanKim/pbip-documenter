@@ -135,6 +135,95 @@ class App {
                 try { localStorage.setItem('pbip-doc-sidebar-tables-collapsed', !isExpanded); } catch {}
             });
         });
+
+        // Track sponsor link clicks via event delegation
+        document.addEventListener('click', (e) => {
+            const link = e.target.closest('a[href*="buymeacoffee.com"], a[href*="github.com/sponsors"]');
+            if (link) {
+                const url = new URL(link.href);
+                const source = url.searchParams.get('o') || 'unknown';
+                this._track('Sponsor Click', { source, platform: link.href.includes('buymeacoffee') ? 'coffee' : 'github' });
+            }
+        });
+
+        // Fetch GitHub stars for social proof
+        this._fetchGitHubStars();
+    }
+
+    // ──────────────────────────────────────────────
+    // ANALYTICS (Plausible custom events)
+    // ──────────────────────────────────────────────
+
+    _track(event, props) {
+        if (typeof plausible === 'function') plausible(event, props ? { props } : undefined);
+    }
+
+    // ──────────────────────────────────────────────
+    // SPONSOR HELPERS
+    // ──────────────────────────────────────────────
+
+    _showTimeSaved() {
+        if (!this.parsedModel) return;
+        const tables = this.parsedModel.tables.length;
+        const measures = this.parsedModel.tables.reduce((s, t) => s + t.measures.length, 0);
+        const visuals = this.visualData?.visuals?.length || 0;
+        const relationships = this.parsedModel.relationships?.length || 0;
+        const minutes = Math.round((tables * 2) + (measures * 1.5) + (visuals * 1) + (relationships * 0.5));
+        const dollars = Math.round(minutes / 60 * 50);
+        const row = document.getElementById('timeSavedRow');
+        const text = document.getElementById('timeSavedText');
+        if (row && text && minutes > 0) {
+            text.innerHTML = `Estimated time saved: <strong>~${minutes} min</strong> (${tables} tables, ${measures} measures, ${visuals} visuals). That's worth about <strong>$${dollars}</strong> at $50/hr. A coffee costs $5.`;
+            row.classList.remove('hidden');
+        }
+    }
+
+    _trackMilestone(section) {
+        const HIGH_VALUE = ['relationships', 'lineage', 'visual-usage', 'table-detail', 'data-sources'];
+        if (!HIGH_VALUE.includes(section)) return;
+        if (sessionStorage.getItem('pbip-doc-milestone-dismissed')) return;
+
+        const visited = JSON.parse(sessionStorage.getItem('pbip-doc-milestones') || '[]');
+        if (!visited.includes(section)) {
+            visited.push(section);
+            sessionStorage.setItem('pbip-doc-milestones', JSON.stringify(visited));
+        }
+        if (visited.length >= 3 && !document.querySelector('.milestone-banner')) {
+            const mc = document.getElementById('mainContent');
+            if (!mc) return;
+            const banner = document.createElement('div');
+            banner.className = 'milestone-banner';
+            banner.innerHTML = `You've explored ${visited.length} sections — relationships, lineage, and more — all generated in seconds. This tool is built and maintained by one developer. <a href="https://buymeacoffee.com/jihwankim?o=milestone" target="_blank">Buy a coffee</a> or <a href="https://github.com/sponsors/JonathanJihwanKim?o=milestone" target="_blank">sponsor on GitHub</a>. <button type="button" class="milestone-banner-close" title="Dismiss">&times;</button>`;
+            mc.prepend(banner);
+            banner.querySelector('.milestone-banner-close').addEventListener('click', () => {
+                banner.remove();
+                sessionStorage.setItem('pbip-doc-milestone-dismissed', '1');
+            });
+        }
+    }
+
+    _fetchGitHubStars() {
+        const cached = sessionStorage.getItem('pbip-doc-gh-stars');
+        if (cached) { this._renderStars(parseInt(cached, 10)); return; }
+        fetch('https://api.github.com/repos/JonathanJihwanKim/pbip-documenter')
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+                if (data && typeof data.stargazers_count === 'number') {
+                    sessionStorage.setItem('pbip-doc-gh-stars', String(data.stargazers_count));
+                    this._renderStars(data.stargazers_count);
+                }
+            })
+            .catch(() => {}); // Silently fail
+    }
+
+    _renderStars(count) {
+        if (count < 1) return;
+        const el = document.getElementById('githubStars');
+        const countEl = document.getElementById('githubStarCount');
+        if (el && countEl) {
+            countEl.textContent = count;
+            el.classList.remove('hidden');
+        }
     }
 
     // ──────────────────────────────────────────────
@@ -400,6 +489,8 @@ class App {
             this.renderOverview();
             this.showSection('overview');
 
+            this._track('Model Parsed', { tables: this.parsedModel.tables.length, measures: this.parsedModel.tables.reduce((s, t) => s + t.measures.length, 0) });
+
             document.getElementById('statsBar').classList.remove('hidden');
             document.getElementById('downloadBar').classList.remove('hidden');
             document.getElementById('appBody').classList.remove('hidden');
@@ -422,6 +513,9 @@ class App {
                     });
                 }
             }
+
+            // Time-saved calculator in download bar
+            this._showTimeSaved();
 
             // Pulse animation on coffee button (first visit only)
             if (!localStorage.getItem('pbip-doc-visited')) {
@@ -539,6 +633,8 @@ class App {
             this.renderOverview();
             this.showSection('overview');
 
+            this._track('Demo Loaded');
+
             document.getElementById('landingSection').classList.add('hidden');
             document.getElementById('statsBar').classList.remove('hidden');
             document.getElementById('downloadBar').classList.remove('hidden');
@@ -548,6 +644,9 @@ class App {
             document.getElementById('folderInfo').classList.remove('hidden');
             const folderNameEl = document.getElementById('folderName');
             if (folderNameEl) folderNameEl.textContent = data._meta?.modelName || 'Contoso (demo)';
+
+            // Time-saved calculator in download bar
+            this._showTimeSaved();
 
             // Show banner with stats (always for demo visitors — they haven't seen value yet)
             const banner = document.getElementById('sponsorBanner');
@@ -904,11 +1003,17 @@ class App {
         if (section === 'visual-usage') this.renderVisualUsageView();
         if (section === 'lineage') this.renderLineageView();
         if (section === 'data-sources') this.renderDataSourcesView();
+
+        // Milestone tracking for sponsor prompt
+        this._trackMilestone(section);
     }
 
     showTableDetail(tableName) {
         const table = this.parsedModel.tables.find(t => t.name === tableName);
         if (!table) return;
+
+        // Milestone tracking
+        this._trackMilestone('table-detail');
 
         // Update sidebar active
         document.querySelectorAll('.sidebar-item').forEach(item => {
@@ -1854,6 +1959,7 @@ class App {
     // ──────────────────────────────────────────────
 
     downloadMarkdown(scope = 'all', btn = null) {
+        this._track('Download', { format: 'markdown', scope });
         if (!this.docGenerator) return;
         if (scope === 'visuals' && (!this.visualData || this.visualData.pages.length === 0)) {
             this.showToast('No report data — include a report folder to export visuals', 'error');
@@ -1877,6 +1983,7 @@ class App {
     }
 
     downloadFullReport(scope = 'all', btn = null) {
+        this._track('Download', { format: 'html', scope });
         if (!this.docGenerator) return;
         if (scope === 'visuals' && (!this.visualData || this.visualData.pages.length === 0)) {
             this.showToast('No report data — include a report folder to export visuals', 'error');

@@ -3,12 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta property="og:title" content="PBIP Documenter">
-    <meta property="og:description" content="Generate comprehensive documentation from Power BI PBIP/TMDL semantic models. Free browser-based tool.">
+    <meta name="description" content="Free browser tool to generate documentation from Power BI PBIP/TMDL semantic models. Visual lineage tracing, DAX dependency chains, relationship diagrams, and visual usage maps — all client-side, no uploads.">
+    <meta name="keywords" content="Power BI, PBIP, TMDL, documentation, semantic model, visual lineage, DAX, relationship diagram, PBIR">
+    <meta name="author" content="Jihwan Kim">
+    <link rel="canonical" href="https://jonathanjihwankim.github.io/pbip-documenter/">
+    <meta property="og:title" content="PBIP Documenter — TMDL Documentation & Visual Lineage">
+    <meta property="og:description" content="Free browser tool to auto-document Power BI PBIP/TMDL semantic models. Visual lineage, DAX dependencies, relationship diagrams — all in your browser.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://jonathanjihwankim.github.io/pbip-documenter/">
+    <meta property="og:image" content="https://jonathanjihwankim.github.io/pbip-documenter/og-image.png">
     <meta name="twitter:card" content="summary_large_image">
-    <title>PBIP Documenter — TMDL Documentation & Visual Lineage</title>
+    <meta name="twitter:title" content="PBIP Documenter — Auto-Document Power BI Models">
+    <meta name="twitter:description" content="Free browser tool for Power BI PBIP/TMDL documentation with visual lineage tracing.">
+    <title>PBIP Documenter — TMDL Documentation & Visual Lineage for Power BI</title>
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "PBIP Documenter",
+        "description": "Free browser tool to generate documentation from Power BI PBIP/TMDL semantic models with visual lineage tracing.",
+        "url": "https://jonathanjihwankim.github.io/pbip-documenter/",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Web (Chrome, Edge, Opera)",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "author": { "@type": "Person", "name": "Jihwan Kim", "url": "https://github.com/JonathanJihwanKim" }
+    }
+    </script>
+    <script defer data-domain="jonathanjihwankim.github.io/pbip-documenter" src="https://plausible.io/js/script.tagged-events.js"></script>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -24,6 +45,10 @@
             <span class="header-subtitle">Full visual-to-source lineage tracing for Power BI</span>
         </div>
         <div class="header-right">
+            <span id="githubStars" class="github-stars hidden">
+                <span class="material-symbols-outlined" style="font-size:14px">star</span>
+                <span id="githubStarCount"></span>
+            </span>
             <a href="https://github.com/sponsors/JonathanJihwanKim?o=header" target="_blank" class="btn-sponsor btn-sponsor-github" title="Help keep this tool free">
                 <span class="material-symbols-outlined" style="font-size:16px">volunteer_activism</span>
                 Sponsor
@@ -197,6 +222,23 @@
                     </div>
                 </div>
             </div>
+            <!-- Time Saved Row (populated by JS after parse) -->
+            <div id="timeSavedRow" class="time-saved-row hidden">
+                <div class="time-saved-content">
+                    <span class="material-symbols-outlined time-saved-icon">schedule</span>
+                    <span id="timeSavedText"></span>
+                </div>
+                <div class="time-saved-actions">
+                    <a href="https://buymeacoffee.com/jihwankim?o=timesaved" target="_blank" class="btn-time-saved-primary">
+                        <span class="material-symbols-outlined" style="font-size:14px">local_cafe</span>
+                        Buy a coffee
+                    </a>
+                    <a href="https://github.com/sponsors/JonathanJihwanKim?o=timesaved" target="_blank" class="btn-time-saved-secondary">
+                        <span class="material-symbols-outlined" style="font-size:14px">volunteer_activism</span>
+                        Sponsor monthly
+                    </a>
+                </div>
+            </div>
             <div style="padding:8px 16px 12px;border-top:1px solid var(--border-light);text-align:right">
                 <button id="btnExportSampleData" class="btn-export-sample" title="Export parsed data as samples/contoso.json for the demo mode">
                     <span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle">save</span>
@@ -295,6 +337,11 @@
                         <span class="material-symbols-outlined">integration_instructions</span>
                         Expressions
                     </div>
+                </div>
+                <div class="sidebar-sponsor-card">
+                    <span class="material-symbols-outlined" style="font-size:14px;color:var(--accent)">favorite</span>
+                    <span>Free &amp; open source</span>
+                    <a href="https://buymeacoffee.com/jihwankim?o=sidebar" target="_blank" class="sidebar-sponsor-link">Support</a>
                 </div>
             </aside>
 
