@@ -8,7 +8,7 @@
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://jonathanjihwankim.github.io/pbip-documenter/">
     <meta name="twitter:card" content="summary_large_image">
-    <title>PBIP Documenter — TMDL Documentation Generator</title>
+    <title>PBIP Documenter — TMDL Documentation & Visual Lineage</title>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,7 +21,7 @@
         <div class="header-left">
             <img src="Power-BI.png" alt="Power BI" class="header-logo">
             <span class="header-title">PBIP Documenter</span>
-            <span class="header-subtitle">TMDL Documentation Generator</span>
+            <span class="header-subtitle">Full visual-to-source lineage tracing for Power BI</span>
         </div>
         <div class="header-right">
             <a href="https://github.com/sponsors/JonathanJihwanKim?o=header" target="_blank" class="btn-sponsor btn-sponsor-github" title="Help keep this tool free">
@@ -47,7 +47,7 @@
         <div id="landingSection" class="content-panel folder-section">
             <h2>Generate Documentation from TMDL</h2>
             <p>Select a project folder to parse your semantic model and generate comprehensive documentation.<br>
-            Supports Markdown and HTML output with relationship diagrams and visual usage mapping.</p>
+            Visual Lineage tracing, DAX dependency chains, data source discovery, relationship diagrams and visual usage mapping.</p>
             <button id="openFolderBtn" class="btn-open-folder">
                 <span class="material-symbols-outlined">folder_open</span>
                 Open Project Folder
@@ -123,6 +123,10 @@
                 <div class="stat-value" id="statVisuals" aria-describedby="statVisualsHint">0</div>
                 <div class="stat-label">Visuals</div>
                 <div class="stat-hint" id="statVisualsHint"></div>
+            </div>
+            <div class="stat-card" id="statDataSourcesCard">
+                <div class="stat-value" id="statDataSources">0</div>
+                <div class="stat-label">Data Sources</div>
             </div>
         </div>
 
@@ -244,6 +248,19 @@
                         Visual Usage
                     </div>
                 </div>
+                <div class="sidebar-section" id="sidebarLineageSection">
+                    <div class="sidebar-header" data-section="lineage">
+                        <span class="material-symbols-outlined">account_tree</span>
+                        Visual Lineage
+                    </div>
+                </div>
+                <div class="sidebar-section" id="sidebarDataSourcesSection">
+                    <div class="sidebar-header" data-section="data-sources">
+                        <span class="material-symbols-outlined">storage</span>
+                        Data Sources
+                        <span class="sidebar-badge" id="sidebarDataSourceCount">0</span>
+                    </div>
+                </div>
                 <div class="sidebar-section">
                     <div class="sidebar-header" data-section="relationships">
                         <span class="material-symbols-outlined">device_hub</span>
@@ -313,6 +330,47 @@
                     </div>
                     <div id="visualUsageByVisual"></div>
                     <div id="visualUsageByField" class="diagram-container hidden"></div>
+                </div>
+
+                <!-- Visual Lineage -->
+                <div id="view-lineage" class="section-view content-panel">
+                    <h2>Visual Lineage</h2>
+                    <div class="view-toggle" id="lineageToggle">
+                        <button type="button" class="view-toggle-btn active" data-view="full">Full Lineage</button>
+                        <button type="button" class="view-toggle-btn" data-view="trace">Visual Trace</button>
+                        <button type="button" class="view-toggle-btn" data-view="impact">Impact Analysis</button>
+                    </div>
+                    <div id="lineageFullView">
+                        <div id="lineageDiagramContainer" class="lineage-diagram-container diagram-interactive"></div>
+                    </div>
+                    <div id="lineageTraceView" class="hidden">
+                        <div class="lineage-select-row">
+                            <label for="lineageVisualSelect">Select a visual:</label>
+                            <select id="lineageVisualSelect" class="lineage-select"></select>
+                            <button type="button" id="lineageTraceBtn" class="btn-trace-lineage">
+                                <span class="material-symbols-outlined" style="font-size:16px">account_tree</span>
+                                Trace to Source
+                            </button>
+                        </div>
+                        <div id="lineageTraceDiagram" class="lineage-diagram-container diagram-interactive"></div>
+                    </div>
+                    <div id="lineageImpactView" class="hidden">
+                        <div class="lineage-select-row">
+                            <label for="lineageMeasureSelect">Select a measure:</label>
+                            <select id="lineageMeasureSelect" class="lineage-select"></select>
+                            <button type="button" id="lineageImpactBtn" class="btn-trace-lineage">
+                                <span class="material-symbols-outlined" style="font-size:16px">hub</span>
+                                Show Impact
+                            </button>
+                        </div>
+                        <div id="lineageImpactDiagram" class="lineage-diagram-container diagram-interactive"></div>
+                    </div>
+                </div>
+
+                <!-- Data Sources -->
+                <div id="view-data-sources" class="section-view content-panel">
+                    <h2>Data Sources</h2>
+                    <div id="dataSourcesContent"></div>
                 </div>
 
                 <!-- Relationships -->
@@ -414,6 +472,9 @@
     <!-- Scripts -->
     <script src="tmdl-parser.js"></script>
     <script src="visual-parser.js"></script>
+    <script src="m-parser.js"></script>
+    <script src="lineage-engine.js"></script>
+    <script src="lineage-diagram.js"></script>
     <script src="doc-generator.js"></script>
     <script src="diagram.js"></script>
     <script src="app.js"></script>

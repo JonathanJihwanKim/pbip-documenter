@@ -1764,3 +1764,194 @@ tr:hover {
     background: #e8eaf6;
     border-color: var(--primary);
 }
+
+/* ── LINEAGE ── */
+.lineage-diagram-container {
+    position: relative;
+    overflow: hidden;
+    cursor: grab;
+    min-height: 350px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin: 12px 0;
+    background: var(--bg-light);
+}
+
+.lineage-diagram-container.panning {
+    cursor: grabbing;
+}
+
+.lineage-diagram-container svg {
+    cursor: inherit;
+    display: block;
+}
+
+.lineage-select-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.lineage-select-row label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--primary);
+}
+
+.lineage-select {
+    flex: 1;
+    min-width: 200px;
+    max-width: 400px;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--text);
+    background: var(--card-bg);
+}
+
+.lineage-select:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+.btn-trace-lineage {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #ffffff;
+    background: #9c27b0;
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all var(--transition);
+    font-family: inherit;
+}
+
+.btn-trace-lineage:hover {
+    background: #7b1fa2;
+    transform: translateY(-1px);
+}
+
+.btn-trace-lineage.btn-trace-sm {
+    padding: 3px 8px;
+    font-size: 11px;
+}
+
+.lineage-mini {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    flex-wrap: wrap;
+}
+
+.lineage-mini .lineage-arrow {
+    color: var(--text-light);
+}
+
+.lineage-badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 2px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.lineage-badge.source {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
+.lineage-badge.table {
+    background: #e3f2fd;
+    color: #1565c0;
+}
+
+.lineage-badge.measure {
+    background: #fff8e1;
+    color: #f57f17;
+}
+
+.lineage-badge.visual {
+    background: #f3e5f5;
+    color: #6a1b9a;
+}
+
+.lineage-badge.column {
+    background: #e3f2fd;
+    color: #1565c0;
+}
+
+/* Lineage SVG node styling */
+.lineage-node {
+    transition: opacity 0.2s ease;
+}
+
+.lineage-edge {
+    transition: all 0.2s ease;
+}
+
+/* Data Source Cards */
+.data-source-card {
+    background: var(--card-bg);
+    border: 1px solid #a5d6a7;
+    border-left: 4px solid #4caf50;
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin: 8px 0;
+}
+
+.data-source-card h4 {
+    font-size: 14px;
+    color: var(--primary);
+    margin-bottom: 4px;
+}
+
+.data-source-card .ds-meta {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.data-source-card .ds-meta code {
+    background: #e8f5e9;
+    padding: 1px 4px;
+    border-radius: 2px;
+    font-size: 12px;
+}
+
+/* Measure chain display */
+.measure-chain {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+    font-size: 12px;
+}
+
+.measure-chain-item {
+    display: inline-block;
+    padding: 1px 6px;
+    background: #fff8e1;
+    border: 1px solid #ffe082;
+    border-radius: 2px;
+    font-size: 11px;
+    color: #f57f17;
+}
+
+.measure-chain-arrow {
+    color: var(--text-light);
+    font-size: 11px;
+}

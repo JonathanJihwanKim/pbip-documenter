@@ -13,7 +13,10 @@ class App {
         this.measureRefs = null;
         this.docGenerator = null;
         this.diagramRenderer = null;
+        this.lineageEngine = null;
+        this.lineageDiagramRenderer = null;
         this._diagramRendered = false;
+        this._lineageRendered = false;
 
         this.parseErrors = [];
 
@@ -370,11 +373,20 @@ class App {
                 }
             }
 
+            // Build lineage engine
+            this.lineageEngine = new LineageEngine(
+                this.parsedModel,
+                this.visualData,
+                this.measureRefs
+            );
+            this.lineageEngine.buildGraph();
+
             // Create doc generator
             this.docGenerator = new DocGenerator(
                 this.parsedModel,
                 this.visualData?.fieldUsageMap || {},
-                this.measureRefs
+                this.measureRefs,
+                this.lineageEngine
             );
 
             // Update UI
@@ -563,6 +575,10 @@ class App {
         document.getElementById('statRelationships').textContent = m.relationships.length;
         document.getElementById('statVisuals').textContent = totalVisuals;
 
+        // Data sources count
+        const totalDataSources = this.lineageEngine ? this.lineageEngine.getAllDataSources().length : 0;
+        document.getElementById('statDataSources').textContent = totalDataSources;
+
         // Visuals hint and dimmed state
         const visualsCard = document.getElementById('statVisualsCard');
         const visualsHint = document.getElementById('statVisualsHint');
@@ -637,6 +653,12 @@ class App {
         document.getElementById('sidebarRolesSection').classList.toggle('hidden', m.roles.length === 0);
         document.getElementById('sidebarExpressionsSection').classList.toggle('hidden', m.expressions.length === 0);
         document.getElementById('sidebarVisualUsageSection').classList.toggle('hidden', !this.visualData);
+
+        // Lineage & data sources sections
+        const dataSources = this.lineageEngine ? this.lineageEngine.getAllDataSources() : [];
+        document.getElementById('sidebarLineageSection').classList.toggle('hidden', !this.lineageEngine);
+        document.getElementById('sidebarDataSourcesSection').classList.toggle('hidden', dataSources.length === 0);
+        document.getElementById('sidebarDataSourceCount').textContent = dataSources.length;
     }
 
     filterSidebar(query) {
@@ -739,6 +761,8 @@ class App {
         if (section === 'roles') this.renderRoles();
         if (section === 'expressions') this.renderExpressions();
         if (section === 'visual-usage') this.renderVisualUsageView();
+        if (section === 'lineage') this.renderLineageView();
+        if (section === 'data-sources') this.renderDataSourcesView();
     }
 
     showTableDetail(tableName) {
@@ -882,6 +906,11 @@ class App {
         if (this.visualData) {
             html += `<tr><td>Report Pages</td><td>${this.visualData.pages.length}</td></tr>`;
             html += `<tr><td>Visuals</td><td>${this.visualData.visuals.length}</td></tr>`;
+        }
+
+        if (this.lineageEngine) {
+            const dataSources = this.lineageEngine.getAllDataSources();
+            html += `<tr><td>Data Sources</td><td>${dataSources.length}</td></tr>`;
         }
 
         html += '</table>';
@@ -1044,6 +1073,146 @@ class App {
         const expressionsEl = document.getElementById('expressionsContent');
         expressionsEl.innerHTML = html;
         this._bindDaxToggles(expressionsEl);
+    }
+
+    renderLineageView() {
+        if (!this.lineageEngine) return;
+
+        // Toggle handler (only bind once)
+        if (!this._lineageToggleBound) {
+            this._lineageToggleBound = true;
+            const toggle = document.getElementById('lineageToggle');
+            toggle.addEventListener('click', (e) => {
+                const btn = e.target.closest('.view-toggle-btn');
+                if (!btn) return;
+                const view = btn.dataset.view;
+                toggle.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById('lineageFullView').classList.toggle('hidden', view !== 'full');
+                document.getElementById('lineageTraceView').classList.toggle('hidden', view !== 'trace');
+                document.getElementById('lineageImpactView').classList.toggle('hidden', view !== 'impact');
+                if (view === 'full' && !this._lineageRendered) this._renderFullLineage();
+                if (view === 'trace') this._populateVisualSelect();
+                if (view === 'impact') this._populateMeasureSelect();
+            });
+
+            // Trace button
+            document.getElementById('lineageTraceBtn').addEventListener('click', () => {
+                const sel = document.getElementById('lineageVisualSelect');
+                const val = sel.value;
+                if (!val) return;
+                const [pageName, visualName] = val.split('|||');
+                const container = document.getElementById('lineageTraceDiagram');
+                const renderer = new LineageDiagramRenderer(container, this.lineageEngine);
+                renderer.renderVisualTrace(container, pageName, visualName);
+            });
+
+            // Impact button
+            document.getElementById('lineageImpactBtn').addEventListener('click', () => {
+                const sel = document.getElementById('lineageMeasureSelect');
+                const measureName = sel.value;
+                if (!measureName) return;
+                const container = document.getElementById('lineageImpactDiagram');
+                const renderer = new LineageDiagramRenderer(container, this.lineageEngine);
+                renderer.renderMeasureImpact(container, measureName);
+            });
+
+            // Trace button delegation (from visual cards)
+            document.getElementById('mainContent').addEventListener('click', (e) => {
+                const traceBtn = e.target.closest('.btn-trace-lineage[data-page][data-visual]');
+                if (!traceBtn) return;
+                const pageName = traceBtn.dataset.page;
+                const visualName = traceBtn.dataset.visual;
+                this.showSection('lineage');
+                // Switch to trace view
+                const toggle = document.getElementById('lineageToggle');
+                toggle.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.remove('active'));
+                toggle.querySelector('[data-view="trace"]').classList.add('active');
+                document.getElementById('lineageFullView').classList.add('hidden');
+                document.getElementById('lineageTraceView').classList.remove('hidden');
+                document.getElementById('lineageImpactView').classList.add('hidden');
+                // Set select and render
+                this._populateVisualSelect();
+                const sel = document.getElementById('lineageVisualSelect');
+                sel.value = `${pageName}|||${visualName}`;
+                const container = document.getElementById('lineageTraceDiagram');
+                const renderer = new LineageDiagramRenderer(container, this.lineageEngine);
+                renderer.renderVisualTrace(container, pageName, visualName);
+            });
+        }
+
+        // Render full lineage on first visit
+        if (!this._lineageRendered) {
+            this._lineageRendered = true;
+            requestAnimationFrame(() => this._renderFullLineage());
+        }
+    }
+
+    _renderFullLineage() {
+        const container = document.getElementById('lineageDiagramContainer');
+        this.lineageDiagramRenderer = new LineageDiagramRenderer(container, this.lineageEngine);
+        this.lineageDiagramRenderer.renderFullLineage(container);
+    }
+
+    _populateVisualSelect() {
+        const sel = document.getElementById('lineageVisualSelect');
+        if (sel.options.length > 0) return; // Already populated
+        if (!this.visualData) return;
+        for (const visual of this.visualData.visuals) {
+            const opt = document.createElement('option');
+            opt.value = `${visual.pageName}|||${visual.visualName}`;
+            opt.textContent = `${visual.pageName} — ${visual.visualName}`;
+            sel.appendChild(opt);
+        }
+    }
+
+    _populateMeasureSelect() {
+        const sel = document.getElementById('lineageMeasureSelect');
+        if (sel.options.length > 0) return; // Already populated
+        for (const table of this.parsedModel.tables) {
+            for (const measure of table.measures) {
+                const opt = document.createElement('option');
+                opt.value = measure.name;
+                opt.textContent = `${table.name}[${measure.name}]`;
+                sel.appendChild(opt);
+            }
+        }
+    }
+
+    renderDataSourcesView() {
+        const content = document.getElementById('dataSourcesContent');
+        if (!this.lineageEngine) {
+            content.innerHTML = '<p class="placeholder">No lineage data available.</p>';
+            return;
+        }
+
+        const sources = this.lineageEngine.getAllDataSources();
+        if (sources.length === 0) {
+            content.innerHTML = '<p class="placeholder">No data sources detected. Ensure your tables have M partition sources defined.</p>';
+            return;
+        }
+
+        let html = '';
+        for (const src of sources) {
+            const name = src.type;
+            const server = src.serverResolved || src.server;
+            const db = src.databaseResolved || src.database;
+
+            html += `<div class="data-source-card">
+                <h4><span class="lineage-badge source">${this._esc(name)}</span>`;
+            if (src.tableName) {
+                html += ` <span class="badge badge-table">${this._esc(src.tableName)}</span>`;
+            }
+            html += `</h4><div class="ds-meta">`;
+            if (server) html += `<span>Server: <code>${this._esc(server)}</code></span>`;
+            if (db) html += `<span>Database: <code>${this._esc(db)}</code></span>`;
+            if (src.url) html += `<span>URL: <code>${this._esc(src.url)}</code></span>`;
+            if (src.path) html += `<span>Path: <code>${this._esc(src.path)}</code></span>`;
+            if (src.parameterized) html += `<span class="badge badge-field-param">Parameterized</span>`;
+            html += `</div></div>`;
+        }
+
+        content.innerHTML = html;
     }
 
     renderRelationshipDiagram() {
@@ -1336,8 +1505,20 @@ class App {
         let html = `<div class="visual-card">
             <div class="visual-card-header">
                 <h4>${this._esc(vName)}</h4>
-                <span class="badge-visual-type">${this._esc(vType)}</span>
-            </div>`;
+                <span class="badge-visual-type">${this._esc(vType)}</span>`;
+
+        // Lineage summary badge + trace button
+        if (this.lineageEngine && visual.pageName) {
+            const summary = this.lineageEngine.getLineageSummary(visual.pageName, vName);
+            if (summary) {
+                html += `<span class="lineage-mini" style="margin-left:auto">${this._esc(summary)}</span>`;
+            }
+            html += `<button type="button" class="btn-trace-lineage btn-trace-sm" data-page="${this._esc(visual.pageName)}" data-visual="${this._esc(vName)}">
+                <span class="material-symbols-outlined" style="font-size:14px">account_tree</span> Trace
+            </button>`;
+        }
+
+        html += `</div>`;
 
         if (!visual.fields || visual.fields.length === 0) {
             html += '<p class="visual-card-empty">No data fields</p>';
@@ -1489,6 +1670,19 @@ class App {
             if (refs.measureRefs.length > 0) {
                 html += '<div style="margin:4px 0;font-size:13px"><strong>Measures:</strong> ';
                 html += refs.measureRefs.map(r => `<code style="background:#fff8e1;padding:1px 4px;border-radius:2px">[${this._esc(r)}]</code>`).join(' ');
+                html += '</div>';
+            }
+        }
+
+        // Measure dependency chain
+        if (this.lineageEngine) {
+            const chain = this.lineageEngine.resolveMeasureChain(measure.name);
+            if (chain.length > 0) {
+                html += '<div class="measure-chain"><strong style="font-size:11px;color:var(--text-secondary)">Depends on:</strong> ';
+                for (let i = 0; i < chain.length; i++) {
+                    if (i > 0) html += '<span class="measure-chain-arrow">\u2192</span>';
+                    html += `<span class="measure-chain-item">[${this._esc(chain[i].name)}]</span>`;
+                }
                 html += '</div>';
             }
         }

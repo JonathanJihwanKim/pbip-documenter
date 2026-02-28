@@ -745,6 +745,21 @@ class DAXReferenceExtractor {
     }
 
     /**
+     * Build a lookup map of measure name → table name
+     * @param {Array} tables - Parsed tables from the model
+     * @returns {Map<string, string>} Map of measureName → tableName
+     */
+    static buildMeasureLookup(tables) {
+        const lookup = new Map();
+        for (const table of tables) {
+            for (const measure of table.measures) {
+                lookup.set(measure.name, table.name);
+            }
+        }
+        return lookup;
+    }
+
+    /**
      * Extract table references from functions like COUNTROWS(Table), ALL(Table)
      */
     static _extractTableRefs(dax) {

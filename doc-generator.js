@@ -9,10 +9,11 @@ class DocGenerator {
      * @param {Object} visualUsage - Visual usage data from VisualParser (optional)
      * @param {Object} measureRefs - DAX reference data (optional)
      */
-    constructor(model, visualUsage, measureRefs) {
+    constructor(model, visualUsage, measureRefs, lineageEngine) {
         this.model = model;
         this.visualUsage = visualUsage || {};
         this.measureRefs = measureRefs || {};
+        this.lineageEngine = lineageEngine || null;
     }
 
     // ──────────────────────────────────────────────
@@ -61,6 +62,14 @@ class DocGenerator {
         if (Object.keys(this.visualUsage).length > 0) {
             lines.push('- [Visual Usage](#visual-usage)');
         }
+        if (this.lineageEngine) {
+            const ds = this.lineageEngine.getAllDataSources();
+            if (ds.length > 0) lines.push('- [Data Sources](#data-sources)');
+            lines.push('- [Measure Dependencies](#measure-dependencies)');
+            if (visualData && visualData.visuals && visualData.visuals.length > 0) {
+                lines.push('- [Visual Lineage Summary](#visual-lineage-summary)');
+            }
+        }
 
         lines.push('');
 
@@ -77,9 +86,12 @@ class DocGenerator {
             this._appendMarkdownVisualUsageSummary(lines);
         }
 
+        // Data Lineage sections
+        this._appendMarkdownLineageSections(lines, visualData);
+
         // Footer
         lines.push('---');
-        lines.push(`*Generated with [pbip-documenter](https://github.com/JonathanJihwanKim/pbip-documenter) — free, open-source TMDL documentation.*`);
+        lines.push(`*Generated with [pbip-documenter](https://github.com/JonathanJihwanKim/pbip-documenter) — free, open-source TMDL documentation with visual lineage.*`);
         lines.push(`*Support: [Sponsor](https://github.com/sponsors/JonathanJihwanKim?o=doc) | [Buy Me a Coffee](https://buymeacoffee.com/jihwankim?o=doc)*`);
 
         return lines.join('\n');
@@ -528,6 +540,65 @@ class DocGenerator {
             lines.push(`| ${field} | ${type} | ${table} | ${visualList} |`);
         }
         lines.push('');
+    }
+
+    /**
+     * Append data lineage sections to markdown
+     */
+    _appendMarkdownLineageSections(lines, visualData) {
+        if (!this.lineageEngine) return;
+
+        // Data Sources section
+        const dataSources = this.lineageEngine.getAllDataSources();
+        if (dataSources.length > 0) {
+            lines.push('## Data Sources');
+            lines.push('');
+            lines.push('| Type | Server/URL | Database | Parameterized |');
+            lines.push('|------|-----------|----------|---------------|');
+            for (const src of dataSources) {
+                const server = src.serverResolved || src.server || src.url || src.path || '';
+                const db = src.databaseResolved || src.database || '';
+                lines.push(`| ${src.type} | ${server} | ${db} | ${src.parameterized ? 'Yes' : 'No'} |`);
+            }
+            lines.push('');
+        }
+
+        // Measure Dependencies section
+        const allMeasures = [];
+        for (const table of this.model.tables) {
+            for (const measure of table.measures) {
+                const chain = this.lineageEngine.resolveMeasureChain(measure.name);
+                if (chain.length > 0) {
+                    allMeasures.push({ name: measure.name, table: table.name, chain });
+                }
+            }
+        }
+        if (allMeasures.length > 0) {
+            lines.push('## Measure Dependencies');
+            lines.push('');
+            lines.push('| Measure | Table | Depends On |');
+            lines.push('|---------|-------|------------|');
+            for (const m of allMeasures) {
+                const deps = m.chain.map(d => `[${d.name}]`).join(' \u2192 ');
+                lines.push(`| ${m.name} | ${m.table} | ${deps} |`);
+            }
+            lines.push('');
+        }
+
+        // Visual Lineage summaries
+        if (visualData && visualData.visuals && visualData.visuals.length > 0) {
+            lines.push('## Visual Lineage Summary');
+            lines.push('');
+            lines.push('| Visual | Page | Lineage |');
+            lines.push('|--------|------|---------|');
+            for (const visual of visualData.visuals) {
+                const summary = this.lineageEngine.getLineageSummary(visual.pageName, visual.visualName);
+                if (summary) {
+                    lines.push(`| ${visual.visualName} | ${visual.pageName} | ${summary} |`);
+                }
+            }
+            lines.push('');
+        }
     }
 
     // ──────────────────────────────────────────────
@@ -1606,9 +1677,37 @@ ${rects}
             html += `</table>`;
         }
 
+        // Data Lineage Section
+        if (this.lineageEngine) {
+            const dataSources = this.lineageEngine.getAllDataSources();
+            if (dataSources.length > 0) {
+                html += `<h2 id="data-sources">Data Sources</h2>
+<table><tr><th>Type</th><th>Server/URL</th><th>Database</th><th>Parameterized</th></tr>`;
+                for (const src of dataSources) {
+                    const server = src.serverResolved || src.server || src.url || src.path || '';
+                    const db = src.databaseResolved || src.database || '';
+                    html += `<tr><td>${this._escHtml(src.type)}</td><td>${this._escHtml(server)}</td><td>${this._escHtml(db)}</td><td>${src.parameterized ? 'Yes' : 'No'}</td></tr>`;
+                }
+                html += `</table>`;
+            }
+
+            // Visual Lineage Summary
+            if (scope !== 'model' && visualData && visualData.visuals && visualData.visuals.length > 0) {
+                html += `<h2 id="data-lineage">Visual Lineage</h2>
+<table><tr><th>Visual</th><th>Page</th><th>Lineage</th></tr>`;
+                for (const visual of visualData.visuals) {
+                    const summary = this.lineageEngine.getLineageSummary(visual.pageName, visual.visualName);
+                    if (summary) {
+                        html += `<tr><td>${this._escHtml(visual.visualName)}</td><td>${this._escHtml(visual.pageName)}</td><td>${this._escHtml(summary)}</td></tr>`;
+                    }
+                }
+                html += `</table>`;
+            }
+        }
+
         // Footer
         html += `<div class="footer">
-    <p>Generated with <a href="https://github.com/JonathanJihwanKim/pbip-documenter" target="_blank">pbip-documenter</a> — free, open-source TMDL documentation.</p>
+    <p>Generated with <a href="https://github.com/JonathanJihwanKim/pbip-documenter" target="_blank">pbip-documenter</a> — free, open-source TMDL documentation with visual lineage.</p>
     <p>If this tool saved you time, consider <a href="https://github.com/sponsors/JonathanJihwanKim?o=doc" target="_blank">sponsoring</a> or <a href="https://buymeacoffee.com/jihwankim?o=doc" target="_blank">buying a coffee</a>.</p>
     <p><a href="https://github.com/JonathanJihwanKim/pbip-impact-analyzer" target="_blank">PBIP Impact Analyzer</a> | <a href="https://jonathanjihwankim.github.io/isHiddenInViewMode/" target="_blank">PBIR Visual Manager</a></p>
 </div>
