@@ -34,6 +34,8 @@ class App {
         // Bind events
         document.getElementById('openFolderBtn').addEventListener('click', () => this.openFolder());
         document.getElementById('changeFolderBtn').addEventListener('click', () => this.openFolder());
+        const sampleBtn = document.getElementById('btnSampleData');
+        if (sampleBtn) sampleBtn.addEventListener('click', () => this.loadSampleData());
         document.getElementById('downloadFullReport').addEventListener('click', () => {
             document.getElementById('htmlOptions').classList.toggle('open');
         });
@@ -399,10 +401,17 @@ class App {
             document.getElementById('downloadBar').classList.remove('hidden');
             document.getElementById('appBody').classList.remove('hidden');
 
-            // Show inline sponsor banner (once ever per browser)
+            // Show inline sponsor banner with parsed stats (once ever per browser)
             if (!localStorage.getItem('pbip-doc-banner-dismissed')) {
                 const banner = document.getElementById('sponsorBanner');
                 if (banner) {
+                    const totalMeasures = this.parsedModel.tables.reduce((s, t) => s + t.measures.length, 0);
+                    const totalTables = this.parsedModel.tables.length;
+                    const totalVisuals = this.visualData?.visuals?.length || 0;
+                    const bannerText = document.getElementById('sponsorBannerText');
+                    if (bannerText) {
+                        bannerText.innerHTML = `Documented <strong>${totalMeasures} measure${totalMeasures !== 1 ? 's' : ''}</strong> across <strong>${totalTables} table${totalTables !== 1 ? 's' : ''}</strong>${totalVisuals ? ` and <strong>${totalVisuals} visual${totalVisuals !== 1 ? 's' : ''}</strong>` : ''}. If this saved you time, consider <a href="https://github.com/sponsors/JonathanJihwanKim?o=banner" target="_blank">sponsoring</a> or <a href="https://buymeacoffee.com/jihwankim?o=banner" target="_blank">buying a coffee</a>.`;
+                    }
                     banner.classList.remove('hidden');
                     document.getElementById('sponsorBannerClose').addEventListener('click', () => {
                         banner.classList.add('hidden');
@@ -438,6 +447,96 @@ class App {
             console.error('Parse error:', error);
         } finally {
             this.showLoading(false, 'Parsing TMDL files...');
+        }
+    }
+
+    // ──────────────────────────────────────────────
+    // DEMO / SAMPLE DATA MODE
+    // ──────────────────────────────────────────────
+
+    async loadSampleData() {
+        const btn = document.getElementById('btnSampleData');
+        const origLabel = btn ? btn.innerHTML : '';
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle">hourglass_top</span> Loading sample…';
+        }
+
+        try {
+            const resp = await fetch('samples/contoso.json');
+            if (!resp.ok) {
+                throw new Error(
+                    `Sample data not found (${resp.status}). ` +
+                    `Open scripts/generate-sample.html in Chrome to generate it first.`
+                );
+            }
+            const data = await resp.json();
+
+            // Inject parsed data
+            this.parsedModel = data.parsedModel;
+            this.measureRefs = data.measureRefs || {};
+            this.visualData = data.visualData || null;
+            this.parseErrors = [];
+
+            // Build lineage engine
+            this.lineageEngine = new LineageEngine(
+                this.parsedModel,
+                this.visualData,
+                this.measureRefs
+            );
+            this.lineageEngine.buildGraph();
+
+            // Create doc generator
+            this.docGenerator = new DocGenerator(
+                this.parsedModel,
+                this.visualData?.fieldUsageMap || data.fieldUsageMap || {},
+                this.measureRefs,
+                this.lineageEngine
+            );
+
+            // Update UI
+            this.updateStats();
+            this.buildSidebar();
+            this.renderOverview();
+            this.showSection('overview');
+
+            document.getElementById('landingSection').classList.add('hidden');
+            document.getElementById('statsBar').classList.remove('hidden');
+            document.getElementById('downloadBar').classList.remove('hidden');
+            document.getElementById('appBody').classList.remove('hidden');
+
+            // Show folder info with demo label
+            document.getElementById('folderInfo').classList.remove('hidden');
+            const folderNameEl = document.getElementById('folderName');
+            if (folderNameEl) folderNameEl.textContent = data._meta?.modelName || 'Contoso (demo)';
+
+            // Show banner with stats (always for demo visitors — they haven't seen value yet)
+            const banner = document.getElementById('sponsorBanner');
+            if (banner && !localStorage.getItem('pbip-doc-banner-dismissed')) {
+                const totalMeasures = this.parsedModel.tables.reduce((s, t) => s + t.measures.length, 0);
+                const totalTables = this.parsedModel.tables.length;
+                const totalVisuals = this.visualData?.visuals?.length || 0;
+                const bannerText = document.getElementById('sponsorBannerText');
+                if (bannerText) {
+                    bannerText.innerHTML = `This live demo documents <strong>${totalMeasures} measure${totalMeasures !== 1 ? 's' : ''}</strong> across <strong>${totalTables} table${totalTables !== 1 ? 's' : ''}</strong> and <strong>${totalVisuals} visual${totalVisuals !== 1 ? 's' : ''}</strong> — all in your browser. If you find it useful, consider <a href="https://github.com/sponsors/JonathanJihwanKim?o=demo" target="_blank">sponsoring</a> or <a href="https://buymeacoffee.com/jihwankim?o=demo" target="_blank">buying a coffee</a>.`;
+                }
+                banner.classList.remove('hidden');
+                document.getElementById('sponsorBannerClose').addEventListener('click', () => {
+                    banner.classList.add('hidden');
+                    localStorage.setItem('pbip-doc-banner-dismissed', '1');
+                });
+            }
+
+            this._diagramRendered = false;
+
+        } catch (err) {
+            this.showToast('Could not load sample data: ' + err.message, 'error');
+            console.error('loadSampleData error:', err);
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = origLabel;
+            }
         }
     }
 

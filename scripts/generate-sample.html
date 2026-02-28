@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Generate contoso.json — pbip-documenter</title>
+<style>
+  body { font-family: 'Segoe UI', sans-serif; max-width: 640px; margin: 60px auto; padding: 0 24px; color: #1a1a2e; }
+  h1 { font-size: 1.4rem; margin-bottom: 8px; }
+  p { color: #555; line-height: 1.6; }
+  button { background: #1a3a5c; color: #fff; border: none; padding: 12px 24px; border-radius: 6px; font-size: 1rem; cursor: pointer; margin-top: 16px; }
+  button:hover { background: #2a5080; }
+  button:disabled { background: #aaa; cursor: default; }
+  pre { background: #f4f4f4; padding: 12px; border-radius: 4px; font-size: 0.85rem; overflow: auto; max-height: 300px; }
+  .success { color: #1a7a3c; font-weight: 600; }
+  .error { color: #c0392b; font-weight: 600; }
+  a { color: #1a3a5c; }
+</style>
+</head>
+<body>
+<h1>Generate <code>samples/contoso.json</code></h1>
+<p>
+  This one-time tool generates the pre-parsed sample data file used by the
+  <strong>"Try with sample data"</strong> demo button in pbip-documenter.
+</p>
+<p>
+  <strong>Instructions:</strong><br>
+  1. Open this page in <strong>Chrome or Edge</strong>.<br>
+  2. Click the button below and select your <code>D:\Contoso\Contoso</code> folder.<br>
+  3. The script will parse the model and download <code>contoso.json</code>.<br>
+  4. Move the downloaded file to <code>d:\pbip-documenter\samples\contoso.json</code>.
+</p>
+
+<button id="btnGenerate">Select Contoso folder and generate JSON</button>
+<div id="log" style="margin-top:20px;"></div>
+
+<script src="../tmdl-parser.js"></script>
+<script src="../visual-parser.js"></script>
+<script src="../m-parser.js"></script>
+<script>
+const log = document.getElementById('log');
+const btn = document.getElementById('btnGenerate');
+
+function logMsg(msg, cls) {
+    const el = document.createElement('p');
+    el.textContent = msg;
+    if (cls) el.className = cls;
+    log.appendChild(el);
+}
+
+btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    log.innerHTML = '';
+    try {
+        // Pick folder
+        const rootHandle = await window.showDirectoryPicker({ mode: 'read' });
+        logMsg(`Selected: ${rootHandle.name}`);
+
+        // Find SemanticModel and Report
+        let semanticHandle = null, reportHandle = null;
+        for await (const [name, handle] of rootHandle.entries()) {
+            if (handle.kind === 'directory' && name.endsWith('.SemanticModel')) semanticHandle = handle;
+            if (handle.kind === 'directory' && name.endsWith('.Report')) reportHandle = handle;
+        }
+        if (!semanticHandle) throw new Error('No .SemanticModel folder found');
+
+        logMsg(`Model: ${semanticHandle.name}`);
+        if (reportHandle) logMsg(`Report: ${reportHandle.name}`);
+
+        // Read TMDL files
+        async function readFile(handle) {
+            const file = await handle.getFile();
+            return await file.text();
+        }
+
+        async function getFileHandle(dirHandle, ...parts) {
+            let h = dirHandle;
+            for (let i = 0; i < parts.length - 1; i++) {
+                try { h = await h.getDirectoryHandle(parts[i]); } catch { return null; }
+            }
+            try { return await h.getFileHandle(parts[parts.length - 1]); } catch { return null; }
+        }
+
+        const fileMap = {};
+
+        const defHandle = await semanticHandle.getDirectoryHandle('definition');
+        for (const name of ['database.tmdl', 'model.tmdl', 'relationships.tmdl', 'expressions.tmdl']) {
+            try {
+                const fh = await defHandle.getFileHandle(name);
+                fileMap[name.replace('.tmdl', '')] = await readFile(fh);
+            } catch {}
+        }
+
+        // Tables
+        fileMap.tables = {};
+        try {
+            const tablesHandle = await defHandle.getDirectoryHandle('tables');
+            for await (const [name, fh] of tablesHandle.entries()) {
+                if (fh.kind === 'file' && name.endsWith('.tmdl')) {
+                    fileMap.tables[name.replace('.tmdl', '')] = await readFile(fh);
+                }
+            }
+        } catch {}
+
+        // Roles
+        fileMap.roles = {};
+        try {
+            const rolesHandle = await defHandle.getDirectoryHandle('roles');
+            for await (const [name, fh] of rolesHandle.entries()) {
+                if (fh.kind === 'file' && name.endsWith('.tmdl')) {
+                    fileMap.roles[name.replace('.tmdl', '')] = await readFile(fh);
+                }
+            }
+        } catch {}
+
+        logMsg(`Found ${Object.keys(fileMap.tables).length} table TMDL files`);
+
+        // Build parseAll input
+        const parseInput = {};
+        if (fileMap.database) parseInput['database.tmdl'] = fileMap.database;
+        if (fileMap.model) parseInput['model.tmdl'] = fileMap.model;
+        if (fileMap.relationships) parseInput['relationships.tmdl'] = fileMap.relationships;
+        if (fileMap.expressions) parseInput['expressions.tmdl'] = fileMap.expressions;
+        for (const [n, c] of Object.entries(fileMap.tables)) parseInput[`tables/${n}.tmdl`] = c;
+        for (const [n, c] of Object.entries(fileMap.roles)) parseInput[`roles/${n}.tmdl`] = c;
+
+        logMsg('Parsing TMDL...');
+        const parser = new TMDLParser();
+        const parsedModel = parser.parseAll(parseInput);
+        const measureRefs = parser.extractAllReferences();
+        const totalMeasures = parsedModel.tables.reduce((s, t) => s + t.measures.length, 0);
+        logMsg(`✓ Parsed ${parsedModel.tables.length} tables, ${totalMeasures} measures`);
+
+        // Read report visuals
+        const pages = [];
+        if (reportHandle) {
+            try {
+                const pagesHandle = await reportHandle.getDirectoryHandle('definition')
+                    .then(d => d.getDirectoryHandle('pages'));
+
+                for await (const [pageId, pageDir] of pagesHandle.entries()) {
+                    if (pageDir.kind !== 'directory') continue;
+                    let pageName = pageId, pageWidth = 1280, pageHeight = 720;
+                    try {
+                        const pjFh = await pageDir.getFileHandle('page.json');
+                        const pj = JSON.parse(await readFile(pjFh));
+                        pageName = pj.displayName || pageId;
+                        pageWidth = pj.width || 1280;
+                        pageHeight = pj.height || 720;
+                    } catch {}
+
+                    const visuals = [];
+                    try {
+                        const visualsHandle = await pageDir.getDirectoryHandle('visuals');
+                        for await (const [vid, vdir] of visualsHandle.entries()) {
+                            if (vdir.kind !== 'directory') continue;
+                            try {
+                                const vjFh = await vdir.getFileHandle('visual.json');
+                                visuals.push(JSON.parse(await readFile(vjFh)));
+                            } catch {}
+                        }
+                    } catch {}
+
+                    pages.push({ pageId, pageName, pageWidth, pageHeight, visuals });
+                }
+            } catch (e) {
+                logMsg(`Warning: could not read report pages: ${e.message}`);
+            }
+        }
+
+        logMsg('Parsing visuals...');
+        const visualParser = new VisualParser();
+        const visualData = visualParser.parseReport(pages);
+        logMsg(`✓ Parsed ${visualData.visuals.length} visuals across ${visualData.pages.length} pages`);
+
+        // Compose output
+        const output = JSON.stringify({
+            parsedModel,
+            measureRefs,
+            visualData,
+            fieldUsageMap: visualParser.getFieldUsageMap(),
+            _meta: {
+                exportedAt: new Date().toISOString(),
+                modelName: parsedModel.database?.name || 'sample',
+                tables: parsedModel.tables.length,
+                measures: totalMeasures,
+                visuals: visualData.visuals.length,
+                note: 'Pre-parsed demo data for pbip-documenter sample mode'
+            }
+        }, null, 2);
+
+        // Download
+        const blob = new Blob([output], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'contoso.json';
+        a.click();
+
+        const sizeMB = (blob.size / 1024 / 1024).toFixed(2);
+        logMsg(`✓ Downloaded contoso.json (${sizeMB} MB) — move it to samples/contoso.json`, 'success');
+        logMsg('Demo mode is now ready!', 'success');
+    } catch (e) {
+        logMsg(`Error: ${e.message}`, 'error');
+        console.error(e);
+    } finally {
+        btn.disabled = false;
+    }
+});
+</script>
+</body>
+</html>

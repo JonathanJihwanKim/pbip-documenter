@@ -55,6 +55,15 @@
             <p style="margin-top:16px;font-size:12px;color:var(--text-light)">
                 Your files stay local — nothing is uploaded. Works entirely in your browser.
             </p>
+            <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border-light)">
+                <button id="btnSampleData" class="btn-sample-data">
+                    <span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle">auto_awesome</span>
+                    Try with Contoso sample data
+                </button>
+                <p style="margin-top:8px;font-size:12px;color:var(--text-light)">
+                    No PBIP file? Explore a live demo with a real Contoso sales model — field parameters, calculation groups, relationships &amp; more.
+                </p>
+            </div>
         </div>
 
         <!-- Discovery Panel (shown when multiple models/reports found) -->
@@ -132,7 +141,7 @@
 
         <!-- Inline Sponsor Banner -->
         <div id="sponsorBanner" class="sponsor-banner hidden">
-            <span class="sponsor-banner-text">Built by a solo developer. If this saves you time, consider
+            <span class="sponsor-banner-text" id="sponsorBannerText">Built by a solo developer. If this saves you time, consider
                 <a href="https://github.com/sponsors/JonathanJihwanKim?o=banner" target="_blank">sponsoring</a> or
                 <a href="https://buymeacoffee.com/jihwankim?o=banner" target="_blank">buying a coffee</a>.
             </span>

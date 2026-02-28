@@ -239,6 +239,15 @@ class TMDLParser {
 
             // Properties
             if (state === 'PROPERTIES' || state === 'TABLE_BODY') {
+                // Bare boolean flags (no colon, no value) — e.g. isHidden, isNameInferred
+                if (indent > baseIndent && /^(isHidden|isNameInferred|isKey|isNullable)$/.test(trimmed)) {
+                    if (currentObject) {
+                        currentObject.properties[trimmed] = 'true';
+                    } else if (state === 'TABLE_BODY') {
+                        if (trimmed === 'isHidden') table.isHidden = true;
+                    }
+                    continue;
+                }
                 if (indent > baseIndent && trimmed.includes(':')) {
                     // Check for 'expression =' or 'source =' which starts a new expression block
                     if (/^(?:expression|source)\s*=/.test(trimmed)) {

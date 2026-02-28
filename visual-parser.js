@@ -203,6 +203,18 @@ class VisualParser {
                     this._extractFieldFromProjection(proj, projectionName, fieldMap);
                 }
             }
+            // fieldParameters: used by pivot tables when a field parameter drives Values
+            if (projection.fieldParameters) {
+                for (const fp of projection.fieldParameters) {
+                    if (fp.parameterExpr) {
+                        this._extractFieldFromProjection(
+                            { field: fp.parameterExpr },
+                            projectionName,
+                            fieldMap
+                        );
+                    }
+                }
+            }
         }
     }
 

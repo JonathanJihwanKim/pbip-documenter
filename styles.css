@@ -330,6 +330,31 @@ body {
     transform: translate(1px, 1px);
 }
 
+.btn-sample-data {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 22px;
+    background: transparent;
+    color: var(--primary);
+    border: 2px solid var(--primary);
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition);
+}
+
+.btn-sample-data:hover {
+    background: var(--primary);
+    color: #fff;
+}
+
+.btn-sample-data:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
 .folder-info {
     display: flex;
     align-items: center;
