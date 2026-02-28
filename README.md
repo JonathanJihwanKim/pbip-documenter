@@ -3,7 +3,7 @@
 **Generate comprehensive documentation from Power BI PBIP/TMDL semantic models — instantly, in your browser.**
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-▶%20Try%20It%20Now-blue?style=for-the-badge)](https://jonathanjihwankim.github.io/pbip-documenter/)
-[![GitHub Sponsors](https://img.shields.io/badge/Sponsor_from_7_EUR/mo-❤-ea4aaa?style=for-the-badge)](https://github.com/sponsors/JonathanJihwanKim)
+[![Fund This Tool](https://img.shields.io/badge/Fund_This_Tool-❤_from_7_EUR/mo-ea4aaa?style=for-the-badge)](https://github.com/sponsors/JonathanJihwanKim)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-☕-orange?style=for-the-badge)](https://buymeacoffee.com/jihwankim)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 
@@ -34,6 +34,14 @@ Point the tool at your PBIP project folder and get instant, professional documen
    - **Full Report (.md)** — clean Markdown with ASCII layout grids, ideal for Git repos and wikis
    - Each format offers three scopes: **All**, **Semantic Model Only**, or **Visuals Only**
 
+## Support Development
+
+This tool is **free forever** — built and maintained solo by [Jihwan Kim](https://github.com/JonathanJihwanKim) (Microsoft MVP). If PBIP Documenter saves you even 30 minutes of manual documentation work, please consider sponsoring. Every contribution goes directly toward new features and maintenance.
+
+**Funding goal: 0 / 200 EUR per month** `░░░░░░░░░░░░░░░░░░░░ 0%`
+
+<a href="https://github.com/sponsors/JonathanJihwanKim"><img src="https://img.shields.io/badge/GitHub%20Sponsors-❤%20Monthly%20from%207%20EUR-ea4aaa?style=for-the-badge" alt="GitHub Sponsors" /></a> <a href="https://buymeacoffee.com/jihwankim"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-☕%20One--time%20support-orange?style=for-the-badge" alt="Buy Me a Coffee" /></a>
+
 ## Features
 
 ### Semantic Model Documentation
@@ -60,6 +68,8 @@ Point the tool at your PBIP project folder and get instant, professional documen
 ### Export
 - **HTML** — fully self-contained file with embedded CSS, SVG diagrams, DAX syntax highlighting, collapsible sections, table of contents with anchor links
 - **Markdown** — clean document with ASCII page layout grids, fenced DAX code blocks, structured tables, and visual field breakdowns
+
+> **Free forever, no paywalls.** Help keep it that way — [support development](https://github.com/sponsors/JonathanJihwanKim).
 
 ## Browser Support
 
@@ -98,18 +108,28 @@ MyProject/
 │                       └── visual.json
 ```
 
-## Support This Project
+## Sponsors & Support
 
-This is a **solo project**, built and maintained by **Jihwan Kim** ([Microsoft MVP](https://github.com/JonathanJihwanKim)). It's **free forever** — no paywalls, no premium tiers. If this tool saves you time documenting your Power BI models, consider supporting its continued development. Your support directly funds new features and maintenance.
+I'm **Jihwan Kim** ([Microsoft MVP](https://github.com/JonathanJihwanKim)), and I build PBIP tools so Power BI developers can work faster. This project is **free forever** — no paywalls, no premium tiers. Sponsoring keeps it that way and funds what comes next.
 
-<a href="https://buymeacoffee.com/jihwankim"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-☕%20One--time%20support-orange?style=for-the-badge" alt="Buy Me a Coffee" /></a>
-<a href="https://github.com/sponsors/JonathanJihwanKim"><img src="https://img.shields.io/badge/GitHub%20Sponsors-❤%20Monthly%20from%207%20EUR-ea4aaa?style=for-the-badge" alt="GitHub Sponsors" /></a>
+<a href="https://github.com/sponsors/JonathanJihwanKim"><img src="https://img.shields.io/badge/GitHub%20Sponsors-❤%20Monthly%20from%207%20EUR-ea4aaa?style=for-the-badge" alt="GitHub Sponsors" /></a> <a href="https://buymeacoffee.com/jihwankim"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-☕%20One--time%20support-orange?style=for-the-badge" alt="Buy Me a Coffee" /></a>
 
-### Sponsors
+### What Your Support Funds
+- New features (lineage diagrams, DAX formatting, CI/CD integration)
+- Bug fixes, browser compatibility, and performance improvements
+- Community support and documentation
 
-Be the first sponsor! Your name will appear here.
+### Sponsor Tiers
 
-Even a one-time coffee helps keep this tool free, maintained, and improving.
+| Tier | Amount | Recognition |
+|------|--------|-------------|
+| **Gold** | 50+ EUR/mo | Logo + link on README and app footer |
+| **Silver** | 10+ EUR/mo | Name + link on README |
+| **Coffee** | One-time | Name listed below |
+
+### Hall of Sponsors
+
+> **Be the first!** Your name, logo, or company will appear right here. [Become a sponsor](https://github.com/sponsors/JonathanJihwanKim) and join the wall.
 
 ## Also by Jihwan Kim
 
