@@ -81,10 +81,30 @@ class LineageEngine {
                     table: table.name,
                     expression: measure.expression
                 });
-                this.edges.push({ from: measureId, to: tableId, type: 'defined_in_table' });
-
-                // DAX references
+                // Connect measure to DAX-referenced tables (not the defining table)
                 const refs = this.measureRefs[measure.name];
+                const daxTables = new Set();
+                if (refs) {
+                    for (const cr of refs.columnRefs) daxTables.add(cr.table);
+                    for (const tr of refs.tableRefs) daxTables.add(tr);
+                }
+                // Transitive: collect tables from chained measures
+                const chain = this.resolveMeasureChain(measure.name);
+                for (const m of chain) {
+                    const mRefs = this.measureRefs[m.name];
+                    if (mRefs) {
+                        for (const cr of mRefs.columnRefs) daxTables.add(cr.table);
+                        for (const tr of mRefs.tableRefs) daxTables.add(tr);
+                    }
+                }
+                if (daxTables.size > 0) {
+                    for (const dt of daxTables) {
+                        this.edges.push({ from: measureId, to: `table:${dt}`, type: 'defined_in_table' });
+                    }
+                } else {
+                    // Fallback for measures with no DAX refs (e.g., constant `= 42`)
+                    this.edges.push({ from: measureId, to: tableId, type: 'defined_in_table' });
+                }
                 if (refs) {
                     // Column references
                     for (const colRef of refs.columnRefs) {
@@ -133,7 +153,68 @@ class LineageEngine {
             });
         }
 
-        // 4. Add visuals
+        // 4. Expand calc groups and field parameters into graph nodes
+        this._calcGroupTables = new Set();
+        this._fieldParamTables = new Set();
+        for (const table of this.parsedModel.tables) {
+            const cgItems = this._getCalculationGroupItems(table.name);
+            if (cgItems) {
+                this._calcGroupTables.add(table.name);
+                for (const item of cgItems) {
+                    const id = `calcItem:${table.name}.${item.name}`;
+                    this.nodes.set(id, {
+                        id,
+                        type: 'calcItem',
+                        name: item.name,
+                        table: table.name
+                    });
+                    this.edges.push({ from: id, to: `table:${table.name}`, type: 'belongs_to_table' });
+                }
+                continue;
+            }
+
+            const fpItems = this._getFieldParameterItems(table.name);
+            if (fpItems) {
+                this._fieldParamTables.add(table.name);
+                for (const item of fpItems) {
+                    const id = `fpItem:${table.name}.${item.table}.${item.column}`;
+
+                    // Resolve: if NAMEOF references a measure, follow its DAX refs to data tables
+                    const resolvedTables = [];
+                    const mTable = this.measureLookup.get(item.column);
+                    if (mTable) {
+                        const refs = this.measureRefs[item.column];
+                        if (refs) {
+                            for (const cr of refs.columnRefs) {
+                                if (!resolvedTables.includes(cr.table)) resolvedTables.push(cr.table);
+                            }
+                            for (const tr of refs.tableRefs) {
+                                if (!resolvedTables.includes(tr)) resolvedTables.push(tr);
+                            }
+                        }
+                    }
+
+                    this.nodes.set(id, {
+                        id,
+                        type: 'fpItem',
+                        name: `${item.table}'[${item.column}]`,
+                        table: item.table,
+                        sourceTable: table.name,
+                        resolvedTables: resolvedTables.length > 0 ? resolvedTables : null
+                    });
+
+                    if (resolvedTables.length > 0) {
+                        for (const rt of resolvedTables) {
+                            this.edges.push({ from: id, to: `table:${rt}`, type: 'belongs_to_table' });
+                        }
+                    } else {
+                        this.edges.push({ from: id, to: `table:${item.table}`, type: 'belongs_to_table' });
+                    }
+                }
+            }
+        }
+
+        // 5. Add visuals
         if (this.visualData) {
             for (const visual of this.visualData.visuals) {
                 const visualId = `visual:${visual.pageName}|${visual.visualName}`;
@@ -155,8 +236,27 @@ class LineageEngine {
                         const measureId = `measure:${tableName}.${fieldName}`;
                         this.edges.push({ from: visualId, to: measureId, type: 'uses_field' });
                     } else if (field.type === 'column') {
-                        const colId = `column:${tableName}.${fieldName}`;
-                        this.edges.push({ from: visualId, to: colId, type: 'uses_field' });
+                        // Redirect calc group / field param columns to expanded items
+                        if (this._calcGroupTables.has(tableName)) {
+                            const cgItems = this._getCalculationGroupItems(tableName);
+                            if (cgItems) {
+                                for (const item of cgItems) {
+                                    const ciId = `calcItem:${tableName}.${item.name}`;
+                                    this.edges.push({ from: visualId, to: ciId, type: 'uses_field' });
+                                }
+                            }
+                        } else if (this._fieldParamTables.has(tableName)) {
+                            const fpItems = this._getFieldParameterItems(tableName);
+                            if (fpItems) {
+                                for (const item of fpItems) {
+                                    const fpId = `fpItem:${tableName}.${item.table}.${item.column}`;
+                                    this.edges.push({ from: visualId, to: fpId, type: 'uses_field' });
+                                }
+                            }
+                        } else {
+                            const colId = `column:${tableName}.${fieldName}`;
+                            this.edges.push({ from: visualId, to: colId, type: 'uses_field' });
+                        }
                     } else if (field.type === 'hierarchy') {
                         // Link to table
                         const tblId = `table:${tableName}`;
@@ -244,7 +344,11 @@ class LineageEngine {
                     measures.set(fieldName, { name: fieldName, table: tableName, chain });
 
                     // Collect tables from measure references
-                    tables.add(tableName);
+                    // Skip adding the defining table if it's a field parameter table
+                    // (fpItem expansion already links to the real data tables)
+                    if (!this._fieldParamTables.has(tableName)) {
+                        tables.add(tableName);
+                    }
                     const refs = this.measureRefs[fieldName];
                     if (refs) {
                         for (const cr of refs.columnRefs) tables.add(cr.table);
@@ -252,7 +356,9 @@ class LineageEngine {
                     }
                     // Tables from chain
                     for (const m of chain) {
-                        tables.add(m.table);
+                        if (!this._fieldParamTables.has(m.table)) {
+                            tables.add(m.table);
+                        }
                         const mRefs = this.measureRefs[m.name];
                         if (mRefs) {
                             for (const cr of mRefs.columnRefs) tables.add(cr.table);
@@ -266,6 +372,80 @@ class LineageEngine {
                     columns.set(key, { table: tableName, column: fieldName });
                 }
                 tables.add(tableName);
+            }
+        }
+
+        // Expand calc group and field parameter columns
+        const expandedCalcItems = [];
+        const expandedFPItems = [];
+        const columnsToRemove = [];
+
+        for (const [key, col] of columns) {
+            const cgItems = this._getCalculationGroupItems(col.table);
+            if (cgItems) {
+                for (const item of cgItems) {
+                    expandedCalcItems.push({
+                        name: item.name,
+                        expression: item.expression || '',
+                        sourceTable: col.table
+                    });
+                }
+                columnsToRemove.push(key);
+                continue;
+            }
+
+            const fpItems = this._getFieldParameterItems(col.table);
+            if (fpItems) {
+                for (const item of fpItems) {
+                    // Resolve: if NAMEOF references a measure, follow its DAX refs to data tables
+                    const resolvedTables = [];
+                    const mTable = this.measureLookup.get(item.column);
+                    if (mTable) {
+                        const refs = this.measureRefs[item.column];
+                        if (refs) {
+                            for (const cr of refs.columnRefs) {
+                                if (!resolvedTables.includes(cr.table)) resolvedTables.push(cr.table);
+                            }
+                            for (const tr of refs.tableRefs) {
+                                if (!resolvedTables.includes(tr)) resolvedTables.push(tr);
+                            }
+                        }
+                    }
+
+                    expandedFPItems.push({
+                        table: item.table,
+                        column: item.column,
+                        sourceTable: col.table,
+                        resolvedTables: resolvedTables.length > 0 ? resolvedTables : null
+                    });
+
+                    // Add resolved data tables (or fallback NAMEOF table) to the tables set
+                    if (resolvedTables.length > 0) {
+                        for (const rt of resolvedTables) tables.add(rt);
+                    } else {
+                        tables.add(item.table); // only include defining table as fallback
+                    }
+                }
+                columnsToRemove.push(key);
+                continue;
+            }
+        }
+
+        for (const key of columnsToRemove) {
+            columns.delete(key);
+        }
+
+        // Remove tables that only appear as NAMEOF targets of field param items.
+        // These measures are already represented by fpItem nodes; removing the
+        // defining table forces the diagram to draw edges to DAX-referenced
+        // data tables instead (e.g. sales instead of Measure).
+        if (expandedFPItems.length > 0) {
+            const fpNameofTables = new Set(expandedFPItems.map(fp => fp.table));
+            for (const ft of fpNameofTables) {
+                const hasDirectColumn = Array.from(columns.values()).some(c => c.table === ft);
+                if (!hasDirectColumn) {
+                    tables.delete(ft);
+                }
             }
         }
 
@@ -293,6 +473,8 @@ class LineageEngine {
             visual: { name: visualName, page: pageName, type: visual.visualType },
             measures: Array.from(measures.values()),
             columns: Array.from(columns.values()),
+            expandedCalcItems,
+            expandedFPItems,
             tables: Array.from(tables).map(t => ({
                 name: t,
                 sources: tableSourceMap[t] || []
@@ -458,8 +640,9 @@ class LineageEngine {
         if (lineage.measures.length > 0) {
             parts.push(`${lineage.measures.length} measure${lineage.measures.length !== 1 ? 's' : ''}`);
         }
-        if (lineage.columns.length > 0) {
-            parts.push(`${lineage.columns.length} column${lineage.columns.length !== 1 ? 's' : ''}`);
+        const colCount = lineage.columns.length + (lineage.expandedCalcItems || []).length + (lineage.expandedFPItems || []).length;
+        if (colCount > 0) {
+            parts.push(`${colCount} column${colCount !== 1 ? 's' : ''}`);
         }
         if (lineage.tables.length > 0) {
             parts.push(`${lineage.tables.length} table${lineage.tables.length !== 1 ? 's' : ''}`);
@@ -469,6 +652,41 @@ class LineageEngine {
         }
 
         return parts.join(' \u2192 ');
+    }
+
+    /**
+     * Returns NAMEOF field items for a field parameter table, or null if not a field parameter.
+     */
+    _getFieldParameterItems(tableName) {
+        const table = this.parsedModel.tables.find(t => t.name === tableName);
+        if (!table) return null;
+
+        const allExpressions = [];
+        for (const col of table.columns) {
+            if (col.expression) allExpressions.push(col.expression);
+        }
+        for (const part of table.partitions) {
+            if (part.source) allExpressions.push(part.source);
+        }
+
+        const isFieldParam = allExpressions.some(expr => /NAMEOF|SWITCH/i.test(expr));
+        if (!isFieldParam) return null;
+
+        const items = [];
+        for (const expr of allExpressions) {
+            const matches = [...expr.matchAll(/NAMEOF\s*\(\s*'([^']+)'\[([^\]]+)\]\s*\)/gi)];
+            for (const m of matches) items.push({ table: m[1], column: m[2] });
+        }
+        return items.length > 0 ? items : null;
+    }
+
+    /**
+     * Returns calculation group items for a table, or null if not a calc group table.
+     */
+    _getCalculationGroupItems(tableName) {
+        const table = this.parsedModel.tables.find(t => t.name === tableName);
+        if (!table || !table.calculationGroup || !table.calculationGroup.items || table.calculationGroup.items.length === 0) return null;
+        return table.calculationGroup.items;
     }
 
     /**

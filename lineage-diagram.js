@@ -22,6 +22,10 @@ class LineageDiagramRenderer {
             visualBg: '#f3e5f5',
             expression: '#78909c',
             expressionBg: '#eceff1',
+            calcGroup: '#2e7d32',
+            calcGroupBg: '#e8f5e9',
+            fieldParam: '#6a1b9a',
+            fieldParamBg: '#f3e5f5',
             edge: '#90a4ae',
             edgeHighlight: '#c89632',
             bg: '#ffffff',
@@ -108,6 +112,18 @@ class LineageDiagramRenderer {
                         name: `${c.table}[${c.column}]`,
                         type: 'column',
                         detail: c.table
+                    })),
+                    ...(lineage.expandedCalcItems || []).map(ci => ({
+                        id: `calcItem:${ci.sourceTable}.${ci.name}`,
+                        name: ci.name,
+                        type: 'calcItem',
+                        detail: `Calc Group: ${ci.sourceTable}`
+                    })),
+                    ...(lineage.expandedFPItems || []).map(fp => ({
+                        id: `fpItem:${fp.table}.${fp.column}`,
+                        name: `${fp.table}'[${fp.column}]`,
+                        type: 'fpItem',
+                        detail: `Field Param: ${fp.sourceTable}`
                     }))
                 ]
             },
@@ -203,6 +219,14 @@ class LineageDiagramRenderer {
         return new XMLSerializer().serializeToString(svg);
     }
 
+    _tableHasVisibleEdges(tableId, edges) {
+        for (const edge of edges) {
+            if (edge.type === 'belongs_to_table' && edge.from.startsWith('column:')) continue;
+            if (edge.from === tableId || edge.to === tableId) return true;
+        }
+        return false;
+    }
+
     // ──────────────────────────────────────────────
     // LAYOUT
     // ──────────────────────────────────────────────
@@ -222,14 +246,26 @@ class LineageDiagramRenderer {
                     });
                     break;
                 case 'table':
-                    tableItems.push({
-                        id, name: node.name, type: 'table',
-                        detail: `${node.columnCount}c / ${node.measureCount}m`
-                    });
+                    if (this._tableHasVisibleEdges(id, engine.edges)) {
+                        tableItems.push({
+                            id, name: node.name, type: 'table',
+                            detail: `${node.columnCount}c / ${node.measureCount}m`
+                        });
+                    }
                     break;
                 case 'measure':
                     measureColumnItems.push({
                         id, name: `[${node.name}]`, type: 'measure', detail: node.table
+                    });
+                    break;
+                case 'calcItem':
+                    measureColumnItems.push({
+                        id, name: node.name, type: 'calcItem', detail: `Calc: ${node.table}`
+                    });
+                    break;
+                case 'fpItem':
+                    measureColumnItems.push({
+                        id, name: node.name, type: 'fpItem', detail: `FP: ${node.sourceTable}`
                     });
                     break;
                 case 'visual':
@@ -381,6 +417,15 @@ class LineageDiagramRenderer {
         g.dataset.nodeId = item.id;
         g.dataset.nodeType = item.type;
 
+        // Override colors for calc group and field parameter items
+        if (item.type === 'calcItem') {
+            color = this.colors.calcGroup;
+            bgColor = this.colors.calcGroupBg;
+        } else if (item.type === 'fpItem') {
+            color = this.colors.fieldParam;
+            bgColor = this.colors.fieldParamBg;
+        }
+
         // Background rect
         g.appendChild(this._createRect(item._x, item._y, item._w, item._h, {
             fill: bgColor, stroke: color, strokeWidth: '1.5', rx: '4'
@@ -468,16 +513,57 @@ class LineageDiagramRenderer {
         // Measures/columns → tables
         const tablesInLineage = new Set(lineage.tables.map(t => t.name));
         for (const m of lineage.measures) {
-            const tid = `table:${m.table}`;
             const mItem = posMap.get(`measure:${m.table}.${m.name}`);
-            const tItem = posMap.get(tid);
-            if (mItem && tItem) this._drawEdge(svg, mItem, tItem, 'defined_in_table');
+            if (!mItem) continue;
+
+            // If measure is defined in a field param table, link to its DAX-referenced tables instead
+            const tItem = posMap.get(`table:${m.table}`);
+            if (tItem) {
+                this._drawEdge(svg, mItem, tItem, 'defined_in_table');
+            } else {
+                // Defining table not in diagram (field param table filtered out) — link to referenced data tables
+                const refs = this.lineageEngine?.measureRefs?.[m.name];
+                if (refs) {
+                    const linked = new Set();
+                    for (const cr of refs.columnRefs) linked.add(cr.table);
+                    for (const tr of refs.tableRefs) linked.add(tr);
+                    for (const rt of linked) {
+                        const rtItem = posMap.get(`table:${rt}`);
+                        if (rtItem) this._drawEdge(svg, mItem, rtItem, 'defined_in_table');
+                    }
+                }
+            }
         }
         for (const c of lineage.columns) {
             const tid = `table:${c.table}`;
             const cItem = posMap.get(`column:${c.table}.${c.column}`);
             const tItem = posMap.get(tid);
             if (cItem && tItem) this._drawEdge(svg, cItem, tItem, 'belongs_to_table');
+        }
+
+        // Visual → expanded calc items, calc items → source table
+        for (const ci of (lineage.expandedCalcItems || [])) {
+            const ciId = `calcItem:${ci.sourceTable}.${ci.name}`;
+            const ciItem = posMap.get(ciId);
+            if (ciItem && visualItem) this._drawEdge(svg, visualItem, ciItem, 'uses_field');
+            const tItem = posMap.get(`table:${ci.sourceTable}`);
+            if (ciItem && tItem) this._drawEdge(svg, ciItem, tItem, 'belongs_to_table');
+        }
+
+        // Visual → expanded field param items, fp items → resolved data tables
+        for (const fp of (lineage.expandedFPItems || [])) {
+            const fpId = `fpItem:${fp.table}.${fp.column}`;
+            const fpItem = posMap.get(fpId);
+            if (fpItem && visualItem) this._drawEdge(svg, visualItem, fpItem, 'uses_field');
+            if (fpItem && fp.resolvedTables && fp.resolvedTables.length > 0) {
+                for (const rt of fp.resolvedTables) {
+                    const tItem = posMap.get(`table:${rt}`);
+                    if (tItem) this._drawEdge(svg, fpItem, tItem, 'belongs_to_table');
+                }
+            } else {
+                const tItem = posMap.get(`table:${fp.table}`);
+                if (fpItem && tItem) this._drawEdge(svg, fpItem, tItem, 'belongs_to_table');
+            }
         }
 
         // Tables → sources
