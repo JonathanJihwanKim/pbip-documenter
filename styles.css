@@ -15,10 +15,12 @@
     --bg-light: #faf9f6;
     --card-bg: #ffffff;
     --border: #d0ccc4;
+    --border-light: #e0dcd4;
     --border-dark: #1a3a5c;
+    --surface: #f8f6f1;
     --text: #2c2c2c;
     --text-secondary: #666666;
-    --text-light: #999999;
+    --text-light: #696969;
     --shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     --shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.12);
     --radius: 2px;
@@ -1702,8 +1704,12 @@ tr:hover {
     font-size: 13px;
     font-family: inherit;
     color: var(--text);
-    outline: none;
     min-width: 0;
+}
+
+.sidebar-search-input-wrap:focus-within {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(26, 58, 92, 0.25);
 }
 
 .sidebar-search-input-wrap input::placeholder {
@@ -1830,6 +1836,21 @@ tr:hover {
 
 .warning-banner-close:hover {
     color: var(--text);
+}
+
+/* ── BREADCRUMB ── */
+.breadcrumb {
+    margin-bottom: 12px;
+    font-size: 13px;
+}
+.breadcrumb-link {
+    color: var(--primary);
+    text-decoration: none;
+    opacity: 0.7;
+}
+.breadcrumb-link:hover {
+    opacity: 1;
+    text-decoration: underline;
 }
 
 /* ── ERROR MODAL ── */

@@ -732,6 +732,21 @@ class LineageDiagramRenderer {
             if (ciItem && tItem) this._drawEdge(svg, ciItem, tItem, 'belongs_to_table');
         }
 
+        // Draw modifies_measure edges from calc items to measures in the trace
+        for (const ci of (lineage.expandedCalcItems || [])) {
+            const ciId = `calcItem:${ci.sourceTable}.${ci.name}`;
+            const ciItem = posMap.get(ciId);
+            if (ciItem) {
+                for (const m of (lineage.measures || [])) {
+                    const mId = `measure:${m.table}.${m.name}`;
+                    const mItem = posMap.get(mId);
+                    if (mItem) {
+                        this._drawEdge(svg, ciItem, mItem, 'modifies_measure');
+                    }
+                }
+            }
+        }
+
         // Visual → expanded field param items, fp items → resolved data tables
         for (const fp of (lineage.expandedFPItems || [])) {
             const fpId = `fpItem:${fp.sourceTable}.${fp.table}.${fp.column}`;
@@ -872,6 +887,12 @@ class LineageDiagramRenderer {
         path.dataset.from = fromItem.id;
         path.dataset.to = toItem.id;
         path.dataset.edgeType = type;
+
+        if (type === 'modifies_measure') {
+            path.setAttribute('stroke', '#f9a825');
+            path.setAttribute('stroke-dasharray', '6,3');
+            path.setAttribute('stroke-width', '1.5');
+        }
 
         // Insert edges before nodes so they render behind
         const firstNode = svg.querySelector('.lineage-node');

@@ -16,6 +16,17 @@ class DocGenerator {
         this.lineageEngine = lineageEngine || null;
     }
 
+    /**
+     * Get tables filtered to exclude auto-date tables
+     */
+    _getVisibleTables() {
+        return this.model.tables.filter(t => !t._isAutoDate);
+    }
+
+    _getAutoDateCount() {
+        return this.model.tables.filter(t => t._isAutoDate).length;
+    }
+
     // ──────────────────────────────────────────────
     // MARKDOWN
     // ──────────────────────────────────────────────
@@ -29,10 +40,12 @@ class DocGenerator {
     _generateMarkdownAll(visualData) {
         const lines = [];
         const modelName = this.model.database?.name || this.model.model?.name || 'Semantic Model';
+        const tables = this.model.tables.filter(t => !t._isAutoDate);
+        const autoDateCount = this.model.tables.length - tables.length;
 
         lines.push(`# ${modelName} — Full Documentation`);
         lines.push('');
-        const totalMeasures = this.model.tables.reduce((s, t) => s + t.measures.length, 0);
+        const totalMeasures = tables.reduce((s, t) => s + t.measures.length, 0);
         lines.push(`*Generated with [PBIP Documenter](https://jonathanjihwankim.github.io/pbip-documenter/) — free browser tool for Power BI semantic model documentation (${totalMeasures} measures documented on ${new Date().toLocaleDateString()})*`);
         lines.push(`*Saved you time? [Sponsor on GitHub ❤️](https://github.com/sponsors/JonathanJihwanKim?o=doc) · [Buy Me a Coffee ☕](https://buymeacoffee.com/jihwankim?o=doc)*`);
         lines.push('');
@@ -43,7 +56,7 @@ class DocGenerator {
         lines.push('- [Model Overview](#model-overview)');
         lines.push('- [Table Inventory](#table-inventory)');
 
-        for (const table of this.model.tables) {
+        for (const table of tables) {
             const anchor = table.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
             lines.push(`  - [${table.name}](#${anchor})`);
         }
@@ -115,7 +128,7 @@ class DocGenerator {
         lines.push('');
         lines.push('- [Model Overview](#model-overview)');
         lines.push('- [Table Inventory](#table-inventory)');
-        for (const table of this.model.tables) {
+        for (const table of this._getVisibleTables()) {
             const anchor = table.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
             lines.push(`  - [${table.name}](#${anchor})`);
         }
@@ -202,21 +215,27 @@ class DocGenerator {
             lines.push(`| Culture | ${this.model.model.culture} |`);
         }
 
-        const totalMeasures = this.model.tables.reduce((sum, t) => sum + t.measures.length, 0);
-        const totalColumns = this.model.tables.reduce((sum, t) => sum + t.columns.length, 0);
+        const visibleTables = this._getVisibleTables();
+        const autoDateCount = this._getAutoDateCount();
+        const totalMeasures = visibleTables.reduce((sum, t) => sum + t.measures.length, 0);
+        const totalColumns = visibleTables.reduce((sum, t) => sum + t.columns.length, 0);
 
-        lines.push(`| Tables | ${this.model.tables.length} |`);
+        lines.push(`| Tables | ${visibleTables.length} |`);
         lines.push(`| Columns | ${totalColumns} |`);
         lines.push(`| Measures | ${totalMeasures} |`);
         lines.push(`| Relationships | ${this.model.relationships.length} |`);
         lines.push(`| Roles | ${this.model.roles.length} |`);
         lines.push('');
+        if (autoDateCount > 0) {
+            lines.push(`> *${autoDateCount} auto-date/time tables hidden*`);
+            lines.push('');
+        }
 
         // Table Inventory
         lines.push('## Table Inventory');
         lines.push('');
 
-        for (const table of this.model.tables) {
+        for (const table of this._getVisibleTables()) {
             lines.push(`### ${table.name}`);
             lines.push('');
 
@@ -246,10 +265,15 @@ class DocGenerator {
 
             // Calculation Group
             if (table.calculationGroup && table.calculationGroup.items.length > 0) {
-                lines.push(`#### Calculation Group (${table.calculationGroup.items.length} items)`);
+                const cgPrec = table.calculationGroup.precedence != null ? ` (precedence: ${table.calculationGroup.precedence})` : '';
+                lines.push(`#### Calculation Group${cgPrec} (${table.calculationGroup.items.length} items)`);
                 lines.push('');
-                for (const item of table.calculationGroup.items) {
-                    lines.push(`##### ${this._escMd(item.name)}`);
+                const sortedCgItems = [...table.calculationGroup.items]
+                    .sort((a, b) => (a.ordinal ?? 999) - (b.ordinal ?? 999));
+                for (const item of sortedCgItems) {
+                    const ordinalStr = item.ordinal != null ? ` [${item.ordinal}]` : '';
+                    const usesSM = /\bSELECTEDMEASURE\s*\(/i.test(item.expression || '');
+                    lines.push(`##### ${this._escMd(item.name)}${ordinalStr}${usesSM ? ' — dynamic' : ''}`);
                     lines.push('');
                     if (item.expression) {
                         lines.push('```dax');
@@ -264,14 +288,17 @@ class DocGenerator {
             if (table.columns.length > 0) {
                 lines.push('#### Columns');
                 lines.push('');
-                lines.push('| Column | Data Type | Description | Hidden | Format |');
-                lines.push('|--------|-----------|-------------|--------|--------|');
+                lines.push('| Column | Data Type | Sort By | Summarize | Hidden | Format |');
+                lines.push('|--------|-----------|---------|-----------|--------|--------|');
 
                 for (const col of table.columns) {
                     const hidden = col.isHidden ? 'Yes' : '';
                     const desc = col.description || '';
                     const fmt = col.formatString || '';
-                    lines.push(`| ${this._escMd(col.name)} | ${col.dataType || ''} | ${this._escMd(desc)} | ${hidden} | ${this._escMd(fmt)} |`);
+                    const sortBy = col.sortByColumn || '';
+                    const summarize = col.summarizeBy || '';
+                    const calcBadge = col.expression ? ' (calc)' : '';
+                    lines.push(`| ${this._escMd(col.name)}${calcBadge} | ${col.dataType || ''} | ${this._escMd(sortBy)} | ${summarize} | ${hidden} | ${this._escMd(fmt)} |`);
                 }
                 lines.push('');
             }
@@ -351,7 +378,18 @@ class DocGenerator {
                 lines.push('#### Partitions');
                 lines.push('');
                 for (const p of table.partitions) {
-                    lines.push(`- **${p.name}** (mode: ${p.mode || 'default'})`);
+                    lines.push(`- **${p.name}** (mode: ${p.mode || 'default'}, type: ${p.sourceType || 'M'})`);
+                    if (p.source) {
+                        lines.push('');
+                        lines.push('  <details><summary>M Query</summary>');
+                        lines.push('');
+                        lines.push('  ```m');
+                        lines.push(p.source.split('\n').map(l => '  ' + l).join('\n'));
+                        lines.push('  ```');
+                        lines.push('');
+                        lines.push('  </details>');
+                        lines.push('');
+                    }
                 }
                 lines.push('');
             }
@@ -364,7 +402,7 @@ class DocGenerator {
         lines.push('|---|---------|-------|----------------|--------|-------------|');
 
         let measureNum = 0;
-        for (const table of this.model.tables) {
+        for (const table of this._getVisibleTables()) {
             for (const m of table.measures) {
                 measureNum++;
                 lines.push(`| ${measureNum} | ${this._escMd(m.name)} | ${table.name} | ${m.displayFolder || ''} | ${this._escMd(m.formatString || '')} | ${this._escMd(m.description || '')} |`);
@@ -558,19 +596,20 @@ class DocGenerator {
         if (dataSources.length > 0) {
             lines.push('## Data Sources');
             lines.push('');
-            lines.push('| Type | Server/URL | Database | Parameterized |');
-            lines.push('|------|-----------|----------|---------------|');
+            lines.push('| Type | Server/URL | Database | Parameterized | Gateway |');
+            lines.push('|------|-----------|----------|---------------|---------|');
             for (const src of dataSources) {
                 const server = src.serverResolved || src.server || src.url || src.path || '';
                 const db = src.databaseResolved || src.database || '';
-                lines.push(`| ${src.type} | ${server} | ${db} | ${src.parameterized ? 'Yes' : 'No'} |`);
+                const gw = src.gatewayRequired === true ? 'Required' : src.gatewayRequired === false ? 'No' : '';
+                lines.push(`| ${src.type} | ${server} | ${db} | ${src.parameterized ? 'Yes' : 'No'} | ${gw} |`);
             }
             lines.push('');
         }
 
         // Measure Dependencies section
         const allMeasures = [];
-        for (const table of this.model.tables) {
+        for (const table of this._getVisibleTables()) {
             for (const measure of table.measures) {
                 const chain = this.lineageEngine.resolveMeasureChain(measure.name);
                 if (chain.length > 0) {
@@ -604,6 +643,18 @@ class DocGenerator {
             }
             lines.push('');
         }
+
+        // Broken References section
+        if (this.lineageEngine?.brokenRefs?.length > 0) {
+            lines.push('## Broken References');
+            lines.push('');
+            lines.push('> ⚠️ The following field references point to measures or columns that do not exist in the model. These may be stale references from renamed or deleted fields.');
+            lines.push('');
+            for (const ref of this.lineageEngine.brokenRefs) {
+                lines.push(`- Visual \`${ref.visual}\` → \`${ref.target}\` (not found)`);
+            }
+            lines.push('');
+        }
     }
 
     // ──────────────────────────────────────────────
@@ -612,8 +663,9 @@ class DocGenerator {
 
     generateHTML() {
         const modelName = this.model.database?.name || this.model.model?.name || 'Semantic Model';
-        const totalMeasures = this.model.tables.reduce((sum, t) => sum + t.measures.length, 0);
-        const totalColumns = this.model.tables.reduce((sum, t) => sum + t.columns.length, 0);
+        const visibleTables = this._getVisibleTables();
+        const totalMeasures = visibleTables.reduce((sum, t) => sum + t.measures.length, 0);
+        const totalColumns = visibleTables.reduce((sum, t) => sum + t.columns.length, 0);
 
         let html = `<!DOCTYPE html>
 <html lang="en">
@@ -721,6 +773,11 @@ tr:hover { background: #f0ebe3; }
 .badge-hidden { background: #fce4ec; color: #c62828; }
 .badge-active { background: #e8f5e9; color: #2e7d32; }
 .badge-inactive { background: #fce4ec; color: #c62828; }
+.badge-calc { background: #e8eaf6; color: #283593; }
+.badge-mode { background: #e3f0ff; color: #1a3a5c; }
+.badge-crossfilter { background: #fff3e0; color: #e65100; }
+.badge-dynamic { background: #f3e5f5; color: #6a1b9a; }
+.auto-date-note { font-size: 13px; color: #666; margin-bottom: 12px; }
 .ref-list {
     display: flex;
     flex-wrap: wrap;
@@ -844,7 +901,7 @@ blockquote {
 
         // Table of Contents
         html += `<h2>Table of Contents</h2><div class="toc">`;
-        for (const table of this.model.tables) {
+        for (const table of this._getVisibleTables()) {
             const anchor = this._anchor(table.name);
             html += `<a href="#${anchor}">${this._escHtml(table.name)} (${table.columns.length} cols, ${table.measures.length} measures)</a>`;
         }
@@ -852,10 +909,15 @@ blockquote {
 
         // Tables
         html += `<h2 id="table-inventory">Table Inventory</h2>`;
+        const _htmlAutoDateCount = this._getAutoDateCount();
+        if (_htmlAutoDateCount > 0) html += `<p class="auto-date-note"><em>${_htmlAutoDateCount} auto-date/time table${_htmlAutoDateCount > 1 ? 's' : ''} hidden</em></p>`;
 
-        for (const table of this.model.tables) {
+        for (const table of this._getVisibleTables()) {
+            const tableMode = table.partitions.find(p => p.mode)?.mode
+                || (table.partitions.find(p => p.sourceType === 'calculated') ? 'Calculated' : 'Import');
             html += `<h3 id="${this._anchor(table.name)}">${this._escHtml(table.name)}`;
             if (table.isHidden) html += ` <span class="badge badge-hidden">Hidden</span>`;
+            html += ` <span class="badge badge-mode">${tableMode}</span>`;
             html += `</h3>`;
 
             if (table.description) {
@@ -865,12 +927,15 @@ blockquote {
             // Columns
             if (table.columns.length > 0) {
                 html += `<h4>Columns (${table.columns.length})</h4>
-<table><tr><th>Column</th><th>Data Type</th><th>Description</th><th>Format</th><th>Status</th></tr>`;
+<table><tr><th>Column</th><th>Data Type</th><th>Sort By</th><th>Summarize</th><th>Description</th><th>Format</th><th>Status</th></tr>`;
 
                 for (const col of table.columns) {
+                    const calcBadge = col.expression ? ' <span class="badge badge-calc">Calc</span>' : '';
                     html += `<tr>
-    <td>${this._escHtml(col.name)}</td>
+    <td>${this._escHtml(col.name)}${calcBadge}</td>
     <td>${col.dataType || ''}</td>
+    <td>${this._escHtml(col.sortByColumn || '')}</td>
+    <td>${col.summarizeBy || ''}</td>
     <td>${this._escHtml(col.description || '')}</td>
     <td>${this._escHtml(col.formatString || '')}</td>
     <td>${col.isHidden ? '<span class="badge badge-hidden">Hidden</span>' : ''}</td>
@@ -943,7 +1008,7 @@ blockquote {
 <table><tr><th>#</th><th>Measure</th><th>Table</th><th>Display Folder</th><th>Format</th><th>Description</th></tr>`;
 
         let num = 0;
-        for (const table of this.model.tables) {
+        for (const table of this._getVisibleTables()) {
             for (const m of table.measures) {
                 num++;
                 html += `<tr>
@@ -966,11 +1031,15 @@ blockquote {
                 const statusBadge = r.isActive
                     ? '<span class="badge badge-active">Active</span>'
                     : '<span class="badge badge-inactive">Inactive</span>';
+                const crossFilter = r.crossFilteringBehavior === 'bothDirections' ? 'Both'
+                    : r.crossFilteringBehavior === 'oneDirection' ? 'Single'
+                    : r.crossFilteringBehavior ? r.crossFilteringBehavior : 'Single';
                 html += `<div class="rel-card">
     <span>${this._escHtml(r.fromTable)}[${this._escHtml(r.fromColumn)}]</span>
     <span class="rel-arrow">→</span>
     <span>${this._escHtml(r.toTable)}[${this._escHtml(r.toColumn)}]</span>
     <span class="badge">${this._formatCardinality(r)}</span>
+    <span class="badge badge-crossfilter">${crossFilter}</span>
     ${statusBadge}
 </div>`;
             }
@@ -1145,6 +1214,11 @@ tr:hover { background: #f0ebe3; }
 .badge-hidden { background: #fce4ec; color: #c62828; }
 .badge-active { background: #e8f5e9; color: #2e7d32; }
 .badge-inactive { background: #fce4ec; color: #c62828; }
+.badge-calc { background: #e8eaf6; color: #283593; }
+.badge-mode { background: #e3f0ff; color: #1a3a5c; }
+.badge-crossfilter { background: #fff3e0; color: #e65100; }
+.badge-dynamic { background: #f3e5f5; color: #6a1b9a; }
+.auto-date-note { font-size: 13px; color: #666; margin-bottom: 12px; }
 .badge-visual-type {
     display: inline-block;
     padding: 2px 8px;
@@ -1330,7 +1404,7 @@ details > .details-content {
         if (scope !== 'visuals' && relDiagramSVG) html += `<a href="#relationship-diagram">Relationship Diagram</a>`;
         if (scope !== 'visuals') {
             html += `<a href="#table-inventory">Table Inventory</a>`;
-            for (const table of this.model.tables) {
+            for (const table of this._getVisibleTables()) {
                 html += `<a href="#${this._anchor(table.name)}">&nbsp;&nbsp;${this._escHtml(table.name)}</a>`;
             }
             html += `<a href="#measure-catalog">Measure Catalog</a>
@@ -1376,8 +1450,10 @@ details > .details-content {
 
         // Table Inventory (same as regular HTML export)
         html += `<h2 id="table-inventory">Table Inventory</h2>`;
+        const _frAutoDateCount = this._getAutoDateCount();
+        if (_frAutoDateCount > 0) html += `<p class="auto-date-note"><em>${_frAutoDateCount} auto-date/time table${_frAutoDateCount > 1 ? 's' : ''} hidden</em></p>`;
 
-        for (const table of this.model.tables) {
+        for (const table of this._getVisibleTables()) {
             html += `<h3 id="${this._anchor(table.name)}">${this._escHtml(table.name)}`;
             if (table.isHidden) html += ` <span class="badge badge-hidden">Hidden</span>`;
             html += `</h3>`;
@@ -1401,11 +1477,17 @@ details > .details-content {
 
             // Calculation Group
             if (table.calculationGroup && table.calculationGroup.items.length > 0) {
-                html += `<h4>Calculation Group <span class="badge badge-calc">Calc Group</span></h4>
+                const cgPrec2 = table.calculationGroup.precedence != null ? ` — precedence: ${table.calculationGroup.precedence}` : '';
+                html += `<h4>Calculation Group <span class="badge badge-calc">Calc Group</span>${cgPrec2}</h4>
 <p style="font-size:13px;color:var(--text-secondary);margin-bottom:8px">${table.calculationGroup.items.length} calculation item(s)</p>`;
-                for (const item of table.calculationGroup.items) {
+                const sortedCgItems2 = [...table.calculationGroup.items]
+                    .sort((a, b) => (a.ordinal ?? 999) - (b.ordinal ?? 999));
+                for (const item of sortedCgItems2) {
+                    const usesSM2 = /\bSELECTEDMEASURE\s*\(/i.test(item.expression || '');
+                    const ordinalBadge = item.ordinal != null ? ` <span class="badge">#${item.ordinal}</span>` : '';
+                    const dynamicBadge = usesSM2 ? ` <span class="badge badge-dynamic">Dynamic</span>` : '';
                     html += `<div class="measure-card">
-    <h5>${this._escHtml(item.name)} <span class="badge badge-calc">Calc Item</span></h5>`;
+    <h5>${this._escHtml(item.name)} <span class="badge badge-calc">Calc Item</span>${ordinalBadge}${dynamicBadge}</h5>`;
                     if (item.expression) {
                         html += `<details><summary>Expression</summary><div class="details-content">
 <div class="dax-block">${this._highlightDAX(item.expression)}</div>
@@ -1421,11 +1503,14 @@ details > .details-content {
                 } else {
                     html += `<h4>Columns (${table.columns.length})</h4>`;
                 }
-                html += `<table><tr><th>Column</th><th>Data Type</th><th>Description</th><th>Format</th><th>Status</th></tr>`;
+                html += `<table><tr><th>Column</th><th>Data Type</th><th>Sort By</th><th>Summarize</th><th>Description</th><th>Format</th><th>Status</th></tr>`;
                 for (const col of table.columns) {
+                    const calcBadge = col.expression ? ' <span class="badge badge-calc">Calc</span>' : '';
                     html += `<tr>
-    <td>${this._escHtml(col.name)}</td>
+    <td>${this._escHtml(col.name)}${calcBadge}</td>
     <td>${col.dataType || ''}</td>
+    <td>${this._escHtml(col.sortByColumn || '')}</td>
+    <td>${col.summarizeBy || ''}</td>
     <td>${this._escHtml(col.description || '')}</td>
     <td>${this._escHtml(col.formatString || '')}</td>
     <td>${col.isHidden ? '<span class="badge badge-hidden">Hidden</span>' : ''}</td>
@@ -1485,7 +1570,7 @@ details > .details-content {
         html += `<h2 id="measure-catalog">Measure Catalog</h2>
 <table><tr><th>#</th><th>Measure</th><th>Table</th><th>Display Folder</th><th>Format</th><th>Description</th></tr>`;
         let num = 0;
-        for (const table of this.model.tables) {
+        for (const table of this._getVisibleTables()) {
             for (const m of table.measures) {
                 num++;
                 html += `<tr><td>${num}</td><td>${this._escHtml(m.name)}</td><td>${this._escHtml(table.name)}</td><td>${this._escHtml(m.displayFolder || '')}</td><td>${this._escHtml(m.formatString || '')}</td><td>${this._escHtml(m.description || '')}</td></tr>`;
@@ -1500,11 +1585,15 @@ details > .details-content {
                 const statusBadge = r.isActive
                     ? '<span class="badge badge-active">Active</span>'
                     : '<span class="badge badge-inactive">Inactive</span>';
+                const crossFilter2 = r.crossFilteringBehavior === 'bothDirections' ? 'Both'
+                    : r.crossFilteringBehavior === 'oneDirection' ? 'Single'
+                    : r.crossFilteringBehavior ? r.crossFilteringBehavior : 'Single';
                 html += `<div class="rel-card">
     <span>${this._escHtml(r.fromTable)}[${this._escHtml(r.fromColumn)}]</span>
     <span class="rel-arrow">&rarr;</span>
     <span>${this._escHtml(r.toTable)}[${this._escHtml(r.toColumn)}]</span>
     <span class="badge">${this._formatCardinality(r)}</span>
+    <span class="badge badge-crossfilter">${crossFilter2}</span>
     ${statusBadge}
 </div>`;
             }
@@ -1760,13 +1849,15 @@ ${rects}
             if (part.source) allExpressions.push(part.source);
         }
 
-        const isFieldParam = allExpressions.some(expr => /NAMEOF|SWITCH/i.test(expr));
+        // Require NAMEOF specifically (not SWITCH alone) to avoid false positives
+        const isFieldParam = allExpressions.some(expr => /\bNAMEOF\s*\(/i.test(expr));
         if (!isFieldParam) return null;
 
         const items = [];
         for (const expr of allExpressions) {
-            const matches = [...expr.matchAll(/NAMEOF\s*\(\s*'([^']+)'\[([^\]]+)\]\s*\)/gi)];
-            for (const m of matches) items.push({ table: m[1], column: m[2] });
+            // Handle both quoted ('TableName') and unquoted (TableName) table references
+            const matches = [...expr.matchAll(/NAMEOF\s*\(\s*(?:'([^']+)'|(\w+))\[([^\]]+)\]\s*\)/gi)];
+            for (const m of matches) items.push({ table: m[1] || m[2], column: m[3] });
         }
         return items;
     }
@@ -1923,28 +2014,28 @@ ${rects}
     _highlightDAX(dax) {
         let html = this._escHtml(dax);
 
-        // Comments (must be first)
+        // 1. Comments (must be first)
         html = html.replace(/(\/\/.*?)(\n|$)/g, '<span class="dax-comment">$1</span>$2');
         html = html.replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="dax-comment">$1</span>');
 
-        // Strings
+        // 2. Strings
         html = html.replace(/(&quot;[^&]*?&quot;)/g, '<span class="dax-string">$1</span>');
 
-        // Numbers
-        html = html.replace(/\b(\d+\.?\d*)\b/g, '<span class="dax-number">$1</span>');
-
-        // Column/measure references
+        // 3. Column/measure references (BEFORE numbers — prevents [Sales 2024] breakage)
         html = html.replace(/(\w+|\&#39;[^&]+\&#39;)\[([^\]]+)\]/g, '<span class="dax-ref">$1[$2]</span>');
         html = html.replace(/\[([^\]]+)\]/g, '<span class="dax-ref">[$1]</span>');
 
-        // DAX keywords
-        const keywords = ['VAR', 'RETURN', 'IF', 'SWITCH', 'TRUE', 'FALSE', 'BLANK', 'IN', 'NOT', 'AND', 'OR', 'DEFINE', 'EVALUATE', 'ORDER BY', 'ASC', 'DESC'];
+        // 4. DAX keywords
+        const keywords = ['VAR', 'RETURN', 'IF', 'THEN', 'ELSE', 'SWITCH', 'TRUE', 'FALSE', 'BLANK', 'IN', 'NOT', 'AND', 'OR', 'DEFINE', 'EVALUATE', 'ORDER BY', 'ASC', 'DESC', 'MEASURE', 'COLUMN', 'TABLE', 'SELECTEDMEASURE'];
         for (const kw of keywords) {
             html = html.replace(new RegExp(`\\b(${kw})\\b`, 'g'), '<span class="dax-keyword">$1</span>');
         }
 
-        // DAX functions
+        // 5. DAX functions
         html = html.replace(/\b([A-Z][A-Z0-9_.]*)\s*\(/g, '<span class="dax-function">$1</span>(');
+
+        // 6. Numbers (LAST — so they don't break refs with digits in names)
+        html = html.replace(/(?<!["\w\[])(\b\d+\.?\d*\b)(?![^\[]*\])/g, '<span class="dax-number">$1</span>');
 
         return html;
     }

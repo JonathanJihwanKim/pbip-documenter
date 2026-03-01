@@ -49,6 +49,10 @@ class TMDLParser {
             try {
                 const table = this.parseTable(files[tableFile], tableFile);
                 if (table) {
+                    // Tag auto-date tables for optional filtering
+                    if (/^LocalDateTable_|^DateTableTemplate_/.test(table.name)) {
+                        table._isAutoDate = true;
+                    }
                     this.model.tables.push(table);
                 }
             } catch (err) {
@@ -335,6 +339,9 @@ class TMDLParser {
                     isHidden: currentObject.properties.isHidden === 'true',
                     sourceColumn: currentObject.properties.sourceColumn || null,
                     summarizeBy: currentObject.properties.summarizeBy || null,
+                    sortByColumn: currentObject.properties.sortByColumn || null,
+                    displayFolder: currentObject.properties.displayFolder || null,
+                    dataCategory: currentObject.properties.dataCategory || null,
                     expression: expressionText
                 });
                 break;
@@ -346,6 +353,7 @@ class TMDLParser {
                     expression: expressionText,
                     displayFolder: currentObject.properties.displayFolder || null,
                     formatString: currentObject.properties.formatString || null,
+                    formatStringExpression: currentObject.properties.formatStringExpression || null,
                     dataCategory: currentObject.properties.dataCategory || null
                 });
                 break;
@@ -379,14 +387,21 @@ class TMDLParser {
                 break;
 
             case 'calculationGroup':
-                table.calculationGroup = { items: [] };
+                table.calculationGroup = {
+                    items: [],
+                    precedence: currentObject.properties.precedence != null
+                        ? parseInt(currentObject.properties.precedence, 10) : null
+                };
                 break;
 
             case 'calculationItem':
                 if (table.calculationGroup) {
                     table.calculationGroup.items.push({
                         name: currentObject.name,
-                        expression: expressionText
+                        expression: expressionText,
+                        ordinal: currentObject.properties.ordinal != null
+                            ? parseInt(currentObject.properties.ordinal, 10) : null,
+                        formatStringExpression: currentObject.properties.formatStringExpression || null
                     });
                 }
                 break;
@@ -444,6 +459,7 @@ class TMDLParser {
                     fromCardinality: null,
                     toCardinality: null,
                     crossFilteringBehavior: null,
+                    securityFilteringBehavior: null,
                     isActive: true
                 };
                 continue;
@@ -473,6 +489,9 @@ class TMDLParser {
                         break;
                     case 'crossFilteringBehavior':
                         currentRel.crossFilteringBehavior = value;
+                        break;
+                    case 'securityFilteringBehavior':
+                        currentRel.securityFilteringBehavior = value;
                         break;
                     case 'isActive':
                         currentRel.isActive = value !== 'false';
@@ -675,6 +694,15 @@ class TMDLParser {
                     refs[measure.name].table = table.name;
                 }
             }
+            // Also extract references from calculated columns
+            for (const col of table.columns) {
+                if (col.expression) {
+                    const key = `${table.name}[${col.name}]`;
+                    refs[key] = DAXReferenceExtractor.extract(col.expression);
+                    refs[key].table = table.name;
+                    refs[key].isCalculatedColumn = true;
+                }
+            }
         }
 
         return refs;
@@ -773,7 +801,7 @@ class DAXReferenceExtractor {
      */
     static _extractTableRefs(dax) {
         const refs = new Set();
-        const pattern = /(?:COUNTROWS|RELATEDTABLE|VALUES|ALL|DISTINCT|SUMMARIZE|ADDCOLUMNS|SELECTCOLUMNS|FILTER|CALCULATETABLE|TOPN|GENERATE|NATURALLEFTOUTERJOIN|NATURALINNERJOIN|CROSSJOIN|UNION|INTERSECT|EXCEPT|TREATAS)\s*\(\s*(?:'([^']+)'|(\w+))\s*(?:[,)])/gi;
+        const pattern = /(?:COUNTROWS|RELATEDTABLE|VALUES|ALL|ALLEXCEPT|ALLSELECTED|ALLNOBLANKROW|REMOVEFILTERS|DISTINCT|SUMMARIZE|SUMMARIZECOLUMNS|ADDCOLUMNS|SELECTCOLUMNS|FILTER|CALCULATETABLE|TOPN|GENERATE|GENERATESERIES|NATURALLEFTOUTERJOIN|NATURALINNERJOIN|CROSSJOIN|UNION|INTERSECT|EXCEPT|TREATAS|LOOKUPVALUE|RELATED|RANKX|SAMPLE|GROUPBY|DATATABLE|WINDOW|OFFSET|INDEX)\s*\(\s*(?:'([^']+)'|(\w+))\s*(?:[,)])/gi;
         let match;
 
         while ((match = pattern.exec(dax)) !== null) {

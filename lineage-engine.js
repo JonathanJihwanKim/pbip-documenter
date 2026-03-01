@@ -301,6 +301,17 @@ class LineageEngine {
                                 calcItemIds.push(`calcItem:${tableName}.${item.name}`);
                             }
                         }
+                    } else if (field.type === 'column') {
+                        // Check if this column belongs to a field parameter table — resolve its measures
+                        const fpItems = this._getFieldParameterItems ? this._getFieldParameterItems(tableName) : null;
+                        if (fpItems && fpItems.length > 0) {
+                            for (const item of fpItems) {
+                                const mTable = this.measureLookup ? this.measureLookup.get(item.column) : null;
+                                if (mTable) {
+                                    measureIds.push(`measure:${mTable}.${item.column}`);
+                                }
+                            }
+                        }
                     }
                 }
                 if (calcItemIds.length > 0 && measureIds.length > 0) {
@@ -327,6 +338,18 @@ class LineageEngine {
                     fromColumn: rel.fromColumn, toColumn: rel.toColumn,
                     fromCardinality: rel.fromCardinality, toCardinality: rel.toCardinality,
                     isActive: rel.isActive
+                });
+            }
+        }
+
+        // Detect broken/stale measure references
+        this.brokenRefs = [];
+        for (const edge of this.edges) {
+            if (edge.type === 'uses_field' && !this.nodes.has(edge.to)) {
+                this.brokenRefs.push({
+                    visual: edge.from,
+                    target: edge.to,
+                    type: 'missing_node'
                 });
             }
         }

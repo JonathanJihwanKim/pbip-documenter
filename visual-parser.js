@@ -184,6 +184,7 @@ class VisualParser {
 
             // Visual objects (conditional formatting, etc.)
             this._extractFromVisualObjects(visualData.visual?.objects, fieldMap);
+            this._extractFromVisualObjects(visualData.visual?.visualContainerObjects, fieldMap);
         } catch (err) {
             console.error('Error extracting field references:', err);
         }

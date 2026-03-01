@@ -258,7 +258,7 @@
         <!-- Main App Body (sidebar + content) -->
         <div id="appBody" class="app-body hidden">
             <!-- Sidebar Navigation -->
-            <aside class="sidebar" id="sidebar">
+            <aside class="sidebar" id="sidebar" aria-label="Model navigation">
                 <div class="sidebar-search" id="sidebarSearch">
                     <div class="sidebar-search-input-wrap">
                         <span class="material-symbols-outlined sidebar-search-icon">search</span>
@@ -268,13 +268,13 @@
                     <div class="sidebar-search-count hidden" id="sidebarSearchCount"></div>
                 </div>
                 <div class="sidebar-section">
-                    <div class="sidebar-header" data-section="overview">
+                    <div class="sidebar-header" data-section="overview" tabindex="0" role="button">
                         <span class="material-symbols-outlined">dashboard</span>
                         Model Overview
                     </div>
                 </div>
                 <div class="sidebar-section hidden" id="sidebarReportPagesSection">
-                    <div class="sidebar-header" data-section="report-pages">
+                    <div class="sidebar-header" data-section="report-pages" tabindex="0" role="button">
                         <span class="material-symbols-outlined">auto_stories</span>
                         Report Pages
                         <span class="sidebar-badge" id="sidebarPageCount">0</span>
@@ -282,7 +282,7 @@
                     <div id="sidebarPageList" class="sidebar-children"></div>
                 </div>
                 <div class="sidebar-section">
-                    <div class="sidebar-header" data-section="tables">
+                    <div class="sidebar-header" data-section="tables" tabindex="0" role="button">
                         <span class="material-symbols-outlined">table_chart</span>
                         Tables
                         <span class="sidebar-badge" id="sidebarTableCount">0</span>
@@ -293,47 +293,47 @@
                     <div id="sidebarTableList" class="sidebar-children"></div>
                 </div>
                 <div class="sidebar-section">
-                    <div class="sidebar-header" data-section="measures">
+                    <div class="sidebar-header" data-section="measures" tabindex="0" role="button">
                         <span class="material-symbols-outlined">functions</span>
                         Measure Catalog
                         <span class="sidebar-badge" id="sidebarMeasureCount">0</span>
                     </div>
                 </div>
                 <div class="sidebar-section" id="sidebarVisualUsageSection">
-                    <div class="sidebar-header" data-section="visual-usage">
+                    <div class="sidebar-header" data-section="visual-usage" tabindex="0" role="button">
                         <span class="material-symbols-outlined">visibility</span>
                         Visual Usage
                     </div>
                 </div>
                 <div class="sidebar-section" id="sidebarLineageSection">
-                    <div class="sidebar-header" data-section="lineage">
+                    <div class="sidebar-header" data-section="lineage" tabindex="0" role="button">
                         <span class="material-symbols-outlined">account_tree</span>
                         Visual Lineage
                     </div>
                 </div>
                 <div class="sidebar-section" id="sidebarDataSourcesSection">
-                    <div class="sidebar-header" data-section="data-sources">
+                    <div class="sidebar-header" data-section="data-sources" tabindex="0" role="button">
                         <span class="material-symbols-outlined">storage</span>
                         Data Sources
                         <span class="sidebar-badge" id="sidebarDataSourceCount">0</span>
                     </div>
                 </div>
                 <div class="sidebar-section">
-                    <div class="sidebar-header" data-section="relationships">
+                    <div class="sidebar-header" data-section="relationships" tabindex="0" role="button">
                         <span class="material-symbols-outlined">device_hub</span>
                         Relationships
                         <span class="sidebar-badge" id="sidebarRelCount">0</span>
                     </div>
                 </div>
                 <div class="sidebar-section" id="sidebarRolesSection">
-                    <div class="sidebar-header" data-section="roles">
+                    <div class="sidebar-header" data-section="roles" tabindex="0" role="button">
                         <span class="material-symbols-outlined">shield</span>
                         Roles
                         <span class="sidebar-badge" id="sidebarRoleCount">0</span>
                     </div>
                 </div>
                 <div class="sidebar-section" id="sidebarExpressionsSection">
-                    <div class="sidebar-header" data-section="expressions">
+                    <div class="sidebar-header" data-section="expressions" tabindex="0" role="button">
                         <span class="material-symbols-outlined">integration_instructions</span>
                         Expressions
                     </div>
@@ -346,7 +346,7 @@
             </aside>
 
             <!-- Main Content Area -->
-            <main class="main-content" id="mainContent">
+            <main class="main-content" id="mainContent" aria-live="polite">
                 <!-- Overview Section -->
                 <div id="view-overview" class="section-view content-panel active">
                     <h2>Model Overview</h2>
@@ -361,6 +361,7 @@
 
                 <!-- Report Page Detail -->
                 <div id="view-report-page" class="section-view content-panel">
+                    <div class="breadcrumb" id="pageDetailBreadcrumb"></div>
                     <h2 id="reportPageName">Page</h2>
                     <div id="reportPageContent"></div>
                 </div>
@@ -373,6 +374,7 @@
 
                 <!-- Single Table Detail -->
                 <div id="view-table-detail" class="section-view content-panel">
+                    <div class="breadcrumb" id="tableDetailBreadcrumb"></div>
                     <h2 id="tableDetailName">Table</h2>
                     <div id="tableDetailContent"></div>
                 </div>
@@ -526,7 +528,7 @@
     </div>
 
     <!-- Error Detail Modal -->
-    <div id="errorModal" class="error-modal hidden">
+    <div id="errorModal" class="error-modal hidden" role="dialog" aria-modal="true">
         <div class="error-modal-backdrop"></div>
         <div class="error-modal-content">
             <div class="error-modal-header">
@@ -567,7 +569,7 @@
             localStorage.setItem(DL_COUNT_KEY, String(count));
             // Show on 1st download of each session AND every 3rd download thereafter
             var shownThisSession = sessionStorage.getItem(SESSION_KEY);
-            var shouldShow = !shownThisSession || (count % 3 === 0);
+            var shouldShow = !shownThisSession;
             if (!shouldShow) return;
             sessionStorage.setItem(SESSION_KEY, '1');
             var toast = document.getElementById('sponsor-toast');

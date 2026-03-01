@@ -57,6 +57,12 @@ class App {
                 const section = header.dataset.section;
                 this.showSection(section);
             });
+            header.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    this.showSection(header.dataset.section);
+                }
+            });
         });
 
         // Sidebar delegated click handlers (one listener per list, not per item)
@@ -118,6 +124,14 @@ class App {
         // Error modal bindings
         document.getElementById('errorModalClose').addEventListener('click', () => this.hideErrorModal());
         document.querySelector('.error-modal-backdrop').addEventListener('click', () => this.hideErrorModal());
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const modal = document.getElementById('errorModal');
+                if (modal && !modal.classList.contains('hidden')) {
+                    this.hideErrorModal?.() || modal.classList.add('hidden');
+                }
+            }
+        });
         document.getElementById('errorModalCopy').addEventListener('click', () => this.copyErrorDetails());
         document.getElementById('warningBannerDetails').addEventListener('click', () => this.showErrorModal());
         document.getElementById('warningBannerClose').addEventListener('click', () => {
@@ -193,7 +207,8 @@ class App {
             if (!mc) return;
             const banner = document.createElement('div');
             banner.className = 'milestone-banner';
-            banner.innerHTML = `You've explored ${visited.length} sections — relationships, lineage, and more — all generated in seconds. This tool is built and maintained by one developer. <a href="https://buymeacoffee.com/jihwankim?o=milestone" target="_blank">Buy a coffee</a> or <a href="https://github.com/sponsors/JonathanJihwanKim?o=milestone" target="_blank">sponsor on GitHub</a>. <button type="button" class="milestone-banner-close" title="Dismiss">&times;</button>`;
+            const sectionNames = (visited || []).map(s => s.replace(/-/g, ' ')).join(', ');
+            banner.innerHTML = `You've explored ${visited.length} sections — ${sectionNames} — all generated in seconds. This tool is built and maintained by one developer. <a href="https://buymeacoffee.com/jihwankim?o=milestone" target="_blank">Buy a coffee</a> or <a href="https://github.com/sponsors/JonathanJihwanKim?o=milestone" target="_blank">sponsor on GitHub</a>. <button type="button" class="milestone-banner-close" title="Dismiss">&times;</button>`;
             mc.prepend(banner);
             banner.querySelector('.milestone-banner-close').addEventListener('click', () => {
                 banner.remove();
@@ -231,6 +246,12 @@ class App {
     // ──────────────────────────────────────────────
 
     async openFolder() {
+        const btn = document.getElementById('openFolderBtn') || document.getElementById('changeFolderBtn');
+        const originalText = btn ? btn.textContent : null;
+        if (btn) {
+            btn.textContent = 'Reading files...';
+            btn.disabled = true;
+        }
         try {
             this.folderHandle = await window.showDirectoryPicker({
                 mode: 'read',
@@ -252,6 +273,11 @@ class App {
             if (error.name === 'AbortError') return; // User cancelled
             this.showToast(error.message, 'error');
             console.error('Error opening folder:', error);
+        } finally {
+            if (btn && originalText !== null) {
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }
         }
     }
 
@@ -504,7 +530,7 @@ class App {
                     const totalVisuals = this.visualData?.visuals?.length || 0;
                     const bannerText = document.getElementById('sponsorBannerText');
                     if (bannerText) {
-                        bannerText.innerHTML = `Documented <strong>${totalMeasures} measure${totalMeasures !== 1 ? 's' : ''}</strong> across <strong>${totalTables} table${totalTables !== 1 ? 's' : ''}</strong>${totalVisuals ? ` and <strong>${totalVisuals} visual${totalVisuals !== 1 ? 's' : ''}</strong>` : ''}. If this saved you time, consider <a href="https://github.com/sponsors/JonathanJihwanKim?o=banner" target="_blank">sponsoring</a> or <a href="https://buymeacoffee.com/jihwankim?o=banner" target="_blank">buying a coffee</a>.`;
+                        bannerText.innerHTML = `Documented <strong>${totalMeasures} measure${totalMeasures !== 1 ? 's' : ''}</strong> across <strong>${totalTables} table${totalTables !== 1 ? 's' : ''}</strong>${totalVisuals ? ` and <strong>${totalVisuals} visual${totalVisuals !== 1 ? 's' : ''}</strong>` : ''}. Built by Jihwan Kim (Microsoft MVP). If this saved you time, consider <a href="https://github.com/sponsors/JonathanJihwanKim?o=banner" target="_blank">sponsoring</a> or <a href="https://buymeacoffee.com/jihwankim?o=banner" target="_blank">buying a coffee</a>.`;
                     }
                     banner.classList.remove('hidden');
                     document.getElementById('sponsorBannerClose').addEventListener('click', () => {
@@ -656,7 +682,7 @@ class App {
                 const totalVisuals = this.visualData?.visuals?.length || 0;
                 const bannerText = document.getElementById('sponsorBannerText');
                 if (bannerText) {
-                    bannerText.innerHTML = `This live demo documents <strong>${totalMeasures} measure${totalMeasures !== 1 ? 's' : ''}</strong> across <strong>${totalTables} table${totalTables !== 1 ? 's' : ''}</strong> and <strong>${totalVisuals} visual${totalVisuals !== 1 ? 's' : ''}</strong> — all in your browser. If you find it useful, consider <a href="https://github.com/sponsors/JonathanJihwanKim?o=demo" target="_blank">sponsoring</a> or <a href="https://buymeacoffee.com/jihwankim?o=demo" target="_blank">buying a coffee</a>.`;
+                    bannerText.innerHTML = `This live demo documents <strong>${totalMeasures} measure${totalMeasures !== 1 ? 's' : ''}</strong> across <strong>${totalTables} table${totalTables !== 1 ? 's' : ''}</strong> and <strong>${totalVisuals} visual${totalVisuals !== 1 ? 's' : ''}</strong> — all in your browser. Built by Jihwan Kim (Microsoft MVP). If you find it useful, consider <a href="https://github.com/sponsors/JonathanJihwanKim?o=demo" target="_blank">sponsoring</a> or <a href="https://buymeacoffee.com/jihwankim?o=demo" target="_blank">buying a coffee</a>.`;
                 }
                 banner.classList.remove('hidden');
                 document.getElementById('sponsorBannerClose').addEventListener('click', () => {
@@ -1006,6 +1032,7 @@ class App {
 
         // Milestone tracking for sponsor prompt
         this._trackMilestone(section);
+        this._track('Section Visited', { section });
     }
 
     showTableDetail(tableName) {
@@ -1024,6 +1051,16 @@ class App {
         document.querySelectorAll('.section-view').forEach(el => el.classList.remove('active'));
         document.getElementById('view-table-detail').classList.add('active');
         document.getElementById('tableDetailName').textContent = table.name;
+
+        // Add breadcrumb back link
+        const breadcrumb = document.getElementById('tableDetailBreadcrumb');
+        if (breadcrumb) {
+            breadcrumb.innerHTML = `<a href="#" class="breadcrumb-link" data-section="tables">← Tables</a>`;
+            breadcrumb.querySelector('.breadcrumb-link').addEventListener('click', (e) => {
+                e.preventDefault();
+                this.showSection('tables');
+            });
+        }
 
         const content = document.getElementById('tableDetailContent');
         let html = '';
@@ -1910,6 +1947,16 @@ class App {
         document.getElementById('view-report-page').classList.add('active');
         document.getElementById('reportPageName').textContent = page.displayName;
 
+        // Add breadcrumb back link
+        const pageBreadcrumb = document.getElementById('pageDetailBreadcrumb');
+        if (pageBreadcrumb) {
+            pageBreadcrumb.innerHTML = `<a href="#" class="breadcrumb-link" data-section="report-pages">← Report Pages</a>`;
+            pageBreadcrumb.querySelector('.breadcrumb-link').addEventListener('click', (e) => {
+                e.preventDefault();
+                this.showSection('report-pages');
+            });
+        }
+
         // Mark sidebar active
         document.querySelectorAll('.sidebar-header').forEach(h => h.classList.remove('active'));
         document.querySelectorAll('.sidebar-item').forEach(item => {
@@ -2454,6 +2501,8 @@ class App {
     }
 
     _showValueMomentToast() {
+        // Don't show if sponsor toast already shown this session
+        if (sessionStorage.getItem('sponsor_toast_shown') === '1') return;
         if (!this.parsedModel) return;
         const m = this.parsedModel;
         const tables = m.tables.length;
