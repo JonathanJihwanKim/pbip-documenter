@@ -166,7 +166,8 @@ class LineageEngine {
                         id,
                         type: 'calcItem',
                         name: item.name,
-                        table: table.name
+                        table: table.name,
+                        expression: item.expression || null
                     });
                     this.edges.push({ from: id, to: `table:${table.name}`, type: 'belongs_to_table' });
                 }
@@ -182,14 +183,20 @@ class LineageEngine {
                     // Resolve: if NAMEOF references a measure, follow its DAX refs to data tables
                     const resolvedTables = [];
                     const mTable = this.measureLookup.get(item.column);
+                    const isMeasureTarget = !!mTable;
                     if (mTable) {
-                        const refs = this.measureRefs[item.column];
-                        if (refs) {
-                            for (const cr of refs.columnRefs) {
-                                if (!resolvedTables.includes(cr.table)) resolvedTables.push(cr.table);
-                            }
-                            for (const tr of refs.tableRefs) {
-                                if (!resolvedTables.includes(tr)) resolvedTables.push(tr);
+                        // Use transitive resolution for deep measure chains
+                        const chain = this.resolveMeasureChain(item.column);
+                        const allMeasures = [{ name: item.column, table: mTable }, ...chain];
+                        for (const m of allMeasures) {
+                            const refs = this.measureRefs[m.name];
+                            if (refs) {
+                                for (const cr of refs.columnRefs) {
+                                    if (!resolvedTables.includes(cr.table)) resolvedTables.push(cr.table);
+                                }
+                                for (const tr of refs.tableRefs) {
+                                    if (!resolvedTables.includes(tr)) resolvedTables.push(tr);
+                                }
                             }
                         }
                     }
@@ -200,6 +207,7 @@ class LineageEngine {
                         name: `${item.table}'[${item.column}]`,
                         table: item.table,
                         sourceTable: table.name,
+                        targetType: isMeasureTarget ? 'measure' : 'column',
                         resolvedTables: resolvedTables.length > 0 ? resolvedTables : null
                     });
 
@@ -209,6 +217,14 @@ class LineageEngine {
                         }
                     } else {
                         this.edges.push({ from: id, to: `table:${item.table}`, type: 'belongs_to_table' });
+                    }
+
+                    // Add resolves_to_measure edge if NAMEOF target is a measure
+                    if (isMeasureTarget) {
+                        const measureId = `measure:${mTable}.${item.column}`;
+                        if (this.nodes.has(measureId)) {
+                            this.edges.push({ from: id, to: measureId, type: 'resolves_to_measure' });
+                        }
                     }
                 }
             }
@@ -263,6 +279,55 @@ class LineageEngine {
                         this.edges.push({ from: visualId, to: tblId, type: 'uses_field' });
                     }
                 }
+            }
+        }
+
+        // 6. Add modifies_measure edges: calc group items → measures on the same visual
+        if (this.visualData && this._calcGroupTables.size > 0) {
+            const addedModEdges = new Set(); // Global dedup across all visuals
+            for (const visual of this.visualData.visuals) {
+                const calcItemIds = [];
+                const measureIds = [];
+                for (const field of (visual.fields || [])) {
+                    const tableName = field.table || field.entity || '';
+                    const fieldName = field.name || field.column || '';
+                    if (!tableName || !fieldName) continue;
+                    if (field.type === 'measure') {
+                        measureIds.push(`measure:${tableName}.${fieldName}`);
+                    } else if (field.type === 'column' && this._calcGroupTables.has(tableName)) {
+                        const cgItems = this._getCalculationGroupItems(tableName);
+                        if (cgItems) {
+                            for (const item of cgItems) {
+                                calcItemIds.push(`calcItem:${tableName}.${item.name}`);
+                            }
+                        }
+                    }
+                }
+                if (calcItemIds.length > 0 && measureIds.length > 0) {
+                    for (const ciId of calcItemIds) {
+                        for (const mId of measureIds) {
+                            const key = `${ciId}\u2192${mId}`;
+                            if (!addedModEdges.has(key)) {
+                                addedModEdges.add(key);
+                                this.edges.push({ from: ciId, to: mId, type: 'modifies_measure' });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 7. Add has_relationship edges between tables
+        for (const rel of (this.parsedModel.relationships || [])) {
+            const fromId = `table:${rel.fromTable}`;
+            const toId = `table:${rel.toTable}`;
+            if (this.nodes.has(fromId) && this.nodes.has(toId)) {
+                this.edges.push({
+                    from: fromId, to: toId, type: 'has_relationship',
+                    fromColumn: rel.fromColumn, toColumn: rel.toColumn,
+                    fromCardinality: rel.fromCardinality, toCardinality: rel.toCardinality,
+                    isActive: rel.isActive
+                });
             }
         }
     }
@@ -390,6 +455,8 @@ class LineageEngine {
                         sourceTable: col.table
                     });
                 }
+                // Add calc group source table to the tables set
+                tables.add(col.table);
                 columnsToRemove.push(key);
                 continue;
             }
@@ -397,17 +464,21 @@ class LineageEngine {
             const fpItems = this._getFieldParameterItems(col.table);
             if (fpItems) {
                 for (const item of fpItems) {
-                    // Resolve: if NAMEOF references a measure, follow its DAX refs to data tables
+                    // Resolve: if NAMEOF references a measure, follow its DAX refs to data tables (transitive)
                     const resolvedTables = [];
                     const mTable = this.measureLookup.get(item.column);
                     if (mTable) {
-                        const refs = this.measureRefs[item.column];
-                        if (refs) {
-                            for (const cr of refs.columnRefs) {
-                                if (!resolvedTables.includes(cr.table)) resolvedTables.push(cr.table);
-                            }
-                            for (const tr of refs.tableRefs) {
-                                if (!resolvedTables.includes(tr)) resolvedTables.push(tr);
+                        const chain = this.resolveMeasureChain(item.column);
+                        const allMeasures = [{ name: item.column, table: mTable }, ...chain];
+                        for (const m of allMeasures) {
+                            const refs = this.measureRefs[m.name];
+                            if (refs) {
+                                for (const cr of refs.columnRefs) {
+                                    if (!resolvedTables.includes(cr.table)) resolvedTables.push(cr.table);
+                                }
+                                for (const tr of refs.tableRefs) {
+                                    if (!resolvedTables.includes(tr)) resolvedTables.push(tr);
+                                }
                             }
                         }
                     }
@@ -559,6 +630,54 @@ class LineageEngine {
         const result = { visuals, dependentMeasures };
         this._measureImpactCache.set(measureName, result);
         return result;
+    }
+
+    /**
+     * Reverse traversal - what measures/visuals depend on this column
+     * @param {string} tableName
+     * @param {string} columnName
+     * @returns {Object} { column, directMeasures, directVisuals, transitiveVisuals }
+     */
+    getColumnImpact(tableName, columnName) {
+        const columnId = `column:${tableName}.${columnName}`;
+
+        // Find measures that directly reference this column
+        const directMeasures = [];
+        for (const edge of this.edges) {
+            if (edge.type === 'references_column' && edge.to === columnId) {
+                const mn = this.nodes.get(edge.from);
+                if (mn) directMeasures.push({ name: mn.name, table: mn.table });
+            }
+        }
+
+        // Find visuals that directly use this column
+        const directVisuals = [];
+        for (const edge of this.edges) {
+            if (edge.type === 'uses_field' && edge.to === columnId) {
+                const vn = this.nodes.get(edge.from);
+                if (vn) directVisuals.push({ name: vn.name, page: vn.pageName, type: vn.visualType });
+            }
+        }
+
+        // Find visuals that use this column transitively through measures
+        const transitiveVisuals = [];
+        const directVisualKeys = new Set(directVisuals.map(v => `${v.page}|${v.name}`));
+        for (const dm of directMeasures) {
+            const impact = this.getMeasureImpact(dm.name);
+            for (const v of impact.visuals) {
+                const key = `${v.page}|${v.name}`;
+                if (!directVisualKeys.has(key) && !transitiveVisuals.some(tv => tv.page === v.page && tv.name === v.name)) {
+                    transitiveVisuals.push({ name: v.name, page: v.page, type: v.type, indirect: true, via: dm.name });
+                }
+            }
+        }
+
+        return {
+            column: { table: tableName, name: columnName },
+            directMeasures,
+            directVisuals,
+            transitiveVisuals
+        };
     }
 
     /**

@@ -2085,6 +2085,143 @@ tr:hover {
     transition: all 0.2s ease;
 }
 
+.lineage-edge.relationship {
+    stroke-dasharray: 6 3;
+}
+
+/* Lineage Detail Panel */
+.lineage-detail-panel {
+    margin: 12px 0;
+    padding: 16px 20px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--primary);
+    border-radius: var(--radius);
+    position: relative;
+    animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.lineage-detail-panel.hidden { display: none; }
+
+.lineage-detail-panel.type-table { border-left-color: #1565c0; }
+.lineage-detail-panel.type-measure { border-left-color: #f9a825; }
+.lineage-detail-panel.type-column { border-left-color: #42a5f5; }
+.lineage-detail-panel.type-visual { border-left-color: #9c27b0; }
+.lineage-detail-panel.type-dataSource { border-left-color: #4caf50; }
+.lineage-detail-panel.type-calcItem { border-left-color: #2e7d32; }
+.lineage-detail-panel.type-fpItem { border-left-color: #6a1b9a; }
+
+.lineage-detail-close {
+    position: absolute;
+    top: 8px; right: 12px;
+    background: none; border: none;
+    cursor: pointer; font-size: 18px;
+    color: var(--text-secondary);
+    line-height: 1;
+}
+.lineage-detail-close:hover { color: var(--text); }
+
+.lineage-detail-heading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.lineage-detail-heading .lineage-badge {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.lineage-detail-heading h3 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.lineage-detail-section {
+    margin-top: 10px;
+}
+
+.lineage-detail-section h4 {
+    margin: 0 0 6px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.lineage-detail-section table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.lineage-detail-section th,
+.lineage-detail-section td {
+    padding: 4px 8px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+
+.lineage-detail-section th {
+    font-weight: 600;
+    color: var(--text-secondary);
+    font-size: 11px;
+}
+
+.lineage-detail-dax {
+    background: #f5f5f0;
+    padding: 8px 12px;
+    border-radius: var(--radius);
+    font-family: 'Consolas', 'Fira Code', monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 200px;
+    overflow-y: auto;
+    line-height: 1.5;
+}
+
+.lineage-detail-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.lineage-detail-chip {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 500;
+    background: #f0f0f0;
+    color: var(--text);
+}
+
+.lineage-detail-chip.measure { background: #fff8e1; color: #f57f17; }
+.lineage-detail-chip.column { background: #e3f2fd; color: #1565c0; }
+.lineage-detail-chip.visual { background: #f3e5f5; color: #6a1b9a; }
+.lineage-detail-chip.table { background: #e3f2fd; color: #1565c0; }
+.lineage-detail-chip.source { background: #e8f5e9; color: #2e7d32; }
+.lineage-detail-chip.calcItem { background: #e8f5e9; color: #2e7d32; }
+.lineage-detail-chip.fpItem { background: #f3e5f5; color: #6a1b9a; }
+.lineage-detail-chip.indirect { opacity: 0.7; font-style: italic; }
+
+/* Expandable table nodes */
+.lineage-node-expand-indicator {
+    font-size: 10px;
+    fill: #666;
+    cursor: pointer;
+}
+
 /* Data Source Cards */
 .data-source-card {
     background: var(--card-bg);

@@ -35,6 +35,7 @@ class LineageDiagramRenderer {
             textWhite: '#ffffff'
         };
         this._cleanupFn = null;
+        this._expandedTables = new Set();
     }
 
     /**
@@ -43,6 +44,7 @@ class LineageDiagramRenderer {
     renderFullLineage(container) {
         const target = container || this.container;
         this._clearContainer(target);
+        this._isFullLineageView = true;
 
         const engine = this.lineageEngine;
         if (!engine || !engine.nodes) return;
@@ -66,6 +68,7 @@ class LineageDiagramRenderer {
     renderVisualTrace(container, pageName, visualName) {
         const target = container || this.container;
         this._clearContainer(target);
+        this._isFullLineageView = false;
 
         const lineage = this.lineageEngine.getVisualLineage(pageName, visualName);
         if (!lineage) {
@@ -120,7 +123,7 @@ class LineageDiagramRenderer {
                         detail: `Calc Group: ${ci.sourceTable}`
                     })),
                     ...(lineage.expandedFPItems || []).map(fp => ({
-                        id: `fpItem:${fp.table}.${fp.column}`,
+                        id: `fpItem:${fp.sourceTable}.${fp.table}.${fp.column}`,
                         name: `${fp.table}'[${fp.column}]`,
                         type: 'fpItem',
                         detail: `Field Param: ${fp.sourceTable}`
@@ -156,6 +159,7 @@ class LineageDiagramRenderer {
     renderMeasureImpact(container, measureName) {
         const target = container || this.container;
         this._clearContainer(target);
+        this._isFullLineageView = false;
 
         const impact = this.lineageEngine.getMeasureImpact(measureName);
         const tableName = this.lineageEngine.measureLookup.get(measureName);
@@ -211,12 +215,135 @@ class LineageDiagramRenderer {
     }
 
     /**
+     * Render column impact analysis
+     */
+    renderColumnImpact(container, tableName, columnName) {
+        const target = container || this.container;
+        this._clearContainer(target);
+        this._isFullLineageView = false;
+
+        const impact = this.lineageEngine.getColumnImpact(tableName, columnName);
+        if (!impact) {
+            target.innerHTML = '<p style="text-align:center;color:#666;padding:40px">Column not found.</p>';
+            return;
+        }
+
+        const allVisuals = [...impact.directVisuals, ...impact.transitiveVisuals];
+
+        const columns = [
+            {
+                label: 'Source Column',
+                color: this.colors.column,
+                colorBg: this.colors.columnBg,
+                items: [{
+                    id: `column:${tableName}.${columnName}`,
+                    name: `${tableName}[${columnName}]`,
+                    type: 'column',
+                    detail: tableName
+                }]
+            },
+            {
+                label: 'Referencing Measures',
+                color: this.colors.measure,
+                colorBg: this.colors.measureBg,
+                items: impact.directMeasures.map(m => ({
+                    id: `measure:${m.table}.${m.name}`,
+                    name: `[${m.name}]`,
+                    type: 'measure',
+                    detail: m.table
+                }))
+            },
+            {
+                label: 'Affected Visuals',
+                color: this.colors.visual,
+                colorBg: this.colors.visualBg,
+                items: allVisuals.map(v => ({
+                    id: `visual:${v.page}|${v.name}`,
+                    name: v.name,
+                    type: 'visual',
+                    detail: v.page + (v.indirect ? ` (via ${v.via})` : '')
+                }))
+            }
+        ];
+
+        const layout = this._layoutColumns(columns);
+        const svg = this._renderLayout(layout, columns, `Column Impact: ${tableName}[${columnName}]`);
+
+        // Draw edges
+        const posMap = new Map();
+        for (const col of columns) {
+            for (let i = 0; i < (col._visibleCount || col.items.length); i++) {
+                posMap.set(col.items[i].id, col.items[i]);
+            }
+        }
+
+        const sourceItem = posMap.get(`column:${tableName}.${columnName}`);
+        if (sourceItem) {
+            // Column → Measures
+            for (const dm of impact.directMeasures) {
+                const dmItem = posMap.get(`measure:${dm.table}.${dm.name}`);
+                if (dmItem) this._drawEdge(svg, sourceItem, dmItem, 'references_column');
+            }
+            // Column → Direct Visuals
+            for (const v of impact.directVisuals) {
+                const vItem = posMap.get(`visual:${v.page}|${v.name}`);
+                if (vItem) this._drawEdge(svg, sourceItem, vItem, 'uses_field');
+            }
+            // Measures → Transitive Visuals
+            for (const v of impact.transitiveVisuals) {
+                const vItem = posMap.get(`visual:${v.page}|${v.name}`);
+                if (!vItem) continue;
+                const viaTable = this.lineageEngine.measureLookup.get(v.via);
+                if (viaTable) {
+                    const mItem = posMap.get(`measure:${viaTable}.${v.via}`);
+                    if (mItem) this._drawEdge(svg, mItem, vItem, 'uses_field');
+                }
+            }
+        }
+
+        target.appendChild(svg);
+        this._initInteractivity(svg, layout.width, layout.height, target);
+    }
+
+    /**
      * Export SVG as string
      */
     exportSVG() {
         const svg = this.container.querySelector('svg');
         if (!svg) return null;
         return new XMLSerializer().serializeToString(svg);
+    }
+
+    /**
+     * Get columns of a table that participate in edges (referenced by measures/visuals)
+     */
+    _getConnectedColumns(tableName) {
+        const engine = this.lineageEngine;
+        const prefix = `column:${tableName}.`;
+        const connectedIds = new Set();
+
+        for (const edge of engine.edges) {
+            // Measures referencing columns, visuals using columns
+            if ((edge.type === 'references_column' || edge.type === 'uses_field') && edge.to.startsWith(prefix)) {
+                connectedIds.add(edge.to);
+            }
+            // Relationship columns
+            if (edge.type === 'has_relationship' && (edge.from === `table:${tableName}` || edge.to === `table:${tableName}`)) {
+                if (edge.from === `table:${tableName}` && edge.fromColumn) {
+                    connectedIds.add(`column:${tableName}.${edge.fromColumn}`);
+                }
+                if (edge.to === `table:${tableName}` && edge.toColumn) {
+                    connectedIds.add(`column:${tableName}.${edge.toColumn}`);
+                }
+            }
+        }
+
+        const result = [];
+        for (const colId of connectedIds) {
+            const node = engine.nodes.get(colId);
+            if (node) result.push(node);
+        }
+        return result.sort((a, b) => a.name.localeCompare(b.name));
     }
 
     _tableHasVisibleEdges(tableId, edges) {
@@ -247,10 +374,26 @@ class LineageDiagramRenderer {
                     break;
                 case 'table':
                     if (this._tableHasVisibleEdges(id, engine.edges)) {
+                        const isExpanded = this._expandedTables.has(node.name);
+                        const hasConnectedCols = this._getConnectedColumns(node.name).length > 0;
                         tableItems.push({
                             id, name: node.name, type: 'table',
-                            detail: `${node.columnCount}c / ${node.measureCount}m`
+                            detail: `${node.columnCount}c / ${node.measureCount}m`,
+                            expandable: hasConnectedCols,
+                            expanded: isExpanded
                         });
+                        // Insert connected column sub-items if expanded
+                        if (isExpanded) {
+                            const connCols = this._getConnectedColumns(node.name);
+                            for (const col of connCols) {
+                                tableItems.push({
+                                    id: col.id, name: col.name, type: 'column',
+                                    detail: col.dataType || '',
+                                    isSubItem: true,
+                                    parentTable: node.name
+                                });
+                            }
+                        }
                     }
                     break;
                 case 'measure':
@@ -317,12 +460,14 @@ class LineageDiagramRenderer {
 
             for (let i = 0; i < visibleCount; i++) {
                 const item = col.items[i];
-                item._x = x;
+                const isSubItem = item.isSubItem;
+                const itemH = isSubItem ? 28 : nodeHeight;
+                item._x = isSubItem ? x + 10 : x;
                 item._y = y;
-                item._w = colWidth;
-                item._h = nodeHeight;
+                item._w = isSubItem ? colWidth - 10 : colWidth;
+                item._h = itemH;
                 colPositions[colPositions.length - 1].items.push(item);
-                y += nodeHeight + nodeGap;
+                y += itemH + (isSubItem ? 4 : nodeGap);
             }
 
             // Overflow indicator
@@ -424,36 +569,67 @@ class LineageDiagramRenderer {
         } else if (item.type === 'fpItem') {
             color = this.colors.fieldParam;
             bgColor = this.colors.fieldParamBg;
+        } else if (item.isSubItem && item.type === 'column') {
+            color = this.colors.column;
+            bgColor = this.colors.columnBg;
         }
 
         // Background rect
         g.appendChild(this._createRect(item._x, item._y, item._w, item._h, {
-            fill: bgColor, stroke: color, strokeWidth: '1.5', rx: '4'
+            fill: bgColor, stroke: color, strokeWidth: item.isSubItem ? '1' : '1.5', rx: '4'
         }));
 
-        // Name (truncated)
-        const name = this._truncate(item.name, 22);
-        g.appendChild(this._createText(name, item._x + 8, item._y + 16, {
-            fontSize: '12px', fontWeight: '600', fill: this.colors.text
-        }));
+        if (item.isSubItem) {
+            // Compact sub-item: name only, smaller text
+            const name = this._truncate(item.name, 20);
+            g.appendChild(this._createText(name, item._x + 6, item._y + 16, {
+                fontSize: '11px', fontWeight: '500', fill: this.colors.text
+            }));
+            // Data type on the right
+            if (item.detail) {
+                g.appendChild(this._createText(
+                    this._truncate(item.detail, 10),
+                    item._x + item._w - 8, item._y + 16,
+                    { fontSize: '9px', fill: this.colors.textLight, textAnchor: 'end' }
+                ));
+            }
+        } else {
+            // Name (truncated)
+            const maxNameLen = item.expandable ? 19 : 22;
+            const name = this._truncate(item.name, maxNameLen);
+            g.appendChild(this._createText(name, item._x + 8, item._y + 16, {
+                fontSize: '12px', fontWeight: '600', fill: this.colors.text
+            }));
 
-        // Detail line
-        if (item.detail) {
-            g.appendChild(this._createText(
-                this._truncate(item.detail, 26),
-                item._x + 8, item._y + 28,
-                { fontSize: '10px', fill: this.colors.textLight }
-            ));
+            // Detail line
+            if (item.detail) {
+                g.appendChild(this._createText(
+                    this._truncate(item.detail, 26),
+                    item._x + 8, item._y + 28,
+                    { fontSize: '10px', fill: this.colors.textLight }
+                ));
+            }
+
+            // Expand indicator for expandable tables
+            if (item.expandable) {
+                const indicator = this._createText(
+                    item.expanded ? '\u25BC' : '\u25B6',
+                    item._x + item._w - 22, item._y + 16,
+                    { fontSize: '10px', fill: this.colors.textLight }
+                );
+                indicator.classList.add('lineage-node-expand-indicator');
+                g.appendChild(indicator);
+            }
+
+            // Type indicator dot
+            const dotR = 4;
+            const dot = document.createElementNS(this.SVG_NS, 'circle');
+            dot.setAttribute('cx', item._x + item._w - 10);
+            dot.setAttribute('cy', item._y + item._h / 2);
+            dot.setAttribute('r', dotR);
+            dot.setAttribute('fill', color);
+            g.appendChild(dot);
         }
-
-        // Type indicator dot
-        const dotR = 4;
-        const dot = document.createElementNS(this.SVG_NS, 'circle');
-        dot.setAttribute('cx', item._x + item._w - 10);
-        dot.setAttribute('cy', item._y + item._h / 2);
-        dot.setAttribute('r', dotR);
-        dot.setAttribute('fill', color);
-        g.appendChild(dot);
 
         svg.appendChild(g);
     }
@@ -480,11 +656,17 @@ class LineageDiagramRenderer {
             const toItem = posMap.get(edge.to);
             if (!fromItem || !toItem) continue;
 
-            // Only draw inter-column edges
-            if (fromItem._x === toItem._x) continue;
+            // Skip intra-column edges (belongs_to_table, has_relationship within same column)
+            if (edge.type === 'belongs_to_table') continue;
+            if (edge.type === 'has_relationship') continue; // Phase 5 draws these separately
+            if (edge.type === 'modifies_measure') continue; // Skip in full view (too many)
+            if (Math.abs(fromItem._x - toItem._x) < 20) continue; // Same visual column
 
             this._drawEdge(svg, fromItem, toItem, edge.type);
         }
+
+        // Draw relationship edges within the Tables column (Phase 5)
+        this._drawRelationshipEdges(svg, posMap, engine);
     }
 
     _drawTraceEdges(svg, layout, lineage, columns) {
@@ -552,7 +734,7 @@ class LineageDiagramRenderer {
 
         // Visual → expanded field param items, fp items → resolved data tables
         for (const fp of (lineage.expandedFPItems || [])) {
-            const fpId = `fpItem:${fp.table}.${fp.column}`;
+            const fpId = `fpItem:${fp.sourceTable}.${fp.table}.${fp.column}`;
             const fpItem = posMap.get(fpId);
             if (fpItem && visualItem) this._drawEdge(svg, visualItem, fpItem, 'uses_field');
             if (fpItem && fp.resolvedTables && fp.resolvedTables.length > 0) {
@@ -602,6 +784,61 @@ class LineageDiagramRenderer {
                 if (dmItem) this._drawEdge(svg, dmItem, vItem, 'uses_field');
             } else {
                 this._drawEdge(svg, sourceItem, vItem, 'uses_field');
+            }
+        }
+    }
+
+    _drawRelationshipEdges(svg, posMap, engine) {
+        for (const edge of engine.edges) {
+            if (edge.type !== 'has_relationship') continue;
+            const fromItem = posMap.get(edge.from);
+            const toItem = posMap.get(edge.to);
+            if (!fromItem || !toItem) continue;
+
+            // Draw a curved arc between tables in the same column
+            const x1 = fromItem._x + fromItem._w; // right side
+            const y1 = fromItem._y + fromItem._h / 2;
+            const x2 = toItem._x + toItem._w;
+            const y2 = toItem._y + toItem._h / 2;
+
+            const arcOffset = 30 + Math.abs(y2 - y1) * 0.15;
+            const midY = (y1 + y2) / 2;
+
+            const path = document.createElementNS(this.SVG_NS, 'path');
+            const d = `M${x1},${y1} C${x1 + arcOffset},${y1} ${x2 + arcOffset},${y2} ${x2},${y2}`;
+            path.setAttribute('d', d);
+            path.setAttribute('fill', 'none');
+            path.setAttribute('stroke', '#ef9a9a');
+            path.setAttribute('stroke-width', '1.2');
+            path.setAttribute('stroke-opacity', '0.6');
+            path.setAttribute('stroke-dasharray', '6 3');
+            path.classList.add('lineage-edge', 'relationship');
+            path.dataset.from = edge.from;
+            path.dataset.to = edge.to;
+            path.dataset.edgeType = 'has_relationship';
+
+            // Insert before nodes
+            const firstNode = svg.querySelector('.lineage-node');
+            if (firstNode) {
+                svg.insertBefore(path, firstNode);
+            } else {
+                svg.appendChild(path);
+            }
+
+            // Label at midpoint
+            const label = `${edge.fromColumn || ''} \u2194 ${edge.toColumn || ''}`;
+            if (edge.fromColumn && edge.toColumn) {
+                const labelEl = this._createText(
+                    this._truncate(label, 30),
+                    x1 + arcOffset * 0.6, midY,
+                    { fontSize: '9px', fill: '#c62828', textAnchor: 'start' }
+                );
+                labelEl.setAttribute('opacity', '0.7');
+                if (firstNode) {
+                    svg.insertBefore(labelEl, firstNode);
+                } else {
+                    svg.appendChild(labelEl);
+                }
             }
         }
     }
@@ -750,19 +987,43 @@ class LineageDiagramRenderer {
 
             nodeEl.addEventListener('mouseleave', () => {
                 for (const edge of allEdges) {
-                    edge.setAttribute('stroke', this.colors.edge);
-                    edge.setAttribute('stroke-width', '1.5');
-                    edge.setAttribute('stroke-opacity', '0.5');
+                    const isRel = edge.dataset.edgeType === 'has_relationship';
+                    edge.setAttribute('stroke', isRel ? '#ef9a9a' : this.colors.edge);
+                    edge.setAttribute('stroke-width', isRel ? '1.2' : '1.5');
+                    edge.setAttribute('stroke-opacity', isRel ? '0.6' : '0.5');
                 }
                 for (const n of allNodes) {
                     n.style.opacity = '1';
                 }
             });
 
-            // Click to navigate
+            // Click to navigate or expand
             nodeEl.addEventListener('click', () => {
                 const type = nodeEl.dataset.nodeType;
                 const id = nodeEl.dataset.nodeId;
+
+                // Table nodes: toggle expand in full lineage view only
+                if (type === 'table' && this._isFullLineageView) {
+                    const tableName = id.replace('table:', '');
+                    const connCols = this._getConnectedColumns(tableName);
+                    if (connCols.length > 0) {
+                        // Save viewBox state
+                        const currentVB = svg.getAttribute('viewBox');
+                        if (this._expandedTables.has(tableName)) {
+                            this._expandedTables.delete(tableName);
+                        } else {
+                            this._expandedTables.add(tableName);
+                        }
+                        // Re-render full lineage, preserving viewBox
+                        this.renderFullLineage(container);
+                        if (currentVB) {
+                            const newSvg = container.querySelector('svg');
+                            if (newSvg) newSvg.setAttribute('viewBox', currentVB);
+                        }
+                        return;
+                    }
+                }
+
                 svg.dispatchEvent(new CustomEvent('lineage-navigate', {
                     bubbles: true,
                     detail: { type, id }

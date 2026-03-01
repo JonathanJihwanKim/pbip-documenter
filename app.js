@@ -1363,9 +1363,12 @@ class App {
                 document.getElementById('lineageFullView').classList.toggle('hidden', view !== 'full');
                 document.getElementById('lineageTraceView').classList.toggle('hidden', view !== 'trace');
                 document.getElementById('lineageImpactView').classList.toggle('hidden', view !== 'impact');
+                document.getElementById('lineageColumnImpactView').classList.toggle('hidden', view !== 'column-impact');
+                document.getElementById('lineageDetailPanel').classList.add('hidden');
                 if (view === 'full' && !this._lineageRendered) this._renderFullLineage();
                 if (view === 'trace') this._populateVisualSelect();
                 if (view === 'impact') this._populateMeasureSelect();
+                if (view === 'column-impact') this._populateTableSelect();
             });
 
             // Trace button
@@ -1387,6 +1390,26 @@ class App {
                 const container = document.getElementById('lineageImpactDiagram');
                 const renderer = new LineageDiagramRenderer(container, this.lineageEngine);
                 renderer.renderMeasureImpact(container, measureName);
+            });
+
+            // Column Impact button
+            document.getElementById('lineageColumnImpactBtn').addEventListener('click', () => {
+                const tableSel = document.getElementById('lineageTableSelect');
+                const colSel = document.getElementById('lineageColumnSelect');
+                if (!tableSel.value || !colSel.value) return;
+                const container = document.getElementById('lineageColumnImpactDiagram');
+                const renderer = new LineageDiagramRenderer(container, this.lineageEngine);
+                renderer.renderColumnImpact(container, tableSel.value, colSel.value);
+            });
+
+            // Table select cascade for Column Impact
+            document.getElementById('lineageTableSelect').addEventListener('change', (e) => {
+                this._populateColumnSelect(e.target.value);
+            });
+
+            // Lineage detail panel (single delegated listener for all diagrams)
+            document.getElementById('view-lineage').addEventListener('lineage-navigate', (e) => {
+                this._showLineageDetail(e.detail.type, e.detail.id);
             });
 
         }
@@ -1424,6 +1447,366 @@ class App {
                 const opt = document.createElement('option');
                 opt.value = measure.name;
                 opt.textContent = `${table.name}[${measure.name}]`;
+                sel.appendChild(opt);
+            }
+        }
+    }
+
+    // ── Lineage Detail Panel ──
+
+    _showLineageDetail(type, id) {
+        const panel = document.getElementById('lineageDetailPanel');
+        if (!panel) return;
+
+        const engine = this.lineageEngine;
+        const model = this.parsedModel;
+        if (!engine) return;
+
+        let html = '';
+        const esc = (s) => this._esc(s);
+
+        // Determine badge and name
+        let badgeClass = type;
+        let badgeLabel = type;
+        let name = id;
+
+        const node = engine.nodes.get(id);
+
+        if (type === 'table') {
+            const tableName = id.replace('table:', '');
+            badgeLabel = 'Table';
+            name = tableName;
+            const table = model.tables.find(t => t.name === tableName);
+
+            // Columns
+            let colHtml = '';
+            if (table && table.columns.length > 0) {
+                colHtml = '<div class="lineage-detail-section"><h4>Columns</h4><table><tr><th>Name</th><th>Type</th><th>Hidden</th></tr>';
+                for (const col of table.columns) {
+                    colHtml += `<tr><td>${esc(col.name)}</td><td>${esc(col.dataType || '—')}</td><td>${col.isHidden ? 'Yes' : ''}</td></tr>`;
+                }
+                colHtml += '</table></div>';
+            }
+
+            // Relationships
+            let relHtml = '';
+            const rels = (model.relationships || []).filter(r => r.fromTable === tableName || r.toTable === tableName);
+            if (rels.length > 0) {
+                relHtml = '<div class="lineage-detail-section"><h4>Relationships</h4><table><tr><th>From</th><th>To</th><th>Type</th></tr>';
+                for (const r of rels) {
+                    const card = [r.fromCardinality, r.toCardinality].filter(Boolean).join(':') || '—';
+                    relHtml += `<tr><td>${esc(r.fromTable)}[${esc(r.fromColumn)}]</td><td>${esc(r.toTable)}[${esc(r.toColumn)}]</td><td>${card}${r.isActive === false ? ' (inactive)' : ''}</td></tr>`;
+                }
+                relHtml += '</table></div>';
+            }
+
+            // Connected sources
+            let srcHtml = '';
+            const srcEdges = engine.edges.filter(e => e.from === id && e.type === 'connects_to_source');
+            if (srcEdges.length > 0) {
+                srcHtml = '<div class="lineage-detail-section"><h4>Data Sources</h4><div class="lineage-detail-chips">';
+                for (const e of srcEdges) {
+                    const sn = engine.nodes.get(e.to);
+                    if (sn) srcHtml += `<span class="lineage-detail-chip source">${esc(sn.name)}</span>`;
+                }
+                srcHtml += '</div></div>';
+            }
+
+            html = colHtml + relHtml + srcHtml;
+
+        } else if (type === 'measure') {
+            const parts = id.replace('measure:', '').split('.');
+            const tableName = parts[0];
+            const measureName = parts.slice(1).join('.');
+            badgeLabel = 'Measure';
+            name = `[${measureName}]`;
+
+            const table = model.tables.find(t => t.name === tableName);
+            const measure = table?.measures.find(m => m.name === measureName);
+
+            // DAX
+            if (measure?.expression) {
+                html += `<div class="lineage-detail-section"><h4>DAX Expression</h4><div class="lineage-detail-dax">${esc(measure.expression)}</div></div>`;
+            }
+
+            // Column refs
+            const refs = this.measureRefs?.[measureName];
+            if (refs?.columnRefs?.length > 0) {
+                html += '<div class="lineage-detail-section"><h4>Referenced Columns</h4><div class="lineage-detail-chips">';
+                for (const cr of refs.columnRefs) {
+                    html += `<span class="lineage-detail-chip column">${esc(cr.table)}[${esc(cr.column)}]</span>`;
+                }
+                html += '</div></div>';
+            }
+
+            // Measure dependencies
+            if (refs?.measureRefs?.length > 0) {
+                html += '<div class="lineage-detail-section"><h4>Depends On Measures</h4><div class="lineage-detail-chips">';
+                for (const mr of refs.measureRefs) {
+                    html += `<span class="lineage-detail-chip measure">[${esc(mr)}]</span>`;
+                }
+                html += '</div></div>';
+            }
+
+            // Visuals using it
+            const usageKey = `measure|${tableName}|${measureName}`;
+            const usage = this.visualData?.fieldUsageMap?.[usageKey];
+            if (usage && usage.length > 0) {
+                html += '<div class="lineage-detail-section"><h4>Used By Visuals</h4><div class="lineage-detail-chips">';
+                for (const u of usage) {
+                    html += `<span class="lineage-detail-chip visual">${esc(u.pageName)} — ${esc(u.visualName)}</span>`;
+                }
+                html += '</div></div>';
+            }
+
+        } else if (type === 'column') {
+            const parts = id.replace('column:', '').split('.');
+            const tableName = parts[0];
+            const colName = parts.slice(1).join('.');
+            badgeLabel = 'Column';
+            name = `${tableName}[${colName}]`;
+
+            const table = model.tables.find(t => t.name === tableName);
+            const col = table?.columns.find(c => c.name === colName);
+
+            if (col) {
+                html += `<div class="lineage-detail-section"><h4>Properties</h4><table>`;
+                html += `<tr><td><strong>Data Type</strong></td><td>${esc(col.dataType || '—')}</td></tr>`;
+                if (col.sourceColumn) html += `<tr><td><strong>Source Column</strong></td><td>${esc(col.sourceColumn)}</td></tr>`;
+                if (col.formatString) html += `<tr><td><strong>Format</strong></td><td>${esc(col.formatString)}</td></tr>`;
+                if (col.isHidden) html += `<tr><td><strong>Hidden</strong></td><td>Yes</td></tr>`;
+                html += '</table></div>';
+            }
+
+            // Measures referencing this column
+            const refMeasures = engine.edges.filter(e => e.type === 'references_column' && e.to === id);
+            if (refMeasures.length > 0) {
+                html += '<div class="lineage-detail-section"><h4>Referenced By Measures</h4><div class="lineage-detail-chips">';
+                for (const e of refMeasures) {
+                    const mn = engine.nodes.get(e.from);
+                    if (mn) html += `<span class="lineage-detail-chip measure">[${esc(mn.name)}]</span>`;
+                }
+                html += '</div></div>';
+            }
+
+            // Visuals using this column
+            const usageKey = `column|${tableName}|${colName}`;
+            const usage = this.visualData?.fieldUsageMap?.[usageKey];
+            if (usage && usage.length > 0) {
+                html += '<div class="lineage-detail-section"><h4>Used By Visuals</h4><div class="lineage-detail-chips">';
+                for (const u of usage) {
+                    html += `<span class="lineage-detail-chip visual">${esc(u.pageName)} — ${esc(u.visualName)}</span>`;
+                }
+                html += '</div></div>';
+            }
+
+            // Relationships involving this column
+            const rels = (model.relationships || []).filter(r =>
+                (r.fromTable === tableName && r.fromColumn === colName) ||
+                (r.toTable === tableName && r.toColumn === colName)
+            );
+            if (rels.length > 0) {
+                html += '<div class="lineage-detail-section"><h4>Relationships</h4><div class="lineage-detail-chips">';
+                for (const r of rels) {
+                    const card = [r.fromCardinality, r.toCardinality].filter(Boolean).join(':') || '';
+                    html += `<span class="lineage-detail-chip table">${esc(r.fromTable)}[${esc(r.fromColumn)}] → ${esc(r.toTable)}[${esc(r.toColumn)}] ${card}</span>`;
+                }
+                html += '</div></div>';
+            }
+
+        } else if (type === 'visual') {
+            const sepIdx = id.indexOf('|');
+            const pageName = id.substring(7, sepIdx); // skip 'visual:'
+            const visualName = id.substring(sepIdx + 1);
+            badgeLabel = 'Visual';
+            name = visualName;
+
+            if (node) {
+                html += `<div class="lineage-detail-section"><table>`;
+                html += `<tr><td><strong>Type</strong></td><td>${esc(node.visualType || '—')}</td></tr>`;
+                html += `<tr><td><strong>Page</strong></td><td>${esc(pageName)}</td></tr>`;
+                html += '</table></div>';
+            }
+
+            // Fields by projection role
+            const visual = this.visualData?.visuals.find(v => v.pageName === pageName && v.visualName === visualName);
+            if (visual?.fields?.length > 0) {
+                const byRole = {};
+                for (const f of visual.fields) {
+                    const role = f.projectionName || 'Other';
+                    if (!byRole[role]) byRole[role] = [];
+                    byRole[role].push(f);
+                }
+                html += '<div class="lineage-detail-section"><h4>Fields</h4>';
+                for (const [role, fields] of Object.entries(byRole)) {
+                    html += `<div style="margin-bottom:6px"><strong style="font-size:11px;color:var(--text-secondary)">${esc(role)}</strong><div class="lineage-detail-chips">`;
+                    for (const f of fields) {
+                        const chipClass = f.type === 'measure' ? 'measure' : 'column';
+                        const label = f.type === 'measure' ? `[${f.name}]` : `${f.table}[${f.name || f.column || f.hierarchy}]`;
+                        html += `<span class="lineage-detail-chip ${chipClass}">${esc(label)}</span>`;
+                    }
+                    html += '</div></div>';
+                }
+                html += '</div>';
+            }
+
+            // Lineage summary
+            const summary = engine.getLineageSummary(pageName, visualName);
+            if (summary) {
+                html += `<div class="lineage-detail-section"><h4>Lineage</h4><span style="font-size:12px">${esc(summary)}</span></div>`;
+            }
+
+        } else if (type === 'calcItem') {
+            const parts = id.replace('calcItem:', '').split('.');
+            const tableName = parts[0];
+            const itemName = parts.slice(1).join('.');
+            badgeLabel = 'Calc Item';
+            badgeClass = 'calcItem';
+            name = itemName;
+
+            const table = model.tables.find(t => t.name === tableName);
+            const item = table?.calculationGroup?.items?.find(i => i.name === itemName);
+
+            html += `<div class="lineage-detail-section"><table><tr><td><strong>Calculation Group</strong></td><td>${esc(tableName)}</td></tr></table></div>`;
+
+            if (item?.expression) {
+                html += `<div class="lineage-detail-section"><h4>DAX Expression</h4><div class="lineage-detail-dax">${esc(item.expression)}</div></div>`;
+            }
+
+            // Visuals using this calc group
+            const visualEdges = engine.edges.filter(e => e.type === 'uses_field' && e.to === id);
+            if (visualEdges.length > 0) {
+                html += '<div class="lineage-detail-section"><h4>Used By Visuals</h4><div class="lineage-detail-chips">';
+                for (const e of visualEdges) {
+                    const vn = engine.nodes.get(e.from);
+                    if (vn) html += `<span class="lineage-detail-chip visual">${esc(vn.pageName)} — ${esc(vn.name)}</span>`;
+                }
+                html += '</div></div>';
+            }
+
+            // Measures modified by this calc group (modifies_measure edges)
+            const modEdges = engine.edges.filter(e => e.type === 'modifies_measure' && e.from === id);
+            if (modEdges.length > 0) {
+                html += '<div class="lineage-detail-section"><h4>Modifies Measures</h4><div class="lineage-detail-chips">';
+                for (const e of modEdges) {
+                    const mn = engine.nodes.get(e.to);
+                    if (mn) html += `<span class="lineage-detail-chip measure">[${esc(mn.name)}]</span>`;
+                }
+                html += '</div></div>';
+            }
+
+        } else if (type === 'fpItem') {
+            badgeLabel = 'Field Param';
+            badgeClass = 'fpItem';
+            name = node?.name || id;
+
+            html += `<div class="lineage-detail-section"><table>`;
+            html += `<tr><td><strong>Field Parameter</strong></td><td>${esc(node?.sourceTable || '')}</td></tr>`;
+            html += `<tr><td><strong>NAMEOF Target</strong></td><td>${esc(node?.name || '')}</td></tr>`;
+            if (node?.targetType) html += `<tr><td><strong>Target Type</strong></td><td>${esc(node.targetType)}</td></tr>`;
+            html += '</table></div>';
+
+            if (node?.resolvedTables?.length > 0) {
+                html += '<div class="lineage-detail-section"><h4>Resolved Data Tables</h4><div class="lineage-detail-chips">';
+                for (const rt of node.resolvedTables) {
+                    html += `<span class="lineage-detail-chip table">${esc(rt)}</span>`;
+                }
+                html += '</div></div>';
+            }
+
+            // Visuals using this field param item
+            const visualEdges = engine.edges.filter(e => e.type === 'uses_field' && e.to === id);
+            if (visualEdges.length > 0) {
+                html += '<div class="lineage-detail-section"><h4>Used By Visuals</h4><div class="lineage-detail-chips">';
+                for (const e of visualEdges) {
+                    const vn = engine.nodes.get(e.from);
+                    if (vn) html += `<span class="lineage-detail-chip visual">${esc(vn.pageName)} — ${esc(vn.name)}</span>`;
+                }
+                html += '</div></div>';
+            }
+
+            // Resolved measure (resolves_to_measure edge)
+            const resolveEdges = engine.edges.filter(e => e.type === 'resolves_to_measure' && e.from === id);
+            if (resolveEdges.length > 0) {
+                html += '<div class="lineage-detail-section"><h4>Resolves To Measure</h4><div class="lineage-detail-chips">';
+                for (const e of resolveEdges) {
+                    const mn = engine.nodes.get(e.to);
+                    if (mn) html += `<span class="lineage-detail-chip measure">[${esc(mn.name)}]</span>`;
+                }
+                html += '</div></div>';
+            }
+
+        } else if (type === 'dataSource') {
+            badgeLabel = 'Data Source';
+            badgeClass = 'source';
+            name = node?.name || id;
+
+            if (node) {
+                html += '<div class="lineage-detail-section"><table>';
+                html += `<tr><td><strong>Type</strong></td><td>${esc(node.sourceType || node.type || '—')}</td></tr>`;
+                const server = node.serverResolved || node.server;
+                if (server) html += `<tr><td><strong>Server</strong></td><td>${esc(server)}</td></tr>`;
+                const db = node.databaseResolved || node.database;
+                if (db) html += `<tr><td><strong>Database</strong></td><td>${esc(db)}</td></tr>`;
+                if (node.url) html += `<tr><td><strong>URL</strong></td><td>${esc(node.url)}</td></tr>`;
+                html += '</table></div>';
+            }
+
+            // Connected tables
+            const tableEdges = engine.edges.filter(e => e.type === 'connects_to_source' && e.to === id);
+            if (tableEdges.length > 0) {
+                html += '<div class="lineage-detail-section"><h4>Connected Tables</h4><div class="lineage-detail-chips">';
+                for (const e of tableEdges) {
+                    const tn = engine.nodes.get(e.from);
+                    if (tn) html += `<span class="lineage-detail-chip table">${esc(tn.name)}</span>`;
+                }
+                html += '</div></div>';
+            }
+        }
+
+        // Remove old type classes
+        panel.className = 'lineage-detail-panel type-' + badgeClass;
+        panel.innerHTML = `
+            <button class="lineage-detail-close" title="Close">&times;</button>
+            <div class="lineage-detail-heading">
+                <span class="lineage-badge ${badgeClass}">${esc(badgeLabel)}</span>
+                <h3>${esc(name)}</h3>
+            </div>
+            ${html}
+        `;
+        panel.querySelector('.lineage-detail-close').addEventListener('click', () => {
+            panel.classList.add('hidden');
+        });
+        panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    // ── Column Impact Tab ──
+
+    _populateTableSelect() {
+        const sel = document.getElementById('lineageTableSelect');
+        if (sel.options.length > 0) return;
+        const tables = new Set();
+        for (const [, node] of this.lineageEngine.nodes) {
+            if (node.type === 'column') tables.add(node.table);
+        }
+        for (const t of [...tables].sort()) {
+            const opt = document.createElement('option');
+            opt.value = t;
+            opt.textContent = t;
+            sel.appendChild(opt);
+        }
+        // Populate columns for first table
+        if (sel.options.length > 0) this._populateColumnSelect(sel.value);
+    }
+
+    _populateColumnSelect(tableName) {
+        const sel = document.getElementById('lineageColumnSelect');
+        sel.innerHTML = '';
+        for (const [, node] of this.lineageEngine.nodes) {
+            if (node.type === 'column' && node.table === tableName) {
+                const opt = document.createElement('option');
+                opt.value = node.name;
+                opt.textContent = node.name;
                 sel.appendChild(opt);
             }
         }

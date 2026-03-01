@@ -401,6 +401,7 @@
                         <button type="button" class="view-toggle-btn active" data-view="full">Full Lineage</button>
                         <button type="button" class="view-toggle-btn" data-view="trace">Visual Trace</button>
                         <button type="button" class="view-toggle-btn" data-view="impact">Impact Analysis</button>
+                        <button type="button" class="view-toggle-btn" data-view="column-impact">Column Impact</button>
                     </div>
                     <div id="lineageFullView">
                         <div id="lineageDiagramContainer" class="lineage-diagram-container diagram-interactive"></div>
@@ -427,6 +428,20 @@
                         </div>
                         <div id="lineageImpactDiagram" class="lineage-diagram-container diagram-interactive"></div>
                     </div>
+                    <div id="lineageColumnImpactView" class="hidden">
+                        <div class="lineage-select-row">
+                            <label for="lineageTableSelect">Table:</label>
+                            <select id="lineageTableSelect" class="lineage-select"></select>
+                            <label for="lineageColumnSelect">Column:</label>
+                            <select id="lineageColumnSelect" class="lineage-select"></select>
+                            <button type="button" id="lineageColumnImpactBtn" class="btn-trace-lineage">
+                                <span class="material-symbols-outlined" style="font-size:16px">hub</span>
+                                Show Column Impact
+                            </button>
+                        </div>
+                        <div id="lineageColumnImpactDiagram" class="lineage-diagram-container diagram-interactive"></div>
+                    </div>
+                    <div id="lineageDetailPanel" class="lineage-detail-panel hidden"></div>
                 </div>
 
                 <!-- Data Sources -->
@@ -535,8 +550,8 @@
     <script src="tmdl-parser.js"></script>
     <script src="visual-parser.js"></script>
     <script src="m-parser.js"></script>
-    <script src="lineage-engine.js?v=20260228e"></script>
-    <script src="lineage-diagram.js?v=20260228e"></script>
+    <script src="lineage-engine.js?v=20260301a"></script>
+    <script src="lineage-diagram.js?v=20260301a"></script>
     <script src="doc-generator.js"></script>
     <script src="diagram.js"></script>
     <script src="app.js"></script>
