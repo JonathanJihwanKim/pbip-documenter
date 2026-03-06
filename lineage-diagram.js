@@ -36,6 +36,7 @@ class LineageDiagramRenderer {
         };
         this._cleanupFn = null;
         this._expandedTables = new Set();
+        this._expandedPages = new Set();
     }
 
     /**
@@ -363,7 +364,7 @@ class LineageDiagramRenderer {
         const sourceItems = [];
         const tableItems = [];
         const measureColumnItems = [];
-        const visualItems = [];
+        const rawVisualItems = [];
 
         for (const [id, node] of engine.nodes) {
             switch (node.type) {
@@ -412,12 +413,57 @@ class LineageDiagramRenderer {
                     });
                     break;
                 case 'visual':
-                    visualItems.push({
+                    rawVisualItems.push({
                         id, name: node.name, type: 'visual',
-                        detail: node.pageName
+                        detail: node.visualType || node.pageName,
+                        pageName: node.pageName
                     });
                     break;
             }
+        }
+
+        // Issue 14: Inject placeholders for empty columns
+        if (sourceItems.length === 0) {
+            sourceItems.push({
+                id: 'placeholder:noSources', name: 'No data sources detected',
+                type: 'placeholder', detail: 'Calculated / DirectQuery',
+                _isPlaceholder: true
+            });
+        }
+
+        // Issue 15: Group visuals by page with expandable hierarchy
+        const visualItems = [];
+        if (rawVisualItems.length > 0) {
+            const pageMap = new Map();
+            for (const v of rawVisualItems) {
+                const page = v.pageName || 'Unknown Page';
+                if (!pageMap.has(page)) pageMap.set(page, []);
+                pageMap.get(page).push(v);
+            }
+            for (const [pageName, pageVisuals] of pageMap) {
+                const isExpanded = this._expandedPages.has(pageName);
+                visualItems.push({
+                    id: `page:${pageName}`, name: pageName, type: 'pageHeader',
+                    detail: `${pageVisuals.length} visual${pageVisuals.length !== 1 ? 's' : ''}`,
+                    isPageHeader: true, expandable: true, expanded: isExpanded,
+                    pageName, visualCount: pageVisuals.length
+                });
+                if (isExpanded) {
+                    for (const v of pageVisuals) {
+                        visualItems.push({
+                            ...v, isSubItem: true, parentPage: pageName
+                        });
+                    }
+                }
+            }
+        } else {
+            // Issue 14: Placeholder for empty visuals
+            const reason = engine.visualData ? 'No visuals in report' : 'No report folder loaded';
+            visualItems.push({
+                id: 'placeholder:noVisuals', name: reason,
+                type: 'placeholder', detail: 'Select project root folder',
+                _isPlaceholder: true
+            });
         }
 
         return [
@@ -444,16 +490,9 @@ class LineageDiagramRenderer {
         const colPositions = [];
 
         for (const col of columns) {
-            if (col.items.length === 0) {
-                col._visibleCount = 0;
-                col._overflow = 0;
-                colPositions.push({ x: -1, items: [] });
-                continue;
-            }
-
             const visibleCount = Math.min(col.items.length, MAX_VISIBLE);
             col._visibleCount = visibleCount;
-            col._overflow = col.items.length - visibleCount;
+            col._overflow = Math.max(0, col.items.length - visibleCount);
 
             colPositions.push({ x, items: [] });
             let y = padding + titleHeight + headerHeight;
@@ -511,19 +550,20 @@ class LineageDiagramRenderer {
         let x = layout.padding;
         for (let ci = 0; ci < columns.length; ci++) {
             const col = columns[ci];
-            if (col.items.length === 0) {
-                continue;
-            }
+
+            // Count real (non-placeholder) items for header display
+            const realCount = col.items.filter(i => !i._isPlaceholder).length;
+            const isEmpty = realCount === 0;
 
             // Column header
             const headerY = layout.padding + layout.titleHeight;
             const headerG = document.createElementNS(this.SVG_NS, 'g');
 
             headerG.appendChild(this._createRect(x, headerY, layout.colWidth, 32, {
-                fill: col.color, rx: '4'
+                fill: isEmpty ? '#bdbdbd' : col.color, rx: '4'
             }));
             headerG.appendChild(this._createText(
-                `${col.label} (${col.items.length})`,
+                `${col.label} (${realCount})`,
                 x + layout.colWidth / 2, headerY + 21,
                 { fontSize: '12px', fontWeight: '600', fill: this.colors.textWhite, textAnchor: 'middle' }
             ));
@@ -562,6 +602,59 @@ class LineageDiagramRenderer {
         g.dataset.nodeId = item.id;
         g.dataset.nodeType = item.type;
 
+        // Placeholder nodes (Issue 14)
+        if (item._isPlaceholder) {
+            const rect = this._createRect(item._x, item._y, item._w, item._h, {
+                fill: '#f5f5f5', stroke: '#bdbdbd', strokeWidth: '1', rx: '4'
+            });
+            rect.setAttribute('stroke-dasharray', '6 3');
+            g.appendChild(rect);
+            g.appendChild(this._createText(
+                this._truncate(item.name, 22), item._x + 8, item._y + 16,
+                { fontSize: '11px', fontWeight: '500', fill: '#9e9e9e' }
+            ));
+            if (item.detail) {
+                g.appendChild(this._createText(
+                    this._truncate(item.detail, 26), item._x + 8, item._y + 28,
+                    { fontSize: '10px', fill: '#bdbdbd' }
+                ));
+            }
+            svg.appendChild(g);
+            return;
+        }
+
+        // Page header nodes (Issue 15)
+        if (item.isPageHeader) {
+            color = this.colors.visual;
+            bgColor = '#ede7f6';
+            g.appendChild(this._createRect(item._x, item._y, item._w, item._h, {
+                fill: bgColor, stroke: color, strokeWidth: '2', rx: '4'
+            }));
+            g.appendChild(this._createText(
+                this._truncate(item.name, 17), item._x + 8, item._y + 16,
+                { fontSize: '12px', fontWeight: '700', fill: this.colors.text }
+            ));
+            g.appendChild(this._createText(
+                item.detail, item._x + 8, item._y + 28,
+                { fontSize: '10px', fill: this.colors.textLight }
+            ));
+            const indicator = this._createText(
+                item.expanded ? '\u25BC' : '\u25B6',
+                item._x + item._w - 22, item._y + 16,
+                { fontSize: '10px', fill: this.colors.textLight }
+            );
+            indicator.classList.add('lineage-node-expand-indicator');
+            g.appendChild(indicator);
+            const dot = document.createElementNS(this.SVG_NS, 'circle');
+            dot.setAttribute('cx', item._x + item._w - 10);
+            dot.setAttribute('cy', item._y + item._h / 2);
+            dot.setAttribute('r', 4);
+            dot.setAttribute('fill', color);
+            g.appendChild(dot);
+            svg.appendChild(g);
+            return;
+        }
+
         // Override colors for calc group and field parameter items
         if (item.type === 'calcItem') {
             color = this.colors.calcGroup;
@@ -572,6 +665,9 @@ class LineageDiagramRenderer {
         } else if (item.isSubItem && item.type === 'column') {
             color = this.colors.column;
             bgColor = this.colors.columnBg;
+        } else if (item.isSubItem && item.type === 'visual') {
+            color = this.colors.visual;
+            bgColor = this.colors.visualBg;
         }
 
         // Background rect
@@ -655,6 +751,7 @@ class LineageDiagramRenderer {
             const fromItem = posMap.get(edge.from);
             const toItem = posMap.get(edge.to);
             if (!fromItem || !toItem) continue;
+            if (fromItem._isPlaceholder || toItem._isPlaceholder) continue;
 
             // Skip intra-column edges (belongs_to_table, has_relationship within same column)
             if (edge.type === 'belongs_to_table') continue;
@@ -1023,19 +1120,20 @@ class LineageDiagramRenderer {
                 const type = nodeEl.dataset.nodeType;
                 const id = nodeEl.dataset.nodeId;
 
+                // Placeholder nodes: no interaction
+                if (type === 'placeholder') return;
+
                 // Table nodes: toggle expand in full lineage view only
                 if (type === 'table' && this._isFullLineageView) {
                     const tableName = id.replace('table:', '');
                     const connCols = this._getConnectedColumns(tableName);
                     if (connCols.length > 0) {
-                        // Save viewBox state
                         const currentVB = svg.getAttribute('viewBox');
                         if (this._expandedTables.has(tableName)) {
                             this._expandedTables.delete(tableName);
                         } else {
                             this._expandedTables.add(tableName);
                         }
-                        // Re-render full lineage, preserving viewBox
                         this.renderFullLineage(container);
                         if (currentVB) {
                             const newSvg = container.querySelector('svg');
@@ -1045,13 +1143,30 @@ class LineageDiagramRenderer {
                     }
                 }
 
+                // Page header nodes: toggle expand in full lineage view only
+                if (type === 'pageHeader' && this._isFullLineageView) {
+                    const pageName = id.replace('page:', '');
+                    const currentVB = svg.getAttribute('viewBox');
+                    if (this._expandedPages.has(pageName)) {
+                        this._expandedPages.delete(pageName);
+                    } else {
+                        this._expandedPages.add(pageName);
+                    }
+                    this.renderFullLineage(container);
+                    if (currentVB) {
+                        const newSvg = container.querySelector('svg');
+                        if (newSvg) newSvg.setAttribute('viewBox', currentVB);
+                    }
+                    return;
+                }
+
                 svg.dispatchEvent(new CustomEvent('lineage-navigate', {
                     bubbles: true,
                     detail: { type, id }
                 }));
             });
 
-            nodeEl.style.cursor = 'pointer';
+            nodeEl.style.cursor = nodeEl.dataset.nodeType === 'placeholder' ? 'default' : 'pointer';
         }
 
         this._cleanupFn = () => {
