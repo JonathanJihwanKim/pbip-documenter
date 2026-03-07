@@ -593,6 +593,49 @@ class LineageDiagramRenderer {
             this._drawFullLineageEdges(svg, layout, columns);
         }
 
+        // Legend for edge types
+        const hasFP = columns.some(c => c.items.some(i => i.type === 'fpItem'));
+        const hasCG = columns.some(c => c.items.some(i => i.type === 'calcItem'));
+        if (hasFP || hasCG) {
+            const legendY = layout.height - 24;
+            let lx = layout.padding;
+            const legendG = document.createElementNS(this.SVG_NS, 'g');
+            legendG.classList.add('lineage-legend');
+
+            // Static edge
+            const staticLine = document.createElementNS(this.SVG_NS, 'line');
+            staticLine.setAttribute('x1', lx); staticLine.setAttribute('y1', legendY);
+            staticLine.setAttribute('x2', lx + 24); staticLine.setAttribute('y2', legendY);
+            staticLine.setAttribute('stroke', this.colors.edge); staticLine.setAttribute('stroke-width', '1.5');
+            staticLine.setAttribute('stroke-opacity', '0.5');
+            legendG.appendChild(staticLine);
+            legendG.appendChild(this._createText('Static', lx + 28, legendY + 4, { fontSize: '10px', fill: this.colors.textLight }));
+            lx += 72;
+
+            if (hasFP) {
+                const fpLine = document.createElementNS(this.SVG_NS, 'line');
+                fpLine.setAttribute('x1', lx); fpLine.setAttribute('y1', legendY);
+                fpLine.setAttribute('x2', lx + 24); fpLine.setAttribute('y2', legendY);
+                fpLine.setAttribute('stroke', '#7b1fa2'); fpLine.setAttribute('stroke-width', '1.5');
+                fpLine.setAttribute('stroke-dasharray', '5,3'); fpLine.setAttribute('stroke-opacity', '0.6');
+                legendG.appendChild(fpLine);
+                legendG.appendChild(this._createText('Field Param', lx + 28, legendY + 4, { fontSize: '10px', fill: '#7b1fa2' }));
+                lx += 100;
+            }
+
+            if (hasCG) {
+                const cgLine = document.createElementNS(this.SVG_NS, 'line');
+                cgLine.setAttribute('x1', lx); cgLine.setAttribute('y1', legendY);
+                cgLine.setAttribute('x2', lx + 24); cgLine.setAttribute('y2', legendY);
+                cgLine.setAttribute('stroke', '#f9a825'); cgLine.setAttribute('stroke-width', '1.5');
+                cgLine.setAttribute('stroke-dasharray', '6,3');
+                legendG.appendChild(cgLine);
+                legendG.appendChild(this._createText('Calc Group', lx + 28, legendY + 4, { fontSize: '10px', fill: '#f57f17' }));
+            }
+
+            svg.appendChild(legendG);
+        }
+
         return svg;
     }
 
@@ -989,6 +1032,13 @@ class LineageDiagramRenderer {
             path.setAttribute('stroke', '#f9a825');
             path.setAttribute('stroke-dasharray', '6,3');
             path.setAttribute('stroke-width', '1.5');
+        }
+
+        // Style fpItem edges as dashed purple
+        if (fromItem.type === 'fpItem' || toItem.type === 'fpItem') {
+            path.setAttribute('stroke', '#7b1fa2');
+            path.setAttribute('stroke-dasharray', '5,3');
+            path.setAttribute('stroke-opacity', '0.6');
         }
 
         // Insert edges before nodes so they render behind

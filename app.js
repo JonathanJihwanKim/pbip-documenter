@@ -193,7 +193,7 @@ class App {
     }
 
     _trackMilestone(section) {
-        const HIGH_VALUE = ['relationships', 'lineage', 'visual-usage', 'table-detail', 'data-sources'];
+        const HIGH_VALUE = ['relationships', 'lineage', 'visual-usage', 'table-detail', 'data-sources', 'dynamic-features'];
         if (!HIGH_VALUE.includes(section)) return;
         if (sessionStorage.getItem('pbip-doc-milestone-dismissed')) return;
 
@@ -202,6 +202,27 @@ class App {
             visited.push(section);
             sessionStorage.setItem('pbip-doc-milestones', JSON.stringify(visited));
         }
+
+        // Value-moment prompt for Dynamic Features (first visit only)
+        if (section === 'dynamic-features' && !sessionStorage.getItem('pbip-doc-dynamic-prompt-shown')) {
+            const summary = this._getDynamicFeaturesSummary();
+            if (summary.total > 0) {
+                sessionStorage.setItem('pbip-doc-dynamic-prompt-shown', '1');
+                const contentEl = document.getElementById('dynamicFeaturesContent');
+                if (contentEl && !contentEl.querySelector('.value-moment-prompt')) {
+                    const prompt = document.createElement('div');
+                    prompt.className = 'value-moment-prompt';
+                    prompt.innerHTML = `<span class="material-symbols-outlined" style="font-size:16px;color:var(--accent)">auto_awesome</span>
+                        <span>PBIP Documenter just revealed <strong>${summary.total} hidden dynamic feature${summary.total !== 1 ? 's' : ''}</strong> that raw PBIR JSON doesn't show. Built by one developer.
+                        <a href="https://buymeacoffee.com/jihwankim?o=dynamic-value" target="_blank">Buy a coffee</a> or
+                        <a href="https://github.com/sponsors/JonathanJihwanKim?o=dynamic-value" target="_blank">sponsor on GitHub</a>.</span>
+                        <button type="button" class="value-moment-close" title="Dismiss">&times;</button>`;
+                    contentEl.insertBefore(prompt, contentEl.firstChild);
+                    prompt.querySelector('.value-moment-close').addEventListener('click', () => prompt.remove());
+                }
+            }
+        }
+
         if (visited.length >= 3 && !document.querySelector('.milestone-banner')) {
             const mc = document.getElementById('mainContent');
             if (!mc) return;
@@ -530,7 +551,13 @@ class App {
                     const totalVisuals = this.visualData?.visuals?.length || 0;
                     const bannerText = document.getElementById('sponsorBannerText');
                     if (bannerText) {
-                        bannerText.innerHTML = `Documented <strong>${totalMeasures} measure${totalMeasures !== 1 ? 's' : ''}</strong> across <strong>${totalTables} table${totalTables !== 1 ? 's' : ''}</strong>${totalVisuals ? ` and <strong>${totalVisuals} visual${totalVisuals !== 1 ? 's' : ''}</strong>` : ''}. Built by Jihwan Kim (Microsoft MVP). If this saved you time, consider <a href="https://github.com/sponsors/JonathanJihwanKim?o=banner" target="_blank">sponsoring</a> or <a href="https://buymeacoffee.com/jihwankim?o=banner" target="_blank">buying a coffee</a>.`;
+                        const dynSummary = this._getDynamicFeaturesSummary();
+                        let bannerMsg = `Documented <strong>${totalMeasures} measure${totalMeasures !== 1 ? 's' : ''}</strong> across <strong>${totalTables} table${totalTables !== 1 ? 's' : ''}</strong>${totalVisuals ? ` and <strong>${totalVisuals} visual${totalVisuals !== 1 ? 's' : ''}</strong>` : ''}`;
+                        if (dynSummary.total > 0) {
+                            bannerMsg += ` — including <strong>${dynSummary.total} dynamic feature${dynSummary.total !== 1 ? 's' : ''}</strong> hidden from PBIR JSON`;
+                        }
+                        bannerMsg += `. Built by Jihwan Kim (Microsoft MVP). <a href="https://github.com/sponsors/JonathanJihwanKim?o=banner" target="_blank">Sponsor</a> or <a href="https://buymeacoffee.com/jihwankim?o=banner" target="_blank">buy a coffee</a>.`;
+                        bannerText.innerHTML = bannerMsg;
                     }
                     banner.classList.remove('hidden');
                     document.getElementById('sponsorBannerClose').addEventListener('click', () => {
@@ -682,7 +709,13 @@ class App {
                 const totalVisuals = this.visualData?.visuals?.length || 0;
                 const bannerText = document.getElementById('sponsorBannerText');
                 if (bannerText) {
-                    bannerText.innerHTML = `This live demo documents <strong>${totalMeasures} measure${totalMeasures !== 1 ? 's' : ''}</strong> across <strong>${totalTables} table${totalTables !== 1 ? 's' : ''}</strong> and <strong>${totalVisuals} visual${totalVisuals !== 1 ? 's' : ''}</strong> — all in your browser. Built by Jihwan Kim (Microsoft MVP). If you find it useful, consider <a href="https://github.com/sponsors/JonathanJihwanKim?o=demo" target="_blank">sponsoring</a> or <a href="https://buymeacoffee.com/jihwankim?o=demo" target="_blank">buying a coffee</a>.`;
+                    const dynSummary = this._getDynamicFeaturesSummary();
+                    let demoMsg = `This live demo documents <strong>${totalMeasures} measure${totalMeasures !== 1 ? 's' : ''}</strong> across <strong>${totalTables} table${totalTables !== 1 ? 's' : ''}</strong> and <strong>${totalVisuals} visual${totalVisuals !== 1 ? 's' : ''}</strong>`;
+                    if (dynSummary.total > 0) {
+                        demoMsg += ` — revealing <strong>${dynSummary.total} dynamic feature${dynSummary.total !== 1 ? 's' : ''}</strong> hidden from PBIR JSON`;
+                    }
+                    demoMsg += `. Built by Jihwan Kim (Microsoft MVP). <a href="https://github.com/sponsors/JonathanJihwanKim?o=demo" target="_blank">Sponsor</a> or <a href="https://buymeacoffee.com/jihwankim?o=demo" target="_blank">buy a coffee</a>.`;
+                    bannerText.innerHTML = demoMsg;
                 }
                 banner.classList.remove('hidden');
                 document.getElementById('sponsorBannerClose').addEventListener('click', () => {
@@ -925,6 +958,11 @@ class App {
         document.getElementById('sidebarLineageSection').classList.toggle('hidden', !this.lineageEngine);
         document.getElementById('sidebarDataSourcesSection').classList.toggle('hidden', dataSources.length === 0);
         document.getElementById('sidebarDataSourceCount').textContent = dataSources.length;
+
+        // Dynamic features section
+        const dynamicSummary = this._getDynamicFeaturesSummary();
+        document.getElementById('sidebarDynamicSection').classList.toggle('hidden', dynamicSummary.total === 0);
+        document.getElementById('sidebarDynamicCount').textContent = dynamicSummary.total;
     }
 
     filterSidebar(query) {
@@ -1029,6 +1067,7 @@ class App {
         if (section === 'visual-usage') this.renderVisualUsageView();
         if (section === 'lineage') this.renderLineageView();
         if (section === 'data-sources') this.renderDataSourcesView();
+        if (section === 'dynamic-features') this.renderDynamicFeaturesView();
 
         // Milestone tracking for sponsor prompt
         this._trackMilestone(section);
@@ -1211,6 +1250,82 @@ class App {
         }
         html += '</table>';
 
+        // Model Insights cards (only when dynamic features or broken refs exist)
+        const dynamicSummary = this._getDynamicFeaturesSummary();
+        const brokenRefs = this.lineageEngine?.brokenRefs || [];
+        if (dynamicSummary.total > 0 || brokenRefs.length > 0) {
+            html += '<h3>Model Insights</h3>';
+            html += '<div class="insights-grid">';
+
+            if (dynamicSummary.fieldParams.length > 0) {
+                const totalFpFields = dynamicSummary.fieldParams.reduce((s, fp) => s + fp.items.length, 0);
+                html += `<div class="insight-card insight-card-fp" data-nav-section="dynamic-features">
+                    <span class="material-symbols-outlined insight-card-icon">tune</span>
+                    <div class="insight-card-text">
+                        <strong>${dynamicSummary.fieldParams.length} Field Parameter${dynamicSummary.fieldParams.length !== 1 ? 's' : ''}</strong>
+                        Visuals have hidden flexibility — ${totalFpFields} switchable field${totalFpFields !== 1 ? 's' : ''} not shown in JSON.
+                    </div>
+                </div>`;
+            }
+
+            if (dynamicSummary.calcGroups.length > 0) {
+                const totalCgItems = dynamicSummary.calcGroups.reduce((s, cg) => s + cg.items.length, 0);
+                html += `<div class="insight-card insight-card-cg" data-nav-section="dynamic-features">
+                    <span class="material-symbols-outlined insight-card-icon">calculate</span>
+                    <div class="insight-card-text">
+                        <strong>${dynamicSummary.calcGroups.length} Calculation Group${dynamicSummary.calcGroups.length !== 1 ? 's' : ''}</strong>
+                        ${totalCgItems} DAX transformation${totalCgItems !== 1 ? 's' : ''} dynamically modify co-visual measures.
+                    </div>
+                </div>`;
+            }
+
+            if (brokenRefs.length > 0) {
+                html += `<div class="insight-card insight-card-broken">
+                    <span class="material-symbols-outlined insight-card-icon">error</span>
+                    <div class="insight-card-text">
+                        <strong>${brokenRefs.length} Broken Reference${brokenRefs.length !== 1 ? 's' : ''}</strong>
+                        Some visuals reference fields that don't exist in the semantic model.
+                    </div>
+                </div>`;
+            }
+
+            html += '</div>';
+
+            // Before/After comparison widget
+            if (dynamicSummary.fieldParams.length > 0) {
+                const fp = dynamicSummary.fieldParams[0];
+                const fpRef = `${fp.table}[${fp.table}]`;
+                const fpReality = fp.items.map(i => `'${i.table}'[${i.column}]`).join(', ');
+                html += `<details class="before-after-widget">
+                    <summary><span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle">compare</span> What PBIR JSON hides vs. what this tool reveals</summary>
+                    <div class="before-after-grid">
+                        <div class="before-after-col before-col">
+                            <h4>Raw PBIR JSON</h4>
+                            <pre class="before-after-code">{ "Column": {
+    "Expression": {
+      "SourceRef": { "Entity": "${this._esc(fp.table)}" }
+    },
+    "Property": "${this._esc(fp.table)}"
+  }
+}</pre>
+                            <p class="before-after-note">Looks like an ordinary column reference. No indication this is a field parameter with ${fp.items.length} switchable fields.</p>
+                        </div>
+                        <div class="before-after-col after-col">
+                            <h4>PBIP Documenter</h4>
+                            <div class="before-after-reveal">
+                                <span class="badge badge-field-param">Field Parameter</span>
+                                <strong>'${this._esc(fp.table)}'</strong> — ${fp.items.length} available fields:
+                                <div class="fp-items-list" style="margin-top:6px">
+                                    ${fp.items.map(i => `<span class="fp-item-chip">'${this._esc(i.table)}'[${this._esc(i.column)}]</span>`).join('')}
+                                </div>
+                            </div>
+                            <p class="before-after-note">The full dynamic capability is revealed by cross-referencing the semantic model's TMDL definitions.</p>
+                        </div>
+                    </div>
+                </details>`;
+            }
+        }
+
         document.getElementById('overviewContent').innerHTML = html;
 
         // Bind table links
@@ -1218,6 +1333,13 @@ class App {
             link.addEventListener('click', e => {
                 e.preventDefault();
                 this.showTableDetail(link.dataset.table);
+            });
+        });
+
+        // Bind insight card navigation
+        document.querySelectorAll('.insight-card[data-nav-section]').forEach(card => {
+            card.addEventListener('click', () => {
+                this.showSection(card.dataset.navSection);
             });
         });
     }
@@ -1885,6 +2007,176 @@ class App {
         content.innerHTML = html;
     }
 
+    // ──────────────────────────────────────────────
+    // DYNAMIC FEATURES VIEW
+    // ──────────────────────────────────────────────
+
+    _getDynamicFeaturesSummary() {
+        if (!this.parsedModel || !this.docGenerator) return { fieldParams: [], calcGroups: [], total: 0 };
+        const fieldParams = [];
+        const calcGroups = [];
+        for (const table of this.parsedModel.tables) {
+            const fpItems = this.docGenerator._getFieldParameterItems(table.name);
+            if (fpItems !== null) {
+                // Find which visuals reference this FP table
+                const visuals = [];
+                if (this.visualData) {
+                    for (const page of this.visualData.pages) {
+                        for (const v of page.visuals) {
+                            if (v.fields && v.fields.some(f => (f.table || f.entity) === table.name)) {
+                                visuals.push({ name: v.visualName || v.visualType, page: page.displayName });
+                            }
+                        }
+                    }
+                }
+                fieldParams.push({ table: table.name, items: fpItems, visuals });
+            }
+            const cgItems = this.docGenerator._getCalculationGroupItems(table.name);
+            if (cgItems !== null) {
+                // Find which visuals reference this CG table
+                const visuals = [];
+                if (this.visualData) {
+                    for (const page of this.visualData.pages) {
+                        for (const v of page.visuals) {
+                            if (v.fields && v.fields.some(f => (f.table || f.entity) === table.name)) {
+                                visuals.push({ name: v.visualName || v.visualType, page: page.displayName });
+                            }
+                        }
+                    }
+                }
+                // Find which measures are modified by this calc group
+                const modifiedMeasures = [];
+                if (this.lineageEngine) {
+                    const graph = this.lineageEngine.graph;
+                    if (graph) {
+                        for (const edge of (graph.edges || [])) {
+                            if (edge.type === 'modifies_measure' && edge.source && edge.source.startsWith('calcItem:' + table.name + '.')) {
+                                const measureId = edge.target;
+                                if (measureId) modifiedMeasures.push(measureId.replace('measure:', ''));
+                            }
+                        }
+                    }
+                }
+                calcGroups.push({
+                    table: table.name,
+                    items: cgItems,
+                    precedence: table.calculationGroup?.precedence,
+                    visuals,
+                    modifiedMeasures
+                });
+            }
+        }
+        return { fieldParams, calcGroups, total: fieldParams.length + calcGroups.length };
+    }
+
+    renderDynamicFeaturesView() {
+        const content = document.getElementById('dynamicFeaturesContent');
+        const summary = this._getDynamicFeaturesSummary();
+
+        if (summary.total === 0) {
+            content.innerHTML = '<p class="placeholder">No dynamic features detected in this model. Field parameters and calculation groups will appear here when present.</p>';
+            return;
+        }
+
+        let html = `<div class="dynamic-summary-header">
+            <span class="dynamic-count">${summary.fieldParams.length} field parameter${summary.fieldParams.length !== 1 ? 's' : ''}</span>
+            <span class="dynamic-sep">&bull;</span>
+            <span class="dynamic-count">${summary.calcGroups.length} calculation group${summary.calcGroups.length !== 1 ? 's' : ''}</span>
+        </div>`;
+
+        // Field Parameters
+        for (const fp of summary.fieldParams) {
+            html += `<div class="dynamic-card dynamic-card-fp">
+                <div class="dynamic-card-header">
+                    <span class="material-symbols-outlined dynamic-card-icon">tune</span>
+                    <h3>'${this._esc(fp.table)}'</h3>
+                    <span class="badge badge-field-param">Field Parameter</span>
+                </div>
+                <div class="dynamic-card-insight">
+                    <span class="material-symbols-outlined" style="font-size:16px;color:#e65100">visibility_off</span>
+                    <span><strong>What PBIR hides:</strong> JSON only stores the last-saved selection. In reality, this visual dynamically switches between <strong>${fp.items.length} field${fp.items.length !== 1 ? 's' : ''}</strong>.</span>
+                </div>
+                <div class="dynamic-card-section">
+                    <h4>Available Fields</h4>
+                    <div class="fp-items-list">`;
+            for (const item of fp.items) {
+                html += `<span class="fp-item-chip">'${this._esc(item.table)}'[${this._esc(item.column)}]</span>`;
+            }
+            html += `</div></div>`;
+
+            if (fp.visuals.length > 0) {
+                html += `<div class="dynamic-card-section">
+                    <h4>Used by ${fp.visuals.length} Visual${fp.visuals.length !== 1 ? 's' : ''}</h4>
+                    <div class="dynamic-visual-list">`;
+                for (const v of fp.visuals) {
+                    html += `<span class="dynamic-visual-chip"><span class="material-symbols-outlined" style="font-size:12px">bar_chart</span> ${this._esc(v.name)} <span class="dynamic-visual-page">${this._esc(v.page)}</span></span>`;
+                }
+                html += `</div></div>`;
+            }
+            html += `</div>`;
+        }
+
+        // Calculation Groups
+        for (const cg of summary.calcGroups) {
+            html += `<div class="dynamic-card dynamic-card-cg">
+                <div class="dynamic-card-header">
+                    <span class="material-symbols-outlined dynamic-card-icon">calculate</span>
+                    <h3>'${this._esc(cg.table)}'</h3>
+                    <span class="badge badge-calc">Calc Group</span>
+                    ${cg.precedence != null ? `<span class="badge badge-mode">Precedence: ${cg.precedence}</span>` : ''}
+                </div>
+                <div class="dynamic-card-insight">
+                    <span class="material-symbols-outlined" style="font-size:16px;color:#e65100">visibility_off</span>
+                    <span><strong>What PBIR hides:</strong> This column appears as an ordinary reference in JSON. In reality, it's a calculation group with <strong>${cg.items.length} DAX transformation${cg.items.length !== 1 ? 's' : ''}</strong> that modify every co-visual measure.</span>
+                </div>
+                <div class="dynamic-card-section">
+                    <h4>Calculation Items</h4>
+                    <div class="calc-items-list" style="flex-direction:column;gap:6px">`;
+            const sortedItems = [...cg.items].sort((a, b) => (a.ordinal ?? 999) - (b.ordinal ?? 999));
+            for (const item of sortedItems) {
+                html += `<div class="cg-item">
+                    <span class="fp-item-chip">${this._esc(item.name)}</span>`;
+                if (/\bSELECTEDMEASURE\s*\(/i.test(item.expression || '')) {
+                    html += `<span class="badge badge-calc" style="font-size:9px">SELECTEDMEASURE</span>`;
+                }
+                if (item.expression) {
+                    html += `<details class="cg-expr-detail"><summary>Expression</summary><pre class="cg-expr-code">${this._esc(item.expression)}</pre></details>`;
+                }
+                html += `</div>`;
+            }
+            html += `</div></div>`;
+
+            if (cg.modifiedMeasures.length > 0) {
+                html += `<div class="dynamic-card-section">
+                    <h4>Modifies ${cg.modifiedMeasures.length} Measure${cg.modifiedMeasures.length !== 1 ? 's' : ''}</h4>
+                    <div class="dynamic-visual-list">`;
+                for (const m of cg.modifiedMeasures) {
+                    html += `<span class="dynamic-visual-chip"><span class="material-symbols-outlined" style="font-size:12px">functions</span> ${this._esc(m)}</span>`;
+                }
+                html += `</div></div>`;
+            }
+
+            if (cg.visuals.length > 0) {
+                html += `<div class="dynamic-card-section">
+                    <h4>Used by ${cg.visuals.length} Visual${cg.visuals.length !== 1 ? 's' : ''}</h4>
+                    <div class="dynamic-visual-list">`;
+                for (const v of cg.visuals) {
+                    html += `<span class="dynamic-visual-chip"><span class="material-symbols-outlined" style="font-size:12px">bar_chart</span> ${this._esc(v.name)} <span class="dynamic-visual-page">${this._esc(v.page)}</span></span>`;
+                }
+                html += `</div></div>`;
+            }
+            html += `</div>`;
+        }
+
+        // Blog cross-link
+        html += `<div class="dynamic-learn-more">
+            <span class="material-symbols-outlined" style="font-size:16px">menu_book</span>
+            <a href="https://powerbimvp.com/posts/pbir-json-hidden-gaps-field-parameters.html" target="_blank">Learn more: PBIR JSON Doesn't Tell the Full Story — Hidden Gaps in Field Parameters</a>
+        </div>`;
+
+        content.innerHTML = html;
+    }
+
     renderRelationshipDiagram() {
         const container = document.getElementById('relationshipsDiagram');
         this.diagramRenderer = new DiagramRenderer(container);
@@ -2182,10 +2474,46 @@ class App {
         const vType = visual.visualType || 'unknown';
         const vName = visual.visualName || vType;
 
+        // Check if this visual uses any dynamic features
+        let hasDynamic = false;
+        if (this.docGenerator && visual.fields) {
+            const seen = new Set();
+            for (const f of visual.fields) {
+                const t = f.table || f.entity || '';
+                if (!t || seen.has(t)) continue;
+                seen.add(t);
+                if (this.docGenerator._getFieldParameterItems(t) !== null ||
+                    this.docGenerator._getCalculationGroupItems(t) !== null) {
+                    hasDynamic = true;
+                    break;
+                }
+            }
+        }
+
         let html = `<div class="visual-card">
             <div class="visual-card-header">
                 <h4>${this._esc(vName)}</h4>
                 <span class="badge-visual-type">${this._esc(vType)}</span>`;
+        if (hasDynamic) {
+            // Compute flexibility breakdown
+            let fpCount = 0, cgCount = 0;
+            const seenFlex = new Set();
+            if (this.docGenerator && visual.fields) {
+                for (const f of visual.fields) {
+                    const t = f.table || f.entity || '';
+                    if (!t || seenFlex.has(t)) continue;
+                    seenFlex.add(t);
+                    const fpItems = this.docGenerator._getFieldParameterItems(t);
+                    if (fpItems !== null) { fpCount += fpItems.length; continue; }
+                    const cgItems = this.docGenerator._getCalculationGroupItems(t);
+                    if (cgItems !== null) cgCount += cgItems.length;
+                }
+            }
+            let flexLabel = '';
+            if (fpCount > 0) flexLabel += `${fpCount} FP`;
+            if (cgCount > 0) flexLabel += (flexLabel ? ' + ' : '') + `${cgCount} CG`;
+            html += `<span class="badge badge-dynamic" title="Dynamic: ${flexLabel}">${flexLabel}</span>`;
+        }
 
         // Lineage summary badge + trace button
         if (this.lineageEngine && visual.pageName) {
@@ -2255,7 +2583,11 @@ class App {
                     const fpItems = this.docGenerator._getFieldParameterItems(t);
                     if (fpItems !== null && fpItems.length > 0) {
                         html += `<div class="visual-special-block fp-block">
-                            <div class="visual-special-header"><span class="badge badge-field-param">Field Parameter</span> <strong>'${this._esc(t)}'</strong> — ${fpItems.length} available field${fpItems.length !== 1 ? 's' : ''}:</div>
+                            <div class="visual-special-header"><span class="badge badge-field-param"><span class="material-symbols-outlined" style="font-size:12px;vertical-align:middle">tune</span> Field Parameter</span> <strong>'${this._esc(t)}'</strong> — ${fpItems.length} available field${fpItems.length !== 1 ? 's' : ''}:</div>
+                            <div class="dynamic-card-insight" style="margin:6px 0 8px">
+                                <span class="material-symbols-outlined" style="font-size:14px;color:#e65100">visibility_off</span>
+                                <span>JSON shows: <code>${this._esc(t)}[${this._esc(t)}]</code>. Reality: switches between ${fpItems.length} field${fpItems.length !== 1 ? 's' : ''}: ${fpItems.map(i => `'${i.table}'[${i.column}]`).join(', ')}</span>
+                            </div>
                             <div class="fp-items-list">`;
                         for (const item of fpItems) {
                             html += `<span class="fp-item-chip">'${this._esc(item.table)}'[${this._esc(item.column)}]</span>`;
@@ -2265,7 +2597,11 @@ class App {
                         const cgItems = this.docGenerator._getCalculationGroupItems(t);
                         if (cgItems !== null && cgItems.length > 0) {
                             html += `<div class="visual-special-block cg-block">
-                                <div class="visual-special-header"><span class="badge badge-calc">Calc Group</span> <strong>'${this._esc(t)}'</strong> — ${cgItems.length} item${cgItems.length !== 1 ? 's' : ''}:</div>
+                                <div class="visual-special-header"><span class="badge badge-calc"><span class="material-symbols-outlined" style="font-size:12px;vertical-align:middle">calculate</span> Calc Group</span> <strong>'${this._esc(t)}'</strong> — ${cgItems.length} item${cgItems.length !== 1 ? 's' : ''}:</div>
+                                <div class="dynamic-card-insight" style="margin:6px 0 8px">
+                                    <span class="material-symbols-outlined" style="font-size:14px;color:#e65100">visibility_off</span>
+                                    <span>JSON shows: <code>'${this._esc(t)}'[Name]</code> (ordinary column). Reality: calculation group with ${cgItems.length} DAX transformation${cgItems.length !== 1 ? 's' : ''} modifying co-visual measures.</span>
+                                </div>
                                 <div class="calc-items-list">`;
                             for (const item of cgItems) {
                                 html += `<div class="cg-item">

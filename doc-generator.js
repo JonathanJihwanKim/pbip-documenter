@@ -85,6 +85,12 @@ class DocGenerator {
             }
         }
 
+        // Dynamic Features TOC entry
+        const dynTables = this._getDynamicFeaturesTables();
+        if (dynTables.fieldParams.length > 0 || dynTables.calcGroups.length > 0) {
+            lines.push('- [Dynamic Features](#dynamic-features)');
+        }
+
         lines.push('');
 
         // Model sections
@@ -102,6 +108,9 @@ class DocGenerator {
 
         // Data Lineage sections
         this._appendMarkdownLineageSections(lines, visualData);
+
+        // Dynamic Features Summary
+        this._appendMarkdownDynamicFeatures(lines, visualData);
 
         // Footer
         lines.push('---');
@@ -1078,6 +1087,9 @@ blockquote {
             }
         }
 
+        // Dynamic Features (HTML)
+        html += this._buildHTMLDynamicFeatures();
+
         // Footer — styled sponsor card
         html += `<div class="footer" style="margin-top:40px;padding:20px 24px;background:#fffbee;border:1px solid #ffe082;border-left:4px solid #c89632;border-radius:2px;">
     <p style="margin:0 0 8px;font-weight:700;">Generated with <a href="https://jonathanjihwankim.github.io/pbip-documenter/" target="_blank" style="color:#1a3a5c;">PBIP Documenter</a> — free, open-source tool for Power BI documentation.</p>
@@ -1803,6 +1815,9 @@ ${rects}
             }
         }
 
+        // Dynamic Features (HTML)
+        html += this._buildHTMLDynamicFeatures();
+
         // Footer — styled sponsor card
         html += `<div class="footer" style="margin-top:40px;padding:20px 24px;background:#fffbee;border:1px solid #ffe082;border-left:4px solid #c89632;border-radius:2px;">
     <p style="margin:0 0 8px;font-weight:700;">Generated with <a href="https://jonathanjihwankim.github.io/pbip-documenter/" target="_blank" style="color:#1a3a5c;">PBIP Documenter</a> — free, open-source tool for Power BI documentation.</p>
@@ -1869,6 +1884,121 @@ ${rects}
         const table = this.model.tables.find(t => t.name === tableName);
         if (!table || !table.calculationGroup || table.calculationGroup.items.length === 0) return null;
         return table.calculationGroup.items;
+    }
+
+    _getDynamicFeaturesTables() {
+        const fieldParams = [];
+        const calcGroups = [];
+        for (const table of this.model.tables) {
+            const fpItems = this._getFieldParameterItems(table.name);
+            if (fpItems !== null) fieldParams.push({ table: table.name, items: fpItems });
+            const cgItems = this._getCalculationGroupItems(table.name);
+            if (cgItems !== null) calcGroups.push({ table: table.name, items: cgItems, precedence: table.calculationGroup?.precedence });
+        }
+        return { fieldParams, calcGroups };
+    }
+
+    _appendMarkdownDynamicFeatures(lines, visualData) {
+        const dyn = this._getDynamicFeaturesTables();
+        if (dyn.fieldParams.length === 0 && dyn.calcGroups.length === 0) return;
+
+        lines.push('## Dynamic Features');
+        lines.push('');
+        lines.push('> These features create dynamic behavior that PBIR JSON does not fully represent.');
+        lines.push('> Field parameters show only the last-saved selection; calculation group columns appear as ordinary column references.');
+        lines.push('');
+
+        if (dyn.fieldParams.length > 0) {
+            lines.push(`### Field Parameters (${dyn.fieldParams.length})`);
+            lines.push('');
+            for (const fp of dyn.fieldParams) {
+                lines.push(`#### \`${fp.table}\``);
+                lines.push('');
+                lines.push(`**What PBIR hides:** JSON stores only the last-saved selection. This parameter dynamically switches between **${fp.items.length} fields**:`);
+                lines.push('');
+                for (const item of fp.items) {
+                    lines.push(`- \`'${item.table}'[${item.column}]\``);
+                }
+                // Which visuals use it
+                if (visualData && visualData.pages) {
+                    const usingVisuals = [];
+                    for (const page of visualData.pages) {
+                        for (const v of page.visuals) {
+                            if (v.fields && v.fields.some(f => (f.table || f.entity) === fp.table)) {
+                                usingVisuals.push(`${v.visualName || v.visualType} (${page.displayName})`);
+                            }
+                        }
+                    }
+                    if (usingVisuals.length > 0) {
+                        lines.push('');
+                        lines.push(`Used by: ${usingVisuals.join(', ')}`);
+                    }
+                }
+                lines.push('');
+            }
+        }
+
+        if (dyn.calcGroups.length > 0) {
+            lines.push(`### Calculation Groups (${dyn.calcGroups.length})`);
+            lines.push('');
+            for (const cg of dyn.calcGroups) {
+                const precLabel = cg.precedence != null ? ` (precedence: ${cg.precedence})` : '';
+                lines.push(`#### \`${cg.table}\`${precLabel}`);
+                lines.push('');
+                lines.push(`**What PBIR hides:** This appears as an ordinary column reference in JSON. In reality, it contains **${cg.items.length} DAX transformations** that modify every co-visual measure.`);
+                lines.push('');
+                const sorted = [...cg.items].sort((a, b) => (a.ordinal ?? 999) - (b.ordinal ?? 999));
+                for (const item of sorted) {
+                    lines.push(`- **${this._escMd(item.name)}**`);
+                    if (item.expression) {
+                        lines.push('  ```dax');
+                        for (const el of item.expression.split('\n')) {
+                            lines.push(`  ${el}`);
+                        }
+                        lines.push('  ```');
+                    }
+                }
+                lines.push('');
+            }
+        }
+    }
+
+    _buildHTMLDynamicFeatures() {
+        const dyn = this._getDynamicFeaturesTables();
+        if (dyn.fieldParams.length === 0 && dyn.calcGroups.length === 0) return '';
+
+        let html = `<h2 id="dynamic-features">Dynamic Features</h2>
+<p style="font-size:13px;color:#666;margin-bottom:16px">These features create dynamic behavior that PBIR JSON does not fully represent.</p>`;
+
+        for (const fp of dyn.fieldParams) {
+            html += `<div style="margin:12px 0;padding:12px 16px;background:#e3f2fd;border-left:4px solid #1565c0;border-radius:4px">
+<h4 style="margin:0 0 6px">'${this._escHtml(fp.table)}' <span style="display:inline-block;padding:1px 6px;background:#e3f2fd;color:#1565c0;font-size:10px;border-radius:2px">Field Parameter</span></h4>
+<p style="font-size:12px;margin:0 0 8px;background:#fff8e1;padding:6px 10px;border:1px solid #ffe082;border-radius:3px"><strong>What PBIR hides:</strong> JSON stores only the last-saved selection. This parameter dynamically switches between <strong>${fp.items.length} fields</strong>.</p>
+<div style="display:flex;flex-wrap:wrap;gap:4px">`;
+            for (const item of fp.items) {
+                html += `<span style="display:inline-block;background:#fff;border:1px solid #bbdefb;border-radius:3px;padding:1px 6px;font-family:monospace;font-size:11px">'${this._escHtml(item.table)}'[${this._escHtml(item.column)}]</span>`;
+            }
+            html += `</div></div>`;
+        }
+
+        for (const cg of dyn.calcGroups) {
+            const precLabel = cg.precedence != null ? ` — precedence: ${cg.precedence}` : '';
+            html += `<div style="margin:12px 0;padding:12px 16px;background:#e8f5e9;border-left:4px solid #2e7d32;border-radius:4px">
+<h4 style="margin:0 0 6px">'${this._escHtml(cg.table)}' <span style="display:inline-block;padding:1px 6px;background:#e8f5e9;color:#2e7d32;font-size:10px;border-radius:2px">Calc Group${precLabel}</span></h4>
+<p style="font-size:12px;margin:0 0 8px;background:#fff8e1;padding:6px 10px;border:1px solid #ffe082;border-radius:3px"><strong>What PBIR hides:</strong> This appears as an ordinary column reference in JSON. In reality, it contains <strong>${cg.items.length} DAX transformations</strong> that modify every co-visual measure.</p>`;
+            const sorted = [...cg.items].sort((a, b) => (a.ordinal ?? 999) - (b.ordinal ?? 999));
+            for (const item of sorted) {
+                html += `<div style="margin:4px 0"><span style="display:inline-block;background:#fff;border:1px solid #c8e6c9;border-radius:3px;padding:1px 6px;font-family:monospace;font-size:11px">${this._escHtml(item.name)}</span>`;
+                if (item.expression) {
+                    html += `<details style="margin-top:2px"><summary style="font-size:11px;color:#555;cursor:pointer">Expression</summary>
+<div class="dax-block" style="margin:4px 0;font-size:11px">${this._highlightDAX(item.expression)}</div></details>`;
+                }
+                html += `</div>`;
+            }
+            html += `</div>`;
+        }
+
+        return html;
     }
 
     /**

@@ -311,6 +311,13 @@
                         Visual Lineage
                     </div>
                 </div>
+                <div class="sidebar-section hidden" id="sidebarDynamicSection">
+                    <div class="sidebar-header" data-section="dynamic-features" tabindex="0" role="button">
+                        <span class="material-symbols-outlined">dynamic_form</span>
+                        Dynamic Features
+                        <span class="sidebar-badge" id="sidebarDynamicCount">0</span>
+                    </div>
+                </div>
                 <div class="sidebar-section" id="sidebarDataSourcesSection">
                     <div class="sidebar-header" data-section="data-sources" tabindex="0" role="button">
                         <span class="material-symbols-outlined">storage</span>
@@ -446,6 +453,13 @@
                     <div id="lineageDetailPanel" class="lineage-detail-panel hidden"></div>
                 </div>
 
+                <!-- Dynamic Features -->
+                <div id="view-dynamic-features" class="section-view content-panel">
+                    <h2>Dynamic Features</h2>
+                    <p class="section-subtitle">Field parameters and calculation groups that PBIR JSON doesn't fully reveal.</p>
+                    <div id="dynamicFeaturesContent"></div>
+                </div>
+
                 <!-- Data Sources -->
                 <div id="view-data-sources" class="section-view content-panel">
                     <h2>Data Sources</h2>
@@ -572,6 +586,15 @@
             var shouldShow = !shownThisSession;
             if (!shouldShow) return;
             sessionStorage.setItem(SESSION_KEY, '1');
+
+            // Gratitude micro-interaction before sponsor ask
+            var thankToast = document.getElementById('toast');
+            if (thankToast) {
+                thankToast.textContent = 'Thank you for using PBIP Documenter!';
+                thankToast.classList.remove('hidden');
+                setTimeout(function() { thankToast.classList.add('hidden'); }, 2500);
+            }
+
             var toast = document.getElementById('sponsor-toast');
             if (!toast) return;
             // Dynamic copy with stats
@@ -581,7 +604,14 @@
             var textEl = document.getElementById('sponsor-toast-text');
             if (textEl && tables && measures) {
                 var t = tables.textContent, m = measures.textContent, c = columns.textContent;
-                textEl.innerHTML = 'You just documented <strong>' + t + ' tables, ' + m + ' measures</strong>, and <strong>' + c + ' columns</strong>. This tool is free and built by one developer.';
+                // Check if dynamic features badge count exists
+                var dynBadge = document.getElementById('sidebarDynamicCount');
+                var dynCount = dynBadge ? parseInt(dynBadge.textContent || '0', 10) : 0;
+                if (dynCount > 0) {
+                    textEl.innerHTML = 'You just documented <strong>' + t + ' tables, ' + m + ' measures</strong>, and <strong>' + dynCount + ' dynamic feature' + (dynCount !== 1 ? 's' : '') + '</strong> that PBIR JSON hides. Built by one developer.';
+                } else {
+                    textEl.innerHTML = 'You just documented <strong>' + t + ' tables, ' + m + ' measures</strong>, and <strong>' + c + ' columns</strong>. This tool is free and built by one developer.';
+                }
             }
             toast.classList.remove('hidden');
             toast.classList.add('slide-up');
@@ -595,7 +625,7 @@
             var btn = document.getElementById(id);
             if (btn) {
                 btn.addEventListener('click', function() {
-                    setTimeout(showSponsorToast, 2000);
+                    setTimeout(showSponsorToast, 3500);
                 });
             }
         });
