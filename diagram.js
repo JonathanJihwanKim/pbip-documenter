@@ -284,11 +284,17 @@ class DiagramRenderer {
             }
         }
 
-        // 4. Position nodes in concentric rings
-        const ringRadius = 250;
+        // 4. Position nodes in concentric rings (dynamic radius for large models)
+        const nodeMap = new Map(nodes.map(n => [n.name, n]));
+
+        // Calculate dynamic ring radius based on nodes per ring to prevent overlap
+        const maxNodesInRing = Math.max(...rings.slice(1).map(r => r.length), 1);
+        const avgNodeWidth = nodes.reduce((s, n) => s + n.width, 0) / nodes.length;
+        const minCircumference = maxNodesInRing * (avgNodeWidth + 40);
+        const ringRadius = Math.max(250, minCircumference / (2 * Math.PI));
+
         const centerX = ringRadius * Math.max(rings.length - 1, 1) + 150;
         const centerY = centerX;
-        const nodeMap = new Map(nodes.map(n => [n.name, n]));
 
         for (let ringIdx = 0; ringIdx < rings.length; ringIdx++) {
             const ring = rings[ringIdx];
@@ -299,16 +305,39 @@ class DiagramRenderer {
                 node.x = centerX - node.width / 2;
                 node.y = centerY - node.height / 2;
             } else {
+                // Scale radius for rings with many nodes
+                const circumNeeded = ring.length * (avgNodeWidth + 40);
+                const effectiveRadius = Math.max(radius, circumNeeded / (2 * Math.PI));
                 for (let i = 0; i < ring.length; i++) {
                     const angle = (2 * Math.PI * i / ring.length) - Math.PI / 2;
                     const node = nodeMap.get(ring[i]);
-                    node.x = centerX + radius * Math.cos(angle) - node.width / 2;
-                    node.y = centerY + radius * Math.sin(angle) - node.height / 2;
+                    node.x = centerX + effectiveRadius * Math.cos(angle) - node.width / 2;
+                    node.y = centerY + effectiveRadius * Math.sin(angle) - node.height / 2;
                 }
             }
         }
 
-        // 5. Normalize to positive coordinates
+        // 5. Collision resolution pass — push overlapping nodes apart
+        for (let pass = 0; pass < 3; pass++) {
+            for (let i = 0; i < nodes.length; i++) {
+                for (let j = i + 1; j < nodes.length; j++) {
+                    const a = nodes[i], b = nodes[j];
+                    const overlapX = (a.width / 2 + b.width / 2 + 20) - Math.abs((a.x + a.width / 2) - (b.x + b.width / 2));
+                    const overlapY = (a.height / 2 + b.height / 2 + 20) - Math.abs((a.y + a.height / 2) - (b.y + b.height / 2));
+                    if (overlapX > 0 && overlapY > 0) {
+                        const pushAxis = overlapX < overlapY ? 'x' : 'y';
+                        const push = (pushAxis === 'x' ? overlapX : overlapY) / 2 + 5;
+                        const sign = (pushAxis === 'x')
+                            ? (a.x < b.x ? -1 : 1)
+                            : (a.y < b.y ? -1 : 1);
+                        a[pushAxis] += sign * push;
+                        b[pushAxis] -= sign * push;
+                    }
+                }
+            }
+        }
+
+        // 6. Normalize to positive coordinates
         let minX = Infinity, minY = Infinity;
         for (const n of nodes) {
             minX = Math.min(minX, n.x);

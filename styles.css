@@ -857,6 +857,7 @@ tr:hover {
 
 /* ── DIAGRAM CONTAINER ── */
 .diagram-container {
+    position: relative;
     overflow-x: auto;
     margin: 12px 0;
     border-radius: var(--radius);
@@ -1538,6 +1539,23 @@ tr:hover {
 
 .diagram-ctrl-btn .material-symbols-outlined {
     font-size: 20px;
+}
+
+.diagram-ctrl-separator {
+    width: 100%;
+    height: 1px;
+    background: var(--border-light);
+    margin: 2px 0;
+}
+
+.diagram-controls-lineage {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    z-index: 10;
 }
 
 /* SVG node interactivity */
@@ -2572,4 +2590,175 @@ tr:hover {
     font-size: 11px;
     color: var(--text-secondary);
     line-height: 1.4;
+}
+
+/* ══════════════════════════════════════════════
+   DARK MODE
+   ══════════════════════════════════════════════ */
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --primary: #7ab4e0;
+        --primary-light: #5a9fd4;
+        --accent: #e0b860;
+        --accent-light: #6b5a30;
+        --red: #ef5350;
+        --blue: #64b5f6;
+        --yellow: #ffd54f;
+        --bg: #1a1a2e;
+        --bg-light: #1e1e33;
+        --card-bg: #252540;
+        --border: #3a3a55;
+        --border-light: #2e2e48;
+        --border-dark: #7ab4e0;
+        --surface: #20203a;
+        --text: #e0e0e0;
+        --text-secondary: #a0a0b0;
+        --text-light: #9090a0;
+        --shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        --shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.4);
+    }
+}
+
+[data-theme="dark"] {
+    --primary: #7ab4e0;
+    --primary-light: #5a9fd4;
+    --accent: #e0b860;
+    --accent-light: #6b5a30;
+    --red: #ef5350;
+    --blue: #64b5f6;
+    --yellow: #ffd54f;
+    --bg: #1a1a2e;
+    --bg-light: #1e1e33;
+    --card-bg: #252540;
+    --border: #3a3a55;
+    --border-light: #2e2e48;
+    --border-dark: #7ab4e0;
+    --surface: #20203a;
+    --text: #e0e0e0;
+    --text-secondary: #a0a0b0;
+    --text-light: #9090a0;
+    --shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+/* Dark mode body background override */
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) body {
+        background-image: none;
+        background-color: var(--bg);
+    }
+}
+
+[data-theme="dark"] body {
+    background-image: none;
+    background-color: var(--bg);
+}
+
+/* Dark mode code/pre blocks */
+[data-theme="dark"] pre,
+[data-theme="dark"] code {
+    background: #1e1e33;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) pre,
+    :root:not([data-theme="light"]) code {
+        background: #1e1e33;
+    }
+}
+
+/* Dark mode theme toggle button */
+.btn-theme-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    background: transparent;
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: all var(--transition);
+    padding: 0;
+}
+
+.btn-theme-toggle:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+/* ══════════════════════════════════════════════
+   RESPONSIVE — MOBILE / TABLET
+   ══════════════════════════════════════════════ */
+
+.sidebar-toggle-btn {
+    display: none;
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    z-index: 1000;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    box-shadow: var(--shadow-hover);
+    align-items: center;
+    justify-content: center;
+}
+
+@media (max-width: 768px) {
+    .app-body {
+        grid-template-columns: 1fr !important;
+    }
+
+    .sidebar {
+        position: fixed;
+        left: -280px;
+        top: 0;
+        bottom: 0;
+        width: 280px;
+        z-index: 999;
+        transition: left 0.3s ease;
+        background: var(--card-bg);
+        box-shadow: var(--shadow-hover);
+    }
+
+    .sidebar.sidebar-open {
+        left: 0;
+    }
+
+    .sidebar-toggle-btn {
+        display: flex;
+    }
+
+    .sidebar-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.4);
+        z-index: 998;
+    }
+
+    .sidebar-overlay.active {
+        display: block;
+    }
+
+    .download-bar-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .diagram-controls {
+        top: 8px;
+        right: 8px;
+    }
+
+    .diagram-ctrl-btn {
+        width: 32px;
+        height: 32px;
+    }
 }

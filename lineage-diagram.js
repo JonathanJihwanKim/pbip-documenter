@@ -475,16 +475,21 @@ class LineageDiagramRenderer {
     }
 
     _layoutColumns(columns) {
-        const colWidth = 180;
-        const nodeHeight = 36;
-        const nodeGap = 8;
-        const colGap = 100;
+        // Adaptive sizing for large models
+        const totalItems = columns.reduce((s, c) => s + c.items.length, 0);
+        const isLargeModel = totalItems > 100;
+
+        const colWidth = isLargeModel ? 160 : 180;
+        const nodeHeight = isLargeModel ? 28 : 36;
+        const nodeGap = isLargeModel ? 5 : 8;
+        const colGap = isLargeModel ? 80 : 100;
         const headerHeight = 50;
         const padding = 40;
         const titleHeight = 50;
 
-        // Cap visible items per column for readability
-        const MAX_VISIBLE = 25;
+        // Dynamic cap: scale with viewport but cap sensibly
+        const maxPerColumn = Math.max(...columns.map(c => c.items.length));
+        const MAX_VISIBLE = isLargeModel ? Math.min(maxPerColumn, 50) : 25;
 
         let x = padding;
         const colPositions = [];

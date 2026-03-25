@@ -160,6 +160,56 @@ class App {
             }
         });
 
+        // Diagram export buttons (delegated)
+        document.addEventListener('click', (e) => {
+            const exportBtn = e.target.closest('[data-export]');
+            if (exportBtn) {
+                const format = exportBtn.dataset.export;
+                const diagram = exportBtn.dataset.diagram;
+                this._handleDiagramExport(format, diagram);
+            }
+            const zoomBtn = e.target.closest('[data-zoom]');
+            if (zoomBtn) {
+                const action = zoomBtn.dataset.zoom;
+                const targetId = zoomBtn.dataset.target;
+                this._handleLineageZoom(action, targetId);
+            }
+        });
+
+        // Dark mode toggle
+        const themeBtn = document.getElementById('btnThemeToggle');
+        if (themeBtn) {
+            // Restore saved theme
+            const saved = localStorage.getItem('pbip-doc-theme');
+            if (saved) {
+                document.documentElement.setAttribute('data-theme', saved);
+                document.getElementById('themeIcon').textContent = saved === 'dark' ? 'light_mode' : 'dark_mode';
+            }
+            themeBtn.addEventListener('click', () => {
+                const current = document.documentElement.getAttribute('data-theme');
+                const next = current === 'dark' ? 'light' : 'dark';
+                document.documentElement.setAttribute('data-theme', next);
+                document.getElementById('themeIcon').textContent = next === 'dark' ? 'light_mode' : 'dark_mode';
+                try { localStorage.setItem('pbip-doc-theme', next); } catch {}
+            });
+        }
+
+        // Mobile sidebar toggle
+        const sidebarToggle = document.getElementById('sidebarToggleBtn');
+        const sidebarOverlay = document.getElementById('sidebarOverlay');
+        if (sidebarToggle) {
+            sidebarToggle.addEventListener('click', () => {
+                document.getElementById('sidebar').classList.toggle('sidebar-open');
+                sidebarOverlay.classList.toggle('active');
+            });
+        }
+        if (sidebarOverlay) {
+            sidebarOverlay.addEventListener('click', () => {
+                document.getElementById('sidebar').classList.remove('sidebar-open');
+                sidebarOverlay.classList.remove('active');
+            });
+        }
+
         // Fetch GitHub stars for social proof
         this._fetchGitHubStars();
     }
@@ -2787,6 +2837,174 @@ class App {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+    }
+
+    // ──────────────────────────────────────────────
+    // DIAGRAM EXPORT
+    // ──────────────────────────────────────────────
+
+    _handleDiagramExport(format, diagramType) {
+        const modelName = this.parsedModel?.database?.name || 'model';
+        try {
+            switch (format) {
+                case 'svg':
+                    this._exportDiagramSVG(diagramType, modelName);
+                    break;
+                case 'drawio':
+                    this._exportDiagramDrawio(diagramType, modelName);
+                    break;
+                case 'mermaid':
+                    this._exportDiagramMermaid(diagramType, modelName);
+                    break;
+            }
+        } catch (err) {
+            console.error('Diagram export error:', err);
+            this.showToast('Export failed: ' + err.message, 'error');
+        }
+    }
+
+    _exportDiagramSVG(diagramType, modelName) {
+        let svgString = null;
+        let filename = `${modelName}-${diagramType}.svg`;
+
+        const containerMap = {
+            'relationships': 'relationshipsDiagram',
+            'visual-usage': 'visualUsageByVisual',
+            'lineage-full': 'lineageDiagramContainer',
+            'lineage-trace': 'lineageTraceDiagram',
+            'lineage-impact': 'lineageImpactDiagram',
+            'lineage-column': 'lineageColumnImpactDiagram'
+        };
+
+        const containerId = containerMap[diagramType];
+        if (!containerId) return;
+
+        const container = document.getElementById(containerId);
+        const svg = container?.querySelector('svg');
+        if (!svg) {
+            this.showToast('No diagram rendered yet. View the diagram first.', 'error');
+            return;
+        }
+
+        // Clone SVG for standalone export
+        const clone = svg.cloneNode(true);
+
+        // Set explicit dimensions from viewBox for standalone rendering
+        const viewBox = clone.getAttribute('viewBox');
+        if (viewBox) {
+            const parts = viewBox.split(/\s+/).map(Number);
+            clone.setAttribute('width', parts[2]);
+            clone.setAttribute('height', parts[3]);
+        }
+
+        // Ensure xmlns
+        clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+
+        // Add embedded font style for standalone viewing
+        const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+        style.textContent = `text { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }`;
+        clone.insertBefore(style, clone.firstChild);
+
+        svgString = '<?xml version="1.0" encoding="UTF-8"?>\n' +
+            new XMLSerializer().serializeToString(clone);
+
+        this._downloadFile(svgString, filename, 'image/svg+xml');
+        this.showToast(`Downloaded ${filename}`);
+        this._track('Diagram Export', { format: 'svg', diagram: diagramType });
+    }
+
+    _exportDiagramDrawio(diagramType, modelName) {
+        if (typeof DrawioExporter === 'undefined') {
+            this.showToast('draw.io exporter not loaded', 'error');
+            return;
+        }
+
+        const exporter = new DrawioExporter(this.parsedModel, this.lineageEngine);
+        let xml;
+
+        if (diagramType === 'relationships') {
+            xml = exporter.generateERD();
+        } else if (diagramType.startsWith('lineage')) {
+            xml = exporter.generateLineage();
+        } else {
+            this.showToast('draw.io export not available for this diagram type', 'error');
+            return;
+        }
+
+        const filename = `${modelName}-${diagramType}.drawio`;
+        this._downloadFile(xml, filename, 'application/xml');
+        this.showToast(`Downloaded ${filename} — open in draw.io to edit`);
+        this._track('Diagram Export', { format: 'drawio', diagram: diagramType });
+    }
+
+    _exportDiagramMermaid(diagramType, modelName) {
+        if (typeof MermaidExporter === 'undefined') {
+            this.showToast('Mermaid exporter not loaded', 'error');
+            return;
+        }
+
+        const exporter = new MermaidExporter(this.parsedModel, this.lineageEngine, this.visualData);
+        let mermaidText;
+
+        if (diagramType === 'relationships') {
+            mermaidText = exporter.generateERDiagram();
+        } else if (diagramType.startsWith('lineage')) {
+            mermaidText = exporter.generateLineageFlowchart();
+        } else {
+            this.showToast('Mermaid export not available for this diagram type', 'error');
+            return;
+        }
+
+        // Copy to clipboard
+        navigator.clipboard.writeText(mermaidText).then(() => {
+            this.showToast('Mermaid diagram copied to clipboard — paste in mermaid.live or any Mermaid-compatible tool');
+        }).catch(() => {
+            // Fallback: download as .mmd file
+            this._downloadFile(mermaidText, `${modelName}-${diagramType}.mmd`, 'text/plain');
+            this.showToast(`Downloaded ${modelName}-${diagramType}.mmd`);
+        });
+        this._track('Diagram Export', { format: 'mermaid', diagram: diagramType });
+    }
+
+    _handleLineageZoom(action, targetId) {
+        const container = document.getElementById(targetId);
+        if (!container) return;
+        const svg = container.querySelector('svg');
+        if (!svg) return;
+
+        const viewBox = svg.getAttribute('viewBox');
+        if (!viewBox) return;
+        const parts = viewBox.split(/\s+/).map(Number);
+        let [x, y, w, h] = parts;
+
+        const origW = parseFloat(svg.dataset.origW || w);
+        const origH = parseFloat(svg.dataset.origH || h);
+        if (!svg.dataset.origW) {
+            svg.dataset.origW = w;
+            svg.dataset.origH = h;
+        }
+
+        switch (action) {
+            case 'in': {
+                if (w < origW * 0.25) return;
+                const cx = x + w / 2, cy = y + h / 2;
+                w *= 0.8; h *= 0.8;
+                x = cx - w / 2; y = cy - h / 2;
+                break;
+            }
+            case 'out': {
+                if (w > origW * 4) return;
+                const cx = x + w / 2, cy = y + h / 2;
+                w *= 1.25; h *= 1.25;
+                x = cx - w / 2; y = cy - h / 2;
+                break;
+            }
+            case 'reset':
+                x = 0; y = 0; w = origW; h = origH;
+                break;
+        }
+
+        svg.setAttribute('viewBox', `${x} ${y} ${w} ${h}`);
     }
 
     // ──────────────────────────────────────────────

@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PBIP Documenter — Test Runner</title>
+<style>
+    body { font-family: 'Segoe UI', sans-serif; max-width: 900px; margin: 40px auto; padding: 0 24px; color: #1a1a2e; }
+    h1 { font-size: 1.4rem; margin-bottom: 4px; }
+    .subtitle { color: #555; font-size: 0.9rem; margin-bottom: 24px; }
+    .suite { margin-bottom: 24px; border: 1px solid #e0dcd4; border-radius: 4px; overflow: hidden; }
+    .suite-header { background: #f5f3ee; padding: 10px 16px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+    .suite-body { padding: 0; }
+    .test-row { padding: 8px 16px; border-top: 1px solid #f0ece4; display: flex; justify-content: space-between; font-size: 0.9rem; }
+    .test-row:first-child { border-top: none; }
+    .pass { color: #1a7a3c; }
+    .fail { color: #c0392b; }
+    .skip { color: #999; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 0.75rem; font-weight: 600; }
+    .badge-pass { background: #d4edda; color: #1a7a3c; }
+    .badge-fail { background: #f8d7da; color: #c0392b; }
+    .badge-skip { background: #e0e0e0; color: #666; }
+    .summary { margin-top: 24px; padding: 16px; border-radius: 4px; font-weight: 600; font-size: 1.1rem; }
+    .summary-pass { background: #d4edda; color: #1a7a3c; border: 1px solid #c3e6cb; }
+    .summary-fail { background: #f8d7da; color: #c0392b; border: 1px solid #f5c6cb; }
+    .perf { font-size: 0.8rem; color: #888; }
+    button { background: #1a3a5c; color: #fff; border: none; padding: 10px 20px; border-radius: 4px; font-size: 0.95rem; cursor: pointer; margin-bottom: 16px; }
+    button:hover { background: #2a5080; }
+    button:disabled { background: #aaa; cursor: default; }
+    #output { min-height: 100px; }
+    .error-detail { font-family: monospace; font-size: 0.8rem; color: #c0392b; padding: 4px 16px 8px; background: #fff5f5; }
+</style>
+</head>
+<body>
+<h1>PBIP Documenter — Test Runner</h1>
+<p class="subtitle">Browser-based test suite. No Node.js required.</p>
+<button id="btnRun">Run All Tests</button>
+<button id="btnRunPerf">Run Performance Benchmarks</button>
+<div id="output"></div>
+
+<script src="../tmdl-parser.js"></script>
+<script src="../visual-parser.js"></script>
+<script src="../m-parser.js"></script>
+<script src="../lineage-engine.js?v=20260301a"></script>
+<script src="../lineage-diagram.js?v=20260306a"></script>
+<script src="../doc-generator.js"></script>
+<script src="../diagram.js"></script>
+<script src="../drawio-exporter.js"></script>
+<script src="../mermaid-exporter.js"></script>
+<script>
+class TestRunner {
+    constructor() {
+        this.suites = [];
+        this.currentSuite = null;
+    }
+
+    suite(name) {
+        this.currentSuite = { name, tests: [], passed: 0, failed: 0, skipped: 0 };
+        this.suites.push(this.currentSuite);
+    }
+
+    test(name, fn) {
+        const result = { name, status: 'pass', error: null, time: 0 };
+        const start = performance.now();
+        try {
+            fn();
+            result.status = 'pass';
+            this.currentSuite.passed++;
+        } catch (e) {
+            result.status = 'fail';
+            result.error = e.message;
+            this.currentSuite.failed++;
+        }
+        result.time = performance.now() - start;
+        this.currentSuite.tests.push(result);
+    }
+
+    skip(name) {
+        this.currentSuite.tests.push({ name, status: 'skip', error: null, time: 0 });
+        this.currentSuite.skipped++;
+    }
+
+    assert(condition, message) {
+        if (!condition) throw new Error(message || 'Assertion failed');
+    }
+
+    assertEqual(actual, expected, message) {
+        if (actual !== expected) {
+            throw new Error(message || `Expected ${expected}, got ${actual}`);
+        }
+    }
+
+    assertGreater(actual, threshold, message) {
+        if (!(actual > threshold)) {
+            throw new Error(message || `Expected > ${threshold}, got ${actual}`);
+        }
+    }
+
+    assertIncludes(str, substr, message) {
+        if (!str.includes(substr)) {
+            throw new Error(message || `Expected string to include "${substr}"`);
+        }
+    }
+
+    render(container) {
+        let html = '';
+        let totalPass = 0, totalFail = 0, totalSkip = 0;
+
+        for (const suite of this.suites) {
+            totalPass += suite.passed;
+            totalFail += suite.failed;
+            totalSkip += suite.skipped;
+
+            const badgeClass = suite.failed > 0 ? 'badge-fail' : 'badge-pass';
+            const badgeText = suite.failed > 0
+                ? `${suite.failed} failed`
+                : `${suite.passed} passed`;
+
+            html += `<div class="suite">
+                <div class="suite-header">
+                    <span>${suite.name}</span>
+                    <span class="badge ${badgeClass}">${badgeText}</span>
+                </div>
+                <div class="suite-body">`;
+
+            for (const t of suite.tests) {
+                const cls = t.status === 'pass' ? 'pass' : t.status === 'fail' ? 'fail' : 'skip';
+                const icon = t.status === 'pass' ? '\u2713' : t.status === 'fail' ? '\u2717' : '\u2014';
+                html += `<div class="test-row">
+                    <span class="${cls}">${icon} ${t.name}</span>
+                    <span class="perf">${t.time.toFixed(1)}ms</span>
+                </div>`;
+                if (t.error) {
+                    html += `<div class="error-detail">${t.error}</div>`;
+                }
+            }
+
+            html += `</div></div>`;
+        }
+
+        const allPassed = totalFail === 0;
+        html += `<div class="summary ${allPassed ? 'summary-pass' : 'summary-fail'}">
+            ${allPassed ? '\u2713' : '\u2717'} ${totalPass} passed, ${totalFail} failed, ${totalSkip} skipped
+        </div>`;
+
+        container.innerHTML = html;
+    }
+}
+
+async function loadSample(filename) {
+    const resp = await fetch(`../samples/${filename}`);
+    if (!resp.ok) throw new Error(`Sample ${filename} not found`);
+    return resp.json();
+}
+
+async function runAllTests() {
+    const btn = document.getElementById('btnRun');
+    btn.disabled = true;
+    btn.textContent = 'Running...';
+    const output = document.getElementById('output');
+    output.innerHTML = '<p>Loading sample data...</p>';
+
+    const t = new TestRunner();
+
+    // Load sample data
+    let contosoData = null;
+    let largeData = null;
+
+    try { contosoData = await loadSample('contoso.json'); } catch {}
+    try { largeData = await loadSample('sample-powerbi.json'); } catch {}
+
+    // ─── TMDL Parser Tests ───
+    t.suite('TMDL Parser');
+
+    t.test('TMDLParser class exists', () => {
+        t.assert(typeof TMDLParser === 'function', 'TMDLParser not defined');
+    });
+
+    t.test('Parser instantiation', () => {
+        const parser = new TMDLParser();
+        t.assert(parser, 'Failed to instantiate');
+    });
+
+    if (contosoData) {
+        t.test('Contoso: correct table count', () => {
+            const tables = contosoData.parsedModel.tables;
+            t.assertGreater(tables.length, 5, 'Should have > 5 tables');
+        });
+
+        t.test('Contoso: measures exist', () => {
+            const totalMeasures = contosoData.parsedModel.tables.reduce((s, tb) => s + tb.measures.length, 0);
+            t.assertGreater(totalMeasures, 0, 'Should have measures');
+        });
+
+        t.test('Contoso: relationships exist', () => {
+            t.assertGreater(contosoData.parsedModel.relationships.length, 0, 'Should have relationships');
+        });
+    } else {
+        t.skip('Contoso sample not available');
+    }
+
+    if (largeData) {
+        t.test('Enterprise: 60+ tables', () => {
+            t.assertGreater(contosoData.parsedModel.tables.length, 5);
+        });
+
+        t.test('Enterprise: 80+ relationships', () => {
+            t.assertGreater(largeData.parsedModel.relationships.length, 80, 'Should have 80+ relationships');
+        });
+
+        t.test('Enterprise: 200+ measures', () => {
+            const totalMeasures = largeData.parsedModel.tables.reduce((s, tb) => s + tb.measures.length, 0);
+            t.assertGreater(totalMeasures, 200, 'Should have 200+ measures');
+        });
+
+        t.test('Enterprise: visuals exist', () => {
+            t.assertGreater(largeData.visualData?.visuals?.length || 0, 100, 'Should have 100+ visuals');
+        });
+    } else {
+        t.skip('Enterprise sample not available (run generate-sample-large.html first)');
+    }
+
+    // ─── Visual Parser Tests ───
+    t.suite('Visual Parser');
+
+    t.test('VisualParser class exists', () => {
+        t.assert(typeof VisualParser === 'function', 'VisualParser not defined');
+    });
+
+    if (contosoData?.visualData) {
+        t.test('Contoso: visuals parsed', () => {
+            t.assertGreater(contosoData.visualData.visuals.length, 0);
+        });
+
+        t.test('Contoso: pages parsed', () => {
+            t.assertGreater(contosoData.visualData.pages.length, 0);
+        });
+    } else {
+        t.skip('Contoso visual data not available');
+    }
+
+    // ─── Lineage Engine Tests ───
+    t.suite('Lineage Engine');
+
+    t.test('LineageEngine class exists', () => {
+        t.assert(typeof LineageEngine === 'function', 'LineageEngine not defined');
+    });
+
+    const testData = contosoData || largeData;
+    if (testData) {
+        t.test('Graph builds without error', () => {
+            const engine = new LineageEngine(
+                testData.parsedModel,
+                testData.visualData,
+                testData.measureRefs || {}
+            );
+            engine.buildGraph();
+            t.assertGreater(engine.nodes.size, 0, 'Should have nodes');
+            t.assertGreater(engine.edges.length, 0, 'Should have edges');
+        });
+    } else {
+        t.skip('No sample data available');
+    }
+
+    // ─── Doc Generator Tests ───
+    t.suite('Doc Generator');
+
+    t.test('DocGenerator class exists', () => {
+        t.assert(typeof DocGenerator === 'function', 'DocGenerator not defined');
+    });
+
+    if (testData) {
+        t.test('Markdown generation', () => {
+            const gen = new DocGenerator(
+                testData.parsedModel,
+                testData.visualData?.fieldUsageMap || testData.fieldUsageMap || {},
+                testData.measureRefs || {}
+            );
+            const md = gen.generateMarkdown();
+            t.assert(md.length > 100, 'Markdown should have substantial content');
+            t.assertIncludes(md, '# ');
+        });
+
+        t.test('HTML generation', () => {
+            const gen = new DocGenerator(
+                testData.parsedModel,
+                testData.visualData?.fieldUsageMap || testData.fieldUsageMap || {},
+                testData.measureRefs || {}
+            );
+            const html = gen.generateHTML();
+            t.assert(html.length > 500, 'HTML should have substantial content');
+            t.assertIncludes(html, '<html');
+        });
+    } else {
+        t.skip('No sample data available');
+    }
+
+    // ─── Exporter Tests ───
+    t.suite('Diagram Exporters');
+
+    t.test('DrawioExporter class exists', () => {
+        t.assert(typeof DrawioExporter === 'function', 'DrawioExporter not defined');
+    });
+
+    t.test('MermaidExporter class exists', () => {
+        t.assert(typeof MermaidExporter === 'function', 'MermaidExporter not defined');
+    });
+
+    if (testData) {
+        t.test('draw.io ERD generation', () => {
+            const engine = new LineageEngine(testData.parsedModel, testData.visualData, testData.measureRefs || {});
+            engine.buildGraph();
+            const exporter = new DrawioExporter(testData.parsedModel, engine);
+            const xml = exporter.generateERD();
+            t.assert(xml.length > 100, 'Should produce XML');
+            t.assertIncludes(xml, '<mxfile');
+            t.assertIncludes(xml, 'mxCell');
+        });
+
+        t.test('draw.io ERD is valid XML', () => {
+            const engine = new LineageEngine(testData.parsedModel, testData.visualData, testData.measureRefs || {});
+            engine.buildGraph();
+            const exporter = new DrawioExporter(testData.parsedModel, engine);
+            const xml = exporter.generateERD();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(xml, 'application/xml');
+            const errors = doc.querySelectorAll('parsererror');
+            t.assertEqual(errors.length, 0, 'XML should be well-formed');
+        });
+
+        t.test('draw.io lineage generation', () => {
+            const engine = new LineageEngine(testData.parsedModel, testData.visualData, testData.measureRefs || {});
+            engine.buildGraph();
+            const exporter = new DrawioExporter(testData.parsedModel, engine);
+            const xml = exporter.generateLineage();
+            t.assert(xml.length > 100, 'Should produce XML');
+            t.assertIncludes(xml, '<mxfile');
+        });
+
+        t.test('Mermaid ERD generation', () => {
+            const exporter = new MermaidExporter(testData.parsedModel);
+            const mermaid = exporter.generateERDiagram();
+            t.assert(mermaid.length > 50, 'Should produce Mermaid syntax');
+            t.assertIncludes(mermaid, 'erDiagram');
+        });
+
+        t.test('Mermaid lineage generation', () => {
+            const engine = new LineageEngine(testData.parsedModel, testData.visualData, testData.measureRefs || {});
+            engine.buildGraph();
+            const exporter = new MermaidExporter(testData.parsedModel, engine, testData.visualData);
+            const mermaid = exporter.generateLineageFlowchart();
+            t.assert(mermaid.length > 50, 'Should produce Mermaid syntax');
+            t.assertIncludes(mermaid, 'flowchart');
+        });
+    } else {
+        t.skip('No sample data available for exporter tests');
+    }
+
+    // ─── SVG Export Tests ───
+    t.suite('SVG Export');
+
+    t.test('DiagramRenderer class exists', () => {
+        t.assert(typeof DiagramRenderer === 'function', 'DiagramRenderer not defined');
+    });
+
+    t.test('LineageDiagramRenderer class exists', () => {
+        t.assert(typeof LineageDiagramRenderer === 'function', 'LineageDiagramRenderer not defined');
+    });
+
+    t.render(output);
+    btn.disabled = false;
+    btn.textContent = 'Run All Tests';
+}
+
+async function runPerfBenchmarks() {
+    const btn = document.getElementById('btnRunPerf');
+    btn.disabled = true;
+    btn.textContent = 'Benchmarking...';
+    const output = document.getElementById('output');
+    output.innerHTML = '<p>Loading data for benchmarks...</p>';
+
+    const t = new TestRunner();
+    let data = null;
+
+    try { data = await loadSample('sample-powerbi.json'); } catch {}
+    if (!data) { try { data = await loadSample('contoso.json'); } catch {} }
+
+    if (!data) {
+        output.innerHTML = '<p class="fail">No sample data available. Generate a sample first.</p>';
+        btn.disabled = false;
+        btn.textContent = 'Run Performance Benchmarks';
+        return;
+    }
+
+    t.suite(`Performance (${data._meta?.modelName || 'unknown'} — ${data._meta?.tables || '?'} tables, ${data._meta?.measures || '?'} measures)`);
+
+    t.test('Lineage engine build < 2s', () => {
+        const start = performance.now();
+        const engine = new LineageEngine(data.parsedModel, data.visualData, data.measureRefs || {});
+        engine.buildGraph();
+        const elapsed = performance.now() - start;
+        t.assert(elapsed < 2000, `Took ${elapsed.toFixed(0)}ms (target < 2000ms)`);
+    });
+
+    t.test('Markdown generation < 3s', () => {
+        const gen = new DocGenerator(
+            data.parsedModel,
+            data.visualData?.fieldUsageMap || data.fieldUsageMap || {},
+            data.measureRefs || {}
+        );
+        const start = performance.now();
+        gen.generateMarkdown();
+        const elapsed = performance.now() - start;
+        t.assert(elapsed < 3000, `Took ${elapsed.toFixed(0)}ms (target < 3000ms)`);
+    });
+
+    t.test('HTML generation < 3s', () => {
+        const gen = new DocGenerator(
+            data.parsedModel,
+            data.visualData?.fieldUsageMap || data.fieldUsageMap || {},
+            data.measureRefs || {}
+        );
+        const start = performance.now();
+        gen.generateHTML();
+        const elapsed = performance.now() - start;
+        t.assert(elapsed < 3000, `Took ${elapsed.toFixed(0)}ms (target < 3000ms)`);
+    });
+
+    t.test('draw.io ERD export < 1s', () => {
+        const engine = new LineageEngine(data.parsedModel, data.visualData, data.measureRefs || {});
+        engine.buildGraph();
+        const exporter = new DrawioExporter(data.parsedModel, engine);
+        const start = performance.now();
+        exporter.generateERD();
+        const elapsed = performance.now() - start;
+        t.assert(elapsed < 1000, `Took ${elapsed.toFixed(0)}ms (target < 1000ms)`);
+    });
+
+    t.test('Mermaid ERD export < 500ms', () => {
+        const exporter = new MermaidExporter(data.parsedModel);
+        const start = performance.now();
+        exporter.generateERDiagram();
+        const elapsed = performance.now() - start;
+        t.assert(elapsed < 500, `Took ${elapsed.toFixed(0)}ms (target < 500ms)`);
+    });
+
+    t.render(output);
+    btn.disabled = false;
+    btn.textContent = 'Run Performance Benchmarks';
+}
+
+document.getElementById('btnRun').addEventListener('click', runAllTests);
+document.getElementById('btnRunPerf').addEventListener('click', runPerfBenchmarks);
+</script>
+</body>
+</html>

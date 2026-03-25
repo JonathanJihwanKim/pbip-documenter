@@ -45,6 +45,9 @@
             <span class="header-subtitle">Full visual-to-source lineage tracing for Power BI</span>
         </div>
         <div class="header-right">
+            <button id="btnThemeToggle" class="btn-theme-toggle" title="Toggle dark mode" aria-label="Toggle dark mode">
+                <span class="material-symbols-outlined" style="font-size:20px" id="themeIcon">dark_mode</span>
+            </button>
             <span id="githubStars" class="github-stars hidden">
                 <span class="material-symbols-outlined" style="font-size:14px">star</span>
                 <span id="githubStarCount"></span>
@@ -257,6 +260,10 @@
 
         <!-- Main App Body (sidebar + content) -->
         <div id="appBody" class="app-body hidden">
+            <div id="sidebarOverlay" class="sidebar-overlay"></div>
+            <button id="sidebarToggleBtn" class="sidebar-toggle-btn" aria-label="Toggle sidebar">
+                <span class="material-symbols-outlined">menu</span>
+            </button>
             <!-- Sidebar Navigation -->
             <aside class="sidebar" id="sidebar" aria-label="Model navigation">
                 <div class="sidebar-search" id="sidebarSearch">
@@ -399,7 +406,13 @@
                         <button type="button" class="view-toggle-btn active" data-view="by-visual">By Visual</button>
                         <button type="button" class="view-toggle-btn" data-view="by-field">By Field</button>
                     </div>
-                    <div id="visualUsageByVisual"></div>
+                    <div id="visualUsageByVisual" class="diagram-container diagram-interactive">
+                        <div class="diagram-controls diagram-controls-lineage">
+                            <button class="diagram-ctrl-btn" data-export="svg" data-diagram="visual-usage" title="Download SVG">
+                                <span class="material-symbols-outlined">download</span>
+                            </button>
+                        </div>
+                    </div>
                     <div id="visualUsageByField" class="diagram-container hidden"></div>
                 </div>
 
@@ -413,7 +426,29 @@
                         <button type="button" class="view-toggle-btn" data-view="column-impact">Column Impact</button>
                     </div>
                     <div id="lineageFullView">
-                        <div id="lineageDiagramContainer" class="lineage-diagram-container diagram-interactive"></div>
+                        <div id="lineageDiagramContainer" class="lineage-diagram-container diagram-interactive">
+                            <div class="diagram-controls diagram-controls-lineage">
+                                <button class="diagram-ctrl-btn" data-zoom="in" data-target="lineageDiagramContainer" title="Zoom In">
+                                    <span class="material-symbols-outlined">add</span>
+                                </button>
+                                <button class="diagram-ctrl-btn" data-zoom="out" data-target="lineageDiagramContainer" title="Zoom Out">
+                                    <span class="material-symbols-outlined">remove</span>
+                                </button>
+                                <button class="diagram-ctrl-btn" data-zoom="reset" data-target="lineageDiagramContainer" title="Fit to View">
+                                    <span class="material-symbols-outlined">fit_screen</span>
+                                </button>
+                                <div class="diagram-ctrl-separator"></div>
+                                <button class="diagram-ctrl-btn" data-export="svg" data-diagram="lineage-full" title="Download SVG">
+                                    <span class="material-symbols-outlined">download</span>
+                                </button>
+                                <button class="diagram-ctrl-btn" data-export="drawio" data-diagram="lineage-full" title="Download draw.io">
+                                    <span class="material-symbols-outlined">edit_note</span>
+                                </button>
+                                <button class="diagram-ctrl-btn" data-export="mermaid" data-diagram="lineage-full" title="Copy Mermaid">
+                                    <span class="material-symbols-outlined">content_copy</span>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                     <div id="lineageTraceView" class="hidden">
                         <div class="lineage-select-row">
@@ -424,7 +459,23 @@
                                 Trace to Source
                             </button>
                         </div>
-                        <div id="lineageTraceDiagram" class="lineage-diagram-container diagram-interactive"></div>
+                        <div id="lineageTraceDiagram" class="lineage-diagram-container diagram-interactive">
+                            <div class="diagram-controls diagram-controls-lineage">
+                                <button class="diagram-ctrl-btn" data-zoom="in" data-target="lineageTraceDiagram" title="Zoom In">
+                                    <span class="material-symbols-outlined">add</span>
+                                </button>
+                                <button class="diagram-ctrl-btn" data-zoom="out" data-target="lineageTraceDiagram" title="Zoom Out">
+                                    <span class="material-symbols-outlined">remove</span>
+                                </button>
+                                <button class="diagram-ctrl-btn" data-zoom="reset" data-target="lineageTraceDiagram" title="Fit to View">
+                                    <span class="material-symbols-outlined">fit_screen</span>
+                                </button>
+                                <div class="diagram-ctrl-separator"></div>
+                                <button class="diagram-ctrl-btn" data-export="svg" data-diagram="lineage-trace" title="Download SVG">
+                                    <span class="material-symbols-outlined">download</span>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                     <div id="lineageImpactView" class="hidden">
                         <div class="lineage-select-row">
@@ -435,7 +486,23 @@
                                 Show Impact
                             </button>
                         </div>
-                        <div id="lineageImpactDiagram" class="lineage-diagram-container diagram-interactive"></div>
+                        <div id="lineageImpactDiagram" class="lineage-diagram-container diagram-interactive">
+                            <div class="diagram-controls diagram-controls-lineage">
+                                <button class="diagram-ctrl-btn" data-zoom="in" data-target="lineageImpactDiagram" title="Zoom In">
+                                    <span class="material-symbols-outlined">add</span>
+                                </button>
+                                <button class="diagram-ctrl-btn" data-zoom="out" data-target="lineageImpactDiagram" title="Zoom Out">
+                                    <span class="material-symbols-outlined">remove</span>
+                                </button>
+                                <button class="diagram-ctrl-btn" data-zoom="reset" data-target="lineageImpactDiagram" title="Fit to View">
+                                    <span class="material-symbols-outlined">fit_screen</span>
+                                </button>
+                                <div class="diagram-ctrl-separator"></div>
+                                <button class="diagram-ctrl-btn" data-export="svg" data-diagram="lineage-impact" title="Download SVG">
+                                    <span class="material-symbols-outlined">download</span>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                     <div id="lineageColumnImpactView" class="hidden">
                         <div class="lineage-select-row">
@@ -448,7 +515,23 @@
                                 Show Column Impact
                             </button>
                         </div>
-                        <div id="lineageColumnImpactDiagram" class="lineage-diagram-container diagram-interactive"></div>
+                        <div id="lineageColumnImpactDiagram" class="lineage-diagram-container diagram-interactive">
+                            <div class="diagram-controls diagram-controls-lineage">
+                                <button class="diagram-ctrl-btn" data-zoom="in" data-target="lineageColumnImpactDiagram" title="Zoom In">
+                                    <span class="material-symbols-outlined">add</span>
+                                </button>
+                                <button class="diagram-ctrl-btn" data-zoom="out" data-target="lineageColumnImpactDiagram" title="Zoom Out">
+                                    <span class="material-symbols-outlined">remove</span>
+                                </button>
+                                <button class="diagram-ctrl-btn" data-zoom="reset" data-target="lineageColumnImpactDiagram" title="Fit to View">
+                                    <span class="material-symbols-outlined">fit_screen</span>
+                                </button>
+                                <div class="diagram-ctrl-separator"></div>
+                                <button class="diagram-ctrl-btn" data-export="svg" data-diagram="lineage-column" title="Download SVG">
+                                    <span class="material-symbols-outlined">download</span>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                     <div id="lineageDetailPanel" class="lineage-detail-panel hidden"></div>
                 </div>
@@ -479,6 +562,16 @@
                             </button>
                             <button class="diagram-ctrl-btn" id="diagramZoomReset" title="Fit to View">
                                 <span class="material-symbols-outlined">fit_screen</span>
+                            </button>
+                            <div class="diagram-ctrl-separator"></div>
+                            <button class="diagram-ctrl-btn" data-export="svg" data-diagram="relationships" title="Download SVG">
+                                <span class="material-symbols-outlined">download</span>
+                            </button>
+                            <button class="diagram-ctrl-btn" data-export="drawio" data-diagram="relationships" title="Download draw.io">
+                                <span class="material-symbols-outlined">edit_note</span>
+                            </button>
+                            <button class="diagram-ctrl-btn" data-export="mermaid" data-diagram="relationships" title="Copy Mermaid">
+                                <span class="material-symbols-outlined">content_copy</span>
                             </button>
                         </div>
                     </div>
@@ -570,6 +663,8 @@
     <script src="lineage-diagram.js?v=20260306a"></script>
     <script src="doc-generator.js"></script>
     <script src="diagram.js"></script>
+    <script src="drawio-exporter.js"></script>
+    <script src="mermaid-exporter.js"></script>
     <script src="app.js"></script>
 
     <!-- Sponsor Toast Script -->
