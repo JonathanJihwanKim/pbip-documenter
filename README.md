@@ -136,12 +136,17 @@ I'm **Jihwan Kim** ([Microsoft MVP](https://github.com/JonathanJihwanKim)), and 
 | Tier | Amount | Recognition |
 |------|--------|-------------|
 | **Gold** | 50+ EUR/mo | Logo + link on README and app footer |
-| **Silver** | 10+ EUR/mo | Name + link on README |
-| **Coffee** | One-time | Name listed below |
+| **Silver** | 10+ EUR/mo | Name + link on README + shoutout in release notes |
+| **Bronze** | Monthly supporter | Name + link on README |
+| **Coffee** | One-time | Name listed in Hall of Sponsors |
 
 ### Hall of Sponsors
 
-> **Be the first!** Your name, logo, or company will appear right here. [Become a sponsor](https://github.com/sponsors/JonathanJihwanKim) and join the wall.
+| Name | Tier |
+|------|------|
+| [Alex](https://www.reddit.com/user/erparucca/) | Bronze |
+
+> Your name could be here too! [Become a sponsor](https://github.com/sponsors/JonathanJihwanKim) and join the wall.
 
 ## Also by Jihwan Kim
 
