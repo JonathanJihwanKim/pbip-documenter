@@ -144,7 +144,7 @@ I'm **Jihwan Kim** ([Microsoft MVP](https://github.com/JonathanJihwanKim)), and 
 
 | Name | Tier |
 |------|------|
-| [Alex](https://www.reddit.com/user/erparucca/) | Bronze |
+| [Alessandro Tiberti Bertin](https://www.linkedin.com/in/aletb/) | Bronze |
 
 > Your name could be here too! [Become a sponsor](https://github.com/sponsors/JonathanJihwanKim) and join the wall.
 
