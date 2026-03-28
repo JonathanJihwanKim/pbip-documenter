@@ -159,3 +159,14 @@ I'm **Jihwan Kim** ([Microsoft MVP](https://github.com/JonathanJihwanKim)), and 
 ## License
 
 [MIT](LICENSE) — Jihwan Kim
+
+---
+
+### Who is this for?
+
+- **Enterprise BI architects** managing governance across large semantic model estates
+- **Power BI developers** who need instant documentation from PBIP/TMDL metadata
+- **Data governance teams** implementing documentation standards at scale
+- **DevOps engineers** integrating documentation into CI/CD pipelines for Power BI
+
+**Built for:** Power BI | Microsoft Fabric | PBIP | PBIR | TMDL | Semantic Models | DAX | Data Governance | CI/CD | Developer Tools
