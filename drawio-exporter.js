@@ -112,6 +112,139 @@ class DrawioExporter {
     }
 
     /**
+     * Generate a detailed ERD with ALL columns and measures per table.
+     * Designed for large-format printing / comprehensive documentation.
+     * @returns {string} draw.io XML
+     */
+    generateDetailedERD() {
+        const tables = (this.parsedModel.tables || []).filter(t => !t._isAutoDate);
+        const relationships = this.parsedModel.relationships || [];
+
+        // Build FK/PK lookup
+        const fkColumns = new Map();
+        const pkColumns = new Map();
+        for (const rel of relationships) {
+            if (!fkColumns.has(rel.fromTable)) fkColumns.set(rel.fromTable, new Set());
+            fkColumns.get(rel.fromTable).add(rel.fromColumn);
+            if (!pkColumns.has(rel.toTable)) pkColumns.set(rel.toTable, new Set());
+            pkColumns.get(rel.toTable).add(rel.toColumn);
+        }
+
+        // Layout using same BFS grid as detailed-erd.js
+        const layout = this._computeDetailedERDLayout(tables, relationships);
+
+        const cells = [];
+        const tableIdMap = new Map();
+        const rowHeight = 24;
+        const tableWidth = 280;
+
+        for (const entry of layout) {
+            const table = entry.table;
+            const tableId = this._nextId('dtable_' + this._sanitizeId(table.name));
+            tableIdMap.set(table.name, tableId);
+
+            const fkSet = fkColumns.get(table.name) || new Set();
+            const pkSet = pkColumns.get(table.name) || new Set();
+            const columns = table.columns || [];
+            const measures = table.measures || [];
+
+            // Calculate total rows: columns + measures + section headers
+            let rowCount = columns.length;
+            if (measures.length > 0) rowCount += measures.length + 1; // +1 for section header
+            const tableHeight = 30 + rowCount * rowHeight;
+
+            // Storage mode badge
+            const mode = (table.partitions && table.partitions[0]?.mode) || '';
+            const titleSuffix = mode ? ` [${mode}]` : '';
+
+            cells.push(this._mxCell(tableId, this._escapeXml(table.name + titleSuffix),
+                `shape=table;startSize=30;container=1;collapsible=1;childLayout=tableLayout;fixedRows=1;rowLines=0;fontStyle=1;align=center;resizeLast=1;fillColor=#1a3a5c;fontColor=#ffffff;strokeColor=#1a3a5c;`,
+                '1', null, null,
+                { x: entry.x, y: entry.y, width: tableWidth, height: tableHeight }
+            ));
+
+            let colY = 30;
+
+            // All columns
+            for (const col of columns) {
+                const isFk = fkSet.has(col.name);
+                const isPk = pkSet.has(col.name);
+                const isCalc = !col.sourceColumn && col.expression;
+                const dataType = col.dataType ? ` (${col.dataType})` : '';
+                const badges = [];
+                if (isPk) badges.push('PK');
+                if (isFk) badges.push('FK');
+                if (isCalc) badges.push('fx');
+                if (col.isHidden) badges.push('H');
+                const suffix = badges.length > 0 ? ' ' + badges.join(' ') : '';
+                const label = `${col.name}${dataType}${suffix}`;
+
+                const fillColor = isPk || isFk ? '#e8edf2' : isCalc ? '#e8f5e9' : 'none';
+                const fontColor = col.isHidden ? '#999999' : '#333333';
+                const colId = this._nextId('dcol_' + this._sanitizeId(table.name) + '_' + this._sanitizeId(col.name));
+                cells.push(this._mxCell(colId, this._escapeXml(label),
+                    `shape=partialRectangle;overflow=hidden;connectable=0;fillColor=${fillColor};fontColor=${fontColor};top=0;left=0;bottom=0;right=0;fontStyle=0;align=left;spacingLeft=6;fontSize=11;`,
+                    '1', tableId, null,
+                    { y: colY, width: tableWidth, height: rowHeight }
+                ));
+                colY += rowHeight;
+            }
+
+            // Measures section
+            if (measures.length > 0) {
+                const measHeaderId = this._nextId('dmh_' + this._sanitizeId(table.name));
+                cells.push(this._mxCell(measHeaderId, 'MEASURES',
+                    `shape=partialRectangle;overflow=hidden;connectable=0;fillColor=#f5ecd7;fontColor=#8b6e00;top=0;left=0;bottom=0;right=0;fontStyle=1;align=left;spacingLeft=6;fontSize=10;`,
+                    '1', tableId, null,
+                    { y: colY, width: tableWidth, height: rowHeight }
+                ));
+                colY += rowHeight;
+
+                for (const m of measures) {
+                    const mId = this._nextId('dmeas_' + this._sanitizeId(table.name) + '_' + this._sanitizeId(m.name));
+                    const folderHint = m.displayFolder ? ` [${m.displayFolder}]` : '';
+                    cells.push(this._mxCell(mId, this._escapeXml(m.name + folderHint),
+                        `shape=partialRectangle;overflow=hidden;connectable=0;fillColor=#fdf8ed;fontColor=#5d4e00;top=0;left=0;bottom=0;right=0;fontStyle=0;align=left;spacingLeft=6;fontSize=11;`,
+                        '1', tableId, null,
+                        { y: colY, width: tableWidth, height: rowHeight }
+                    ));
+                    colY += rowHeight;
+                }
+            }
+        }
+
+        // Relationship edges
+        for (let i = 0; i < relationships.length; i++) {
+            const rel = relationships[i];
+            const sourceId = tableIdMap.get(rel.fromTable);
+            const targetId = tableIdMap.get(rel.toTable);
+            if (!sourceId || !targetId) continue;
+
+            const relId = this._nextId('drel_' + i);
+            const cardinality = `${rel.fromCardinality || 'many'}:${rel.toCardinality || 'one'}`;
+            const arrows = this._getArrowStyle(cardinality);
+            const isActive = rel.isActive !== false;
+            const strokeColor = isActive ? '#1a3a5c' : '#c62828';
+            const dashed = isActive ? '0' : '1';
+            const label = this._escapeXml(`${rel.fromColumn} \u2192 ${rel.toColumn}`);
+
+            cells.push(this._mxEdge(relId, label,
+                `${arrows}endFill=0;startFill=0;strokeWidth=1.5;strokeColor=${strokeColor};dashed=${dashed};fontSize=9;labelBackgroundColor=#ffffff;`,
+                sourceId, targetId
+            ));
+        }
+
+        // Compute page size from layout extents
+        let maxX = 0, maxY = 0;
+        for (const entry of layout) {
+            maxX = Math.max(maxX, entry.x + 300);
+            maxY = Math.max(maxY, entry.y + 600);
+        }
+
+        return this._wrapDiagram('Detailed ERD', 'detailed-erd', cells, Math.max(maxX + 100, 1169), Math.max(maxY + 100, 827));
+    }
+
+    /**
      * Generate a data lineage diagram as draw.io XML.
      * Left-to-right flow: Data Sources → Tables → Measures → Visuals.
      * Requires lineageEngine or falls back to parsedModel data.
@@ -327,6 +460,94 @@ class DrawioExporter {
         const bottomY = centerY + ringRadius + 200;
         for (let i = 0; i < standalone.length; i++) {
             results.push({ table: standalone[i], x: 50 + i * 250, y: bottomY });
+        }
+
+        return results;
+    }
+
+    /**
+     * BFS column-grid layout for detailed ERD (all columns visible, taller boxes).
+     * @returns {Array<{table, x, y}>}
+     */
+    _computeDetailedERDLayout(tables, relationships) {
+        const tableMap = new Map();
+        for (const t of tables) tableMap.set(t.name, t);
+
+        // Fact table heuristic
+        const manySideCounts = {};
+        for (const t of tables) manySideCounts[t.name] = 0;
+        for (const rel of relationships) {
+            const fromCard = rel.fromCardinality || 'many';
+            const toCard = rel.toCardinality || 'one';
+            if (fromCard === 'many' && manySideCounts[rel.fromTable] !== undefined) manySideCounts[rel.fromTable]++;
+            if (toCard === 'many' && manySideCounts[rel.toTable] !== undefined) manySideCounts[rel.toTable]++;
+        }
+        let factTable = tables[0]?.name;
+        let maxCount = -1;
+        for (const [name, count] of Object.entries(manySideCounts)) {
+            if (count > maxCount) { factTable = name; maxCount = count; }
+        }
+
+        // BFS from fact table
+        const adj = {};
+        for (const t of tables) adj[t.name] = new Set();
+        for (const rel of relationships) {
+            if (adj[rel.fromTable]) adj[rel.fromTable].add(rel.toTable);
+            if (adj[rel.toTable]) adj[rel.toTable].add(rel.fromTable);
+        }
+
+        const visited = new Set([factTable]);
+        const bfsCols = [[factTable]];
+        let frontier = [factTable];
+        while (frontier.length > 0) {
+            const next = [];
+            for (const c of frontier) {
+                for (const n of (adj[c] || [])) {
+                    if (!visited.has(n)) { visited.add(n); next.push(n); }
+                }
+            }
+            if (next.length > 0) bfsCols.push(next);
+            frontier = next;
+        }
+
+        const disconnected = tables.filter(t => !visited.has(t.name));
+        const results = [];
+        const tableWidth = 280;
+        const colGap = 60;
+        const rowGap = 40;
+        let currentX = 60;
+
+        // Estimate table height
+        const estHeight = (t) => {
+            let h = 30 + (t.columns || []).length * 24;
+            if (t.measures && t.measures.length > 0) h += (t.measures.length + 1) * 24;
+            return h;
+        };
+
+        for (const col of bfsCols) {
+            const colNodes = col.map(n => tableMap.get(n)).filter(Boolean);
+            colNodes.sort((a, b) => estHeight(b) - estHeight(a));
+            let currentY = 60;
+            for (const t of colNodes) {
+                results.push({ table: t, x: currentX, y: currentY });
+                currentY += estHeight(t) + rowGap;
+            }
+            if (colNodes.length > 0) currentX += tableWidth + colGap;
+        }
+
+        // Disconnected tables in rows below
+        if (disconnected.length > 0) {
+            let maxY = 0;
+            for (const r of results) maxY = Math.max(maxY, r.y + estHeight(r.table));
+            let dx = 60, dy = maxY + 80;
+            for (const t of disconnected) {
+                if (dx + tableWidth > Math.max(currentX, 1200) && dx > 60) {
+                    dx = 60;
+                    dy += 400;
+                }
+                results.push({ table: t, x: dx, y: dy });
+                dx += tableWidth + colGap;
+            }
         }
 
         return results;

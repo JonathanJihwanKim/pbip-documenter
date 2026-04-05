@@ -868,6 +868,41 @@ tr:hover {
     margin: 0 auto;
 }
 
+/* ── DIAGRAM TOGGLE ── */
+.diagram-toggle-group {
+    display: flex;
+    gap: 0;
+    margin-bottom: 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    width: fit-content;
+}
+
+.diagram-toggle-btn {
+    padding: 6px 16px;
+    background: var(--surface, #f5f2ed);
+    color: var(--text-secondary);
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: background 0.15s, color 0.15s;
+}
+
+.diagram-toggle-btn:hover {
+    background: var(--bg-secondary, #ebe7e0);
+}
+
+.diagram-toggle-btn.active {
+    background: var(--primary);
+    color: #fff;
+}
+
+.diagram-toggle-btn + .diagram-toggle-btn {
+    border-left: 1px solid var(--border);
+}
+
 /* ── DESCRIPTION QUOTE ── */
 .description-quote {
     border-left: 4px solid var(--accent);

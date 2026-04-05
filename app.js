@@ -16,6 +16,7 @@ class App {
         this.lineageEngine = null;
         this.lineageDiagramRenderer = null;
         this._diagramRendered = false;
+        this._detailedERDRendered = false;
         this._lineageRendered = false;
 
         this.parseErrors = [];
@@ -175,6 +176,30 @@ class App {
                 this._handleLineageZoom(action, targetId);
             }
         });
+
+        // Detailed ERD toggle
+        const toggleOverview = document.getElementById('toggleOverview');
+        const toggleDetailedERD = document.getElementById('toggleDetailedERD');
+        if (toggleOverview && toggleDetailedERD) {
+            toggleOverview.addEventListener('click', () => {
+                toggleOverview.classList.add('active');
+                toggleDetailedERD.classList.remove('active');
+                document.getElementById('relationshipsDiagram').classList.remove('hidden');
+                document.getElementById('detailedERDContainer').classList.add('hidden');
+            });
+            toggleDetailedERD.addEventListener('click', () => {
+                toggleDetailedERD.classList.add('active');
+                toggleOverview.classList.remove('active');
+                document.getElementById('relationshipsDiagram').classList.add('hidden');
+                document.getElementById('detailedERDContainer').classList.remove('hidden');
+                if (!this._detailedERDRendered && this.parsedModel) {
+                    this._detailedERDRendered = true;
+                    const container = document.getElementById('detailedERDContainer');
+                    container.innerHTML = '<div class="diagram-controls" id="detailedERDControls"><button class="diagram-ctrl-btn" id="detailedERDZoomIn" title="Zoom In"><span class="material-symbols-outlined">add</span></button><button class="diagram-ctrl-btn" id="detailedERDZoomOut" title="Zoom Out"><span class="material-symbols-outlined">remove</span></button><button class="diagram-ctrl-btn" id="detailedERDZoomReset" title="Fit to View"><span class="material-symbols-outlined">fit_screen</span></button><div class="diagram-ctrl-separator"></div><button class="diagram-ctrl-btn" data-export="svg" data-diagram="detailed-erd" title="Download SVG"><span class="material-symbols-outlined">download</span></button><button class="diagram-ctrl-btn" data-export="drawio" data-diagram="detailed-erd" title="Download draw.io"><span class="material-symbols-outlined">edit_note</span></button></div><div class="loading"><div class="spinner"></div>Building detailed ERD\u2026</div>';
+                    requestAnimationFrame(() => requestAnimationFrame(() => this.renderDetailedERD()));
+                }
+            });
+        }
 
         // Dark mode toggle
         const themeBtn = document.getElementById('btnThemeToggle');
@@ -632,6 +657,7 @@ class App {
 
             // Diagram rendering is deferred until the relationships section is shown
             this._diagramRendered = false;
+            this._detailedERDRendered = false;
 
             // Show warning banner if there were parse errors
             if (this.parseErrors.length > 0) {
@@ -775,6 +801,7 @@ class App {
             }
 
             this._diagramRendered = false;
+            this._detailedERDRendered = false;
 
         } catch (err) {
             const msg = err.name === 'TypeError' && err.message.includes('fetch')
@@ -2254,6 +2281,12 @@ class App {
         document.getElementById('relationshipsList').innerHTML = html;
     }
 
+    renderDetailedERD() {
+        const container = document.getElementById('detailedERDContainer');
+        this.detailedERDRenderer = new DetailedERDRenderer(container);
+        this.detailedERDRenderer.render(this.parsedModel.tables, this.parsedModel.relationships);
+    }
+
     // ──────────────────────────────────────────────
     // REPORT PAGES & VISUAL EXPLORER
     // ──────────────────────────────────────────────
@@ -2869,6 +2902,7 @@ class App {
 
         const containerMap = {
             'relationships': 'relationshipsDiagram',
+            'detailed-erd': 'detailedERDContainer',
             'visual-usage': 'visualUsageByVisual',
             'lineage-full': 'lineageDiagramContainer',
             'lineage-trace': 'lineageTraceDiagram',
@@ -2924,6 +2958,8 @@ class App {
 
         if (diagramType === 'relationships') {
             xml = exporter.generateERD();
+        } else if (diagramType === 'detailed-erd') {
+            xml = exporter.generateDetailedERD();
         } else if (diagramType.startsWith('lineage')) {
             xml = exporter.generateLineage();
         } else {

@@ -552,6 +552,10 @@
                 <!-- Relationships -->
                 <div id="view-relationships" class="section-view content-panel">
                     <h2>Relationships</h2>
+                    <div class="diagram-toggle-group">
+                        <button class="diagram-toggle-btn active" id="toggleOverview" title="Simplified overview diagram">Overview</button>
+                        <button class="diagram-toggle-btn" id="toggleDetailedERD" title="Full-detail ERD with all columns, measures, and row-level relationships">Detailed ERD</button>
+                    </div>
                     <div id="relationshipsDiagram" class="diagram-container diagram-interactive">
                         <div class="diagram-controls" id="diagramControls">
                             <button class="diagram-ctrl-btn" id="diagramZoomIn" title="Zoom In">
@@ -572,6 +576,26 @@
                             </button>
                             <button class="diagram-ctrl-btn" data-export="mermaid" data-diagram="relationships" title="Copy Mermaid">
                                 <span class="material-symbols-outlined">content_copy</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="detailedERDContainer" class="diagram-container diagram-interactive hidden">
+                        <div class="diagram-controls" id="detailedERDControls">
+                            <button class="diagram-ctrl-btn" id="detailedERDZoomIn" title="Zoom In">
+                                <span class="material-symbols-outlined">add</span>
+                            </button>
+                            <button class="diagram-ctrl-btn" id="detailedERDZoomOut" title="Zoom Out">
+                                <span class="material-symbols-outlined">remove</span>
+                            </button>
+                            <button class="diagram-ctrl-btn" id="detailedERDZoomReset" title="Fit to View">
+                                <span class="material-symbols-outlined">fit_screen</span>
+                            </button>
+                            <div class="diagram-ctrl-separator"></div>
+                            <button class="diagram-ctrl-btn" data-export="svg" data-diagram="detailed-erd" title="Download SVG">
+                                <span class="material-symbols-outlined">download</span>
+                            </button>
+                            <button class="diagram-ctrl-btn" data-export="drawio" data-diagram="detailed-erd" title="Download draw.io">
+                                <span class="material-symbols-outlined">edit_note</span>
                             </button>
                         </div>
                     </div>
@@ -663,6 +687,7 @@
     <script src="lineage-diagram.js?v=20260306a"></script>
     <script src="doc-generator.js"></script>
     <script src="diagram.js"></script>
+    <script src="detailed-erd.js"></script>
     <script src="drawio-exporter.js"></script>
     <script src="mermaid-exporter.js"></script>
     <script src="app.js"></script>
