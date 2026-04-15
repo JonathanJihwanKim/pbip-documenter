@@ -315,6 +315,141 @@ class MExpressionParser {
     }
 
     /**
+     * Extract physical table and column lineage from an M expression.
+     * Parses Navigation steps, Table.RenameColumns, Table.SelectColumns, Table.AddColumn.
+     * @param {string} mExpression - Power Query M expression text
+     * @returns {{ physicalSchema: string|null, physicalTable: string|null, renames: Array<{sourceName:string, modelName:string}>, selectedColumns: string[]|null, addedColumns: string[] }|null}
+     */
+    static extractTableLineage(mExpression) {
+        if (!mExpression) return null;
+
+        const result = {
+            physicalSchema: null,
+            physicalTable: null,
+            renames: [],         // [{sourceName, modelName}] source col name → model col name
+            selectedColumns: null, // null = all columns, array = explicit projection
+            addedColumns: []     // columns added via Table.AddColumn (computed in PQ)
+        };
+
+        // 1. Navigation step: identifier{[Schema="dbo", Item="FactSales"]}[Data]
+        //    Also handles Item-first ordering.
+        const navSchemaItem = /\{\s*\[\s*Schema\s*=\s*"([^"]+)"\s*,\s*Item\s*=\s*"([^"]+)"\s*\]\s*\}\s*\[Data\]/i.exec(mExpression);
+        if (navSchemaItem) {
+            result.physicalSchema = navSchemaItem[1];
+            result.physicalTable  = navSchemaItem[2];
+        } else {
+            const navItemSchema = /\{\s*\[\s*Item\s*=\s*"([^"]+)"\s*,\s*Schema\s*=\s*"([^"]+)"\s*\]\s*\}\s*\[Data\]/i.exec(mExpression);
+            if (navItemSchema) {
+                result.physicalTable  = navItemSchema[1];
+                result.physicalSchema = navItemSchema[2];
+            }
+        }
+
+        // Fallback: simple Name-based navigation (e.g. Lakehouse, OData)
+        if (!result.physicalTable) {
+            const navName = /\{\s*\[\s*Name\s*=\s*"([^"]+)"\s*\]\s*\}\s*\[Data\]/i.exec(mExpression);
+            if (navName) result.physicalTable = navName[1];
+        }
+
+        // 2. Table.RenameColumns — find all calls and collect {"OldName","NewName"} pairs
+        //    We locate each call site then scan forward for pairs.
+        const renamePat = /Table\.RenameColumns\b/g;
+        let rm;
+        while ((rm = renamePat.exec(mExpression)) !== null) {
+            // Find the opening brace of the list argument (after the first comma)
+            const afterCall = mExpression.slice(rm.index);
+            const commaIdx  = afterCall.indexOf(',');
+            if (commaIdx === -1) continue;
+            const listStart = afterCall.indexOf('{', commaIdx);
+            if (listStart === -1) continue;
+            // Grab a safe window (2000 chars) to find pairs
+            const window = afterCall.slice(listStart, listStart + 2000);
+            const pairPat = /\{\s*"([^"]+)"\s*,\s*"([^"]+)"\s*\}/g;
+            let pp;
+            while ((pp = pairPat.exec(window)) !== null) {
+                result.renames.push({ sourceName: pp[1], modelName: pp[2] });
+            }
+        }
+
+        // 3. Table.SelectColumns — last call wins (represents the final projected set)
+        const selectPat = /Table\.SelectColumns\b/g;
+        let sm, lastSelectPos = -1, lastSelectStr = null;
+        while ((sm = selectPat.exec(mExpression)) !== null) {
+            lastSelectPos = sm.index;
+        }
+        if (lastSelectPos !== -1) {
+            const afterSel  = mExpression.slice(lastSelectPos);
+            const commaIdx  = afterSel.indexOf(',');
+            if (commaIdx !== -1) {
+                const braceIdx = afterSel.indexOf('{', commaIdx);
+                if (braceIdx !== -1) {
+                    const window = afterSel.slice(braceIdx, braceIdx + 4000);
+                    const colPat = /"([^"]+)"/g;
+                    const cols = [];
+                    let cp;
+                    while ((cp = colPat.exec(window)) !== null) {
+                        // Stop if we hit another Table. call keyword (rough boundary)
+                        if (cp.index > 10 && window.slice(0, cp.index).includes('Table.')) break;
+                        cols.push(cp[1]);
+                    }
+                    if (cols.length > 0) result.selectedColumns = cols;
+                }
+            }
+        }
+
+        // 4. Table.AddColumn — collect computed column names
+        const addPat = /Table\.AddColumn\s*\(\s*(?:[^,\n]+),\s*"([^"]+)"/g;
+        let ac;
+        while ((ac = addPat.exec(mExpression)) !== null) {
+            result.addedColumns.push(ac[1]);
+        }
+
+        // 5. Table.RemoveColumns — if we have a selectedColumns list, prune it
+        if (result.selectedColumns !== null) {
+            const removePat = /Table\.RemoveColumns\b/g;
+            let rmc;
+            while ((rmc = removePat.exec(mExpression)) !== null) {
+                const afterRem = mExpression.slice(rmc.index);
+                const commaIdx = afterRem.indexOf(',');
+                if (commaIdx === -1) continue;
+                const braceIdx = afterRem.indexOf('{', commaIdx);
+                if (braceIdx === -1) continue;
+                const window = afterRem.slice(braceIdx, braceIdx + 2000);
+                const rColPat = /"([^"]+)"/g;
+                let rc;
+                while ((rc = rColPat.exec(window)) !== null) {
+                    const idx = result.selectedColumns.indexOf(rc[1]);
+                    if (idx !== -1) result.selectedColumns.splice(idx, 1);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * Extract physical table lineage for every table in a parsed model.
+     * Returns a Map<tableName, tableLineage> for use by the lineage engine.
+     * @param {Object} parsedModel
+     * @returns {Map<string, Object>}
+     */
+    static extractTableLineageFromModel(parsedModel) {
+        const map = new Map();
+        for (const table of (parsedModel.tables || [])) {
+            for (const partition of (table.partitions || [])) {
+                if (partition.source) {
+                    const lineage = this.extractTableLineage(partition.source);
+                    if (lineage && (lineage.physicalTable || lineage.renames.length > 0)) {
+                        // First partition with real lineage wins
+                        if (!map.has(table.name)) map.set(table.name, lineage);
+                    }
+                }
+            }
+        }
+        return map;
+    }
+
+    /**
      * Deduplicate sources across partitions
      * @param {Array} allSources - Array of source objects
      * @returns {Array} Deduplicated sources

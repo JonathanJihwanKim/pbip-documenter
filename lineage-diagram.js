@@ -307,6 +307,124 @@ class LineageDiagramRenderer {
     }
 
     /**
+     * Render forward lineage starting from a physical source table.
+     * Entry point: Source → Model Table → Measures/Columns → Visuals.
+     * Same direction as existing lineage; the new part is the source-first entry point.
+     * @param {string} physicalTable - e.g. "FactSales"
+     * @param {string|null} physicalSchema - e.g. "dbo"
+     */
+    renderSourceTrace(container, physicalTable, physicalSchema) {
+        const target = container || this.container;
+        this._clearContainer(target);
+        this._isFullLineageView = false;
+
+        const engine = this.lineageEngine;
+        const consumers = engine.getPhysicalTableConsumers(physicalTable, physicalSchema);
+        const label = physicalSchema ? `${physicalSchema}.${physicalTable}` : physicalTable;
+
+        if (consumers.tables.length === 0) {
+            target.innerHTML = `<p style="text-align:center;color:#666;padding:40px">No model tables found consuming physical table <strong>${label}</strong>.</p>`;
+            return;
+        }
+
+        // Build four-column layout: Source → Model Tables → Measures → Visuals
+        const columns = [
+            {
+                label: 'Physical Source',
+                color: this.colors.source,
+                colorBg: this.colors.sourceBg,
+                items: [{
+                    id: `phys:${label}`,
+                    name: label,
+                    type: 'source',
+                    detail: physicalSchema || ''
+                }]
+            },
+            {
+                label: 'Model Tables',
+                color: this.colors.table,
+                colorBg: this.colors.tableBg,
+                items: consumers.tables.map(t => ({
+                    id: `table:${t.name}`,
+                    name: t.name,
+                    type: 'table',
+                    detail: ''
+                }))
+            },
+            {
+                label: 'Measures',
+                color: this.colors.measure,
+                colorBg: this.colors.measureBg,
+                items: consumers.measures.map(m => ({
+                    id: `measure:${m.table}.${m.name}`,
+                    name: `[${m.name}]`,
+                    type: 'measure',
+                    detail: m.table
+                }))
+            },
+            {
+                label: 'Visuals',
+                color: this.colors.visual,
+                colorBg: this.colors.visualBg,
+                items: consumers.visuals.map(v => ({
+                    id: `visual:${v.page}|${v.name}`,
+                    name: v.name,
+                    type: 'visual',
+                    detail: v.page
+                }))
+            }
+        ];
+
+        const layout = this._layoutColumns(columns);
+        const svg    = this._renderLayout(layout, columns, `Source Trace: ${label}`);
+
+        // Draw edges
+        const posMap = new Map();
+        for (const col of columns) {
+            for (const item of col.items) posMap.set(item.id, item);
+        }
+
+        const sourceItem = posMap.get(`phys:${label}`);
+        if (sourceItem) {
+            // Source → Model Tables
+            for (const t of consumers.tables) {
+                const tItem = posMap.get(`table:${t.name}`);
+                if (tItem) this._drawEdge(svg, sourceItem, tItem, 'connects_to_source');
+            }
+        }
+        // Model Tables → Measures
+        for (const m of consumers.measures) {
+            const mItem = posMap.get(`measure:${m.table}.${m.name}`);
+            if (!mItem) continue;
+            // Connect via the model table that the measure belongs to
+            const tItem = posMap.get(`table:${m.table}`);
+            if (tItem) this._drawEdge(svg, tItem, mItem, 'defined_in_table');
+        }
+        // Measures → Visuals
+        for (const v of consumers.visuals) {
+            const vItem = posMap.get(`visual:${v.page}|${v.name}`);
+            if (!vItem) continue;
+            // Draw from the first measure that connects to this visual (best-effort)
+            let connected = false;
+            for (const m of consumers.measures) {
+                const mItem = posMap.get(`measure:${m.table}.${m.name}`);
+                if (mItem && !connected) {
+                    this._drawEdge(svg, mItem, vItem, 'uses_field');
+                    connected = true;
+                }
+            }
+            // If no measure edge, draw from the first table
+            if (!connected && consumers.tables.length > 0) {
+                const tItem = posMap.get(`table:${consumers.tables[0].name}`);
+                if (tItem) this._drawEdge(svg, tItem, vItem, 'uses_field');
+            }
+        }
+
+        target.appendChild(svg);
+        this._initInteractivity(svg, layout.width, layout.height, target);
+    }
+
+    /**
      * Export SVG as string
      */
     exportSVG() {

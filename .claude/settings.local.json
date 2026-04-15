@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"const fs=require\\('fs'\\); const src=fs.readFileSync\\('d:/pbip-documenter/m-parser.js','utf8'\\); let ln=0; const lines=src.split\\('\\\\n'\\); for\\(let i=548;i<558;i++\\) console.log\\(i+1, lines[i]\\);\")",
+      "Bash(node -e ' *)",
+      "Bash(node /tmp/test_mparser.js)",
+      "Bash(node tests/test-mparser-lineage.js)",
+      "Bash(node tests/test-lineage-reverse.js)",
+      "Bash(grep -l \"Schema=\" \"d:/sample_powerbi/prod_report_picking_dashboard_v1.SemanticModel/definition/tables/\"*.tmdl)"
+    ]
+  }
+}

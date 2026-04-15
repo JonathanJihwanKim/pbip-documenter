@@ -32,6 +32,16 @@ class App {
             return;
         }
 
+        // Persona chip selection — remember chosen persona and scroll after parse
+        this._activePersona = 'dev';
+        document.querySelectorAll('.persona-chip').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.persona-chip').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                this._activePersona = btn.dataset.persona || 'dev';
+            });
+        });
+
         // Bind events
         document.getElementById('openFolderBtn').addEventListener('click', () => this.openFolder());
         document.getElementById('changeFolderBtn').addEventListener('click', () => this.openFolder());
@@ -609,6 +619,7 @@ class App {
             this.updateStats();
             this.buildSidebar();
             this.renderOverview();
+            this._navigateByPersona();
             this.showSection('overview');
 
             this._track('Model Parsed', { tables: this.parsedModel.tables.length, measures: this.parsedModel.tables.reduce((s, t) => s + t.measures.length, 0) });
@@ -1281,6 +1292,25 @@ class App {
 
         content.innerHTML = html;
         this._bindDaxToggles(content);
+    }
+
+    /**
+     * After a successful parse, navigate to the sidebar section most relevant
+     * to the persona the user selected on the landing page.
+     */
+    _navigateByPersona() {
+        const persona = this._activePersona || 'dev';
+        const sectionMap = {
+            dev:  'measures',       // Power BI developer → Measure Catalog
+            data: 'data-sources',   // Data engineer → Data Sources
+            po:   'overview'        // Product owner → Model Overview
+        };
+        const target = sectionMap[persona] || 'overview';
+        // Only auto-navigate away from overview for non-default personas
+        if (target !== 'overview') {
+            // Defer slightly so overview renders first, then switch
+            setTimeout(() => this.showSection(target), 50);
+        }
     }
 
     renderOverview() {
@@ -2061,24 +2091,70 @@ class App {
             return;
         }
 
-        let html = '';
+        let html = '<p class="section-subtitle">Data engineer view — physical tables loaded from each source, column renames, and downstream consumers.</p>';
+
         for (const src of sources) {
-            const name = src.type;
-            const server = src.serverResolved || src.server;
-            const db = src.databaseResolved || src.database;
+            const server    = src.serverResolved || src.server;
+            const db        = src.databaseResolved || src.database;
+            const sourceId  = `source:${MExpressionParser._sourceKey(src)}`;
+            const consumers = this.lineageEngine.getDataSourceConsumers(sourceId);
+            const mCount    = consumers.measures.length;
+            const vCount    = consumers.visuals.length;
+            const gwBadge   = src.gatewayRequired === true ? '<span class="badge" style="background:#ffebee;color:#c62828;margin-left:4px">Gateway Required</span>' : '';
+            const paramBadge = src.parameterized ? '<span class="badge badge-field-param" style="margin-left:4px">Parameterized</span>' : '';
 
             html += `<div class="data-source-card">
-                <h4><span class="lineage-badge source">${this._esc(name)}</span>`;
-            if (src.tableName) {
-                html += ` <span class="badge badge-table">${this._esc(src.tableName)}</span>`;
+                <h4><span class="lineage-badge source">${this._esc(src.type)}</span>`;
+            if (server) html += ` <code style="font-size:12px;font-weight:normal">${this._esc(server)}</code>`;
+            if (db)     html += ` <span style="color:var(--text-secondary);font-size:12px">/ ${this._esc(db)}</span>`;
+            if (src.url)  html += ` <code style="font-size:12px;font-weight:normal">${this._esc(src.url)}</code>`;
+            if (src.path) html += ` <code style="font-size:12px;font-weight:normal">${this._esc(src.path)}</code>`;
+            html += `${paramBadge}${gwBadge}</h4>`;
+
+            // Consumer summary pills
+            if (mCount > 0 || vCount > 0) {
+                html += `<div class="ds-consumer-summary">
+                    <span>${mCount} measure${mCount !== 1 ? 's' : ''}</span>
+                    <span>${vCount} visual${vCount !== 1 ? 's' : ''}</span>
+                    <span>${consumers.pages.length} page${consumers.pages.length !== 1 ? 's' : ''}</span>
+                </div>`;
             }
-            html += `</h4><div class="ds-meta">`;
-            if (server) html += `<span>Server: <code>${this._esc(server)}</code></span>`;
-            if (db) html += `<span>Database: <code>${this._esc(db)}</code></span>`;
-            if (src.url) html += `<span>URL: <code>${this._esc(src.url)}</code></span>`;
-            if (src.path) html += `<span>Path: <code>${this._esc(src.path)}</code></span>`;
-            if (src.parameterized) html += `<span class="badge badge-field-param">Parameterized</span>`;
-            html += `</div></div>`;
+
+            // Physical tables with schema/rename drill-down
+            if (consumers.tables.length > 0) {
+                html += `<div class="ds-physical-tables">
+                    <p class="ds-section-label">Physical tables (${consumers.tables.length})</p>`;
+                for (const t of consumers.tables) {
+                    const physLabel = [t.physicalSchema, t.physicalTable].filter(Boolean).join('.');
+                    html += `<div class="ds-physical-row">
+                        <span class="ds-model-table" onclick="app.navigateTo('tables', ${JSON.stringify(t.name)})" title="Click to open table">${this._esc(t.name)}</span>`;
+                    if (physLabel) html += `<span class="ds-arrow">←</span><code class="ds-phys-label">${this._esc(physLabel)}</code>`;
+                    if (t.renames.length > 0) {
+                        html += ` <details class="ds-renames-details"><summary>${t.renames.length} rename${t.renames.length !== 1 ? 's' : ''}</summary><ul>`;
+                        for (const r of t.renames) {
+                            html += `<li><code>${this._esc(r.sourceName)}</code> → <code>${this._esc(r.modelName)}</code></li>`;
+                        }
+                        html += `</ul></details>`;
+                    }
+                    if (t.addedColumns.length > 0) {
+                        html += ` <span class="ds-computed-note">+${t.addedColumns.length} computed</span>`;
+                    }
+                    html += `</div>`;
+                }
+                html += `</div>`;
+            }
+
+            // Measure chips (collapsible)
+            if (consumers.measures.length > 0) {
+                html += `<details class="ds-measures-details"><summary class="ds-section-label">Measures (${consumers.measures.length})</summary><div class="ds-measure-chips">`;
+                for (const m of consumers.measures.slice(0, 20)) {
+                    html += `<span class="lineage-badge measure">[${this._esc(m.name)}]</span>`;
+                }
+                if (consumers.measures.length > 20) html += `<span style="font-size:11px;color:var(--text-secondary)">+${consumers.measures.length - 20} more</span>`;
+                html += `</div></details>`;
+            }
+
+            html += `</div>`;
         }
 
         content.innerHTML = html;

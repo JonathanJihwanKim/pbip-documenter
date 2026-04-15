@@ -74,8 +74,25 @@
         <!-- Landing / Folder Selection -->
         <div id="landingSection" class="content-panel folder-section">
             <h2>Generate Documentation from TMDL</h2>
-            <p>Select a project folder to parse your semantic model and generate comprehensive documentation.<br>
-            Visual Lineage tracing, DAX dependency chains, data source discovery, relationship diagrams and visual usage mapping.</p>
+            <p>Select a PBIP project folder to generate comprehensive documentation for your Power BI semantic model — DAX measures, data lineage, visual usage, and more.</p>
+
+            <!-- Persona chips -->
+            <div class="persona-chips" id="personaChips">
+                <span class="persona-label">I am a</span>
+                <button class="persona-chip active" data-persona="dev" title="Measure catalog, DAX references, visual usage — forward view">
+                    <span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle">functions</span>
+                    Power BI Developer
+                </button>
+                <button class="persona-chip" data-persona="data" title="Source tables, column lineage, where-used catalog — reverse view">
+                    <span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle">database</span>
+                    Data Engineer
+                </button>
+                <button class="persona-chip" data-persona="po" title="Executive summary, model overview, dynamic features">
+                    <span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle">leaderboard</span>
+                    Product Owner
+                </button>
+            </div>
+
             <button id="openFolderBtn" class="btn-open-folder">
                 <span class="material-symbols-outlined">folder_open</span>
                 Open Project Folder

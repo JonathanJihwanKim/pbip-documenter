@@ -93,6 +93,9 @@ class DocGenerator {
 
         lines.push('');
 
+        // Executive Summary (product owner overview — appears first)
+        this._appendMarkdownExecutiveSummary(lines, visualData);
+
         // Model sections
         this._appendMarkdownModelSections(lines);
 
@@ -204,6 +207,70 @@ class DocGenerator {
     }
 
     /**
+     * Executive Summary — product owner at-a-glance view.
+     * Appears at the top of full exports. Covers model stats, top measures, top source tables.
+     */
+    _appendMarkdownExecutiveSummary(lines, visualData) {
+        const tables   = this._getVisibleTables();
+        const autoDate = this._getAutoDateCount();
+        const totalMeasures = tables.reduce((s, t) => s + t.measures.length, 0);
+        const totalCols     = tables.reduce((s, t) => s + t.columns.length, 0);
+        const dynTables     = this._getDynamicFeaturesTables();
+        const dynCount      = dynTables.fieldParams.length + dynTables.calcGroups.length;
+
+        lines.push('## Executive Summary');
+        lines.push('');
+        lines.push('| | |');
+        lines.push('|---|---|');
+        lines.push(`| Tables | ${tables.length}${autoDate > 0 ? ` *(${autoDate} auto-date hidden)*` : ''} |`);
+        lines.push(`| Columns | ${totalCols} |`);
+        lines.push(`| Measures | ${totalMeasures} |`);
+        lines.push(`| Relationships | ${this.model.relationships.length} |`);
+        if (visualData) {
+            lines.push(`| Report Pages | ${visualData.pages.length} |`);
+            lines.push(`| Visuals | ${visualData.visuals.length} |`);
+        }
+        if (this.lineageEngine) {
+            lines.push(`| Data Sources | ${this.lineageEngine.getAllDataSources().length} |`);
+        }
+        if (dynCount > 0) {
+            lines.push(`| Dynamic Features | ${dynCount} (${dynTables.fieldParams.length} field param${dynTables.fieldParams.length !== 1 ? 's' : ''}, ${dynTables.calcGroups.length} calc group${dynTables.calcGroups.length !== 1 ? 's' : ''}) |`);
+        }
+        if (this.lineageEngine?.brokenRefs?.length > 0) {
+            lines.push(`| Broken References | ${this.lineageEngine.brokenRefs.length} |`);
+        }
+        lines.push('');
+
+        // Top 5 measures by visual coverage
+        if (this.lineageEngine && visualData) {
+            const topMeasures = this.lineageEngine.getTopMeasuresByVisualCount(5);
+            if (topMeasures.length > 0) {
+                lines.push('### Top Measures by Report Coverage');
+                lines.push('');
+                lines.push('| Measure | Table | Visuals | Pages |');
+                lines.push('|---------|-------|---------|-------|');
+                for (const m of topMeasures) {
+                    lines.push(`| ${this._escMd(m.name)} | ${this._escMd(m.table)} | ${m.visualCount} | ${m.pageCount} |`);
+                }
+                lines.push('');
+            }
+
+            // Top 5 source tables by consumption
+            const topSources = this.lineageEngine.getTopSourceTablesByConsumption(5);
+            if (topSources.length > 0) {
+                lines.push('### Top Source Tables by Downstream Coverage');
+                lines.push('');
+                lines.push('| Physical Table | Schema | Model Table | Measures | Visuals |');
+                lines.push('|---------------|--------|-------------|----------|---------|');
+                for (const s of topSources) {
+                    lines.push(`| ${this._escMd(s.physicalTable)} | ${this._escMd(s.physicalSchema || '')} | ${this._escMd(s.modelTable)} | ${s.measureCount} | ${s.visualCount} |`);
+                }
+                lines.push('');
+            }
+        }
+    }
+
+    /**
      * Append model sections (overview, tables, measures, relationships, roles, expressions)
      * @param {boolean} includeVisualUsage - Whether to include visual usage per measure
      */
@@ -302,7 +369,6 @@ class DocGenerator {
 
                 for (const col of table.columns) {
                     const hidden = col.isHidden ? 'Yes' : '';
-                    const desc = col.description || '';
                     const fmt = col.formatString || '';
                     const sortBy = col.sortByColumn || '';
                     const summarize = col.summarizeBy || '';
@@ -310,6 +376,27 @@ class DocGenerator {
                     lines.push(`| ${this._escMd(col.name)}${calcBadge} | ${col.dataType || ''} | ${this._escMd(sortBy)} | ${summarize} | ${hidden} | ${this._escMd(fmt)} |`);
                 }
                 lines.push('');
+
+                // Column Where Used — for data engineer perspective
+                if (this.lineageEngine) {
+                    const usedRows = [];
+                    for (const col of table.columns) {
+                        if (col.isHidden) continue; // skip hidden utility columns
+                        const consumers = this.lineageEngine.getColumnConsumers(table.name, col.name);
+                        if (consumers.measures.length === 0 && consumers.directVisuals.length === 0) continue;
+                        const measuresStr = consumers.measures.map(m => `\`[${m.name}]\``).join(', ');
+                        const visualsStr  = consumers.directVisuals.map(v => `${v.page}: ${v.name}`).join('; ');
+                        usedRows.push(`| ${this._escMd(col.name)} | ${measuresStr} | ${this._escMd(visualsStr)} |`);
+                    }
+                    if (usedRows.length > 0) {
+                        lines.push('#### Column Usage (Where Used)');
+                        lines.push('');
+                        lines.push('| Column | Referenced by Measures | Used in Visuals |');
+                        lines.push('|--------|------------------------|-----------------|');
+                        for (const row of usedRows) lines.push(row);
+                        lines.push('');
+                    }
+                }
             }
 
             // Measures
@@ -600,20 +687,56 @@ class DocGenerator {
     _appendMarkdownLineageSections(lines, visualData) {
         if (!this.lineageEngine) return;
 
-        // Data Sources section
+        // Data Sources section — expanded with physical table mapping and consumer catalog
         const dataSources = this.lineageEngine.getAllDataSources();
         if (dataSources.length > 0) {
             lines.push('## Data Sources');
             lines.push('');
-            lines.push('| Type | Server/URL | Database | Parameterized | Gateway |');
-            lines.push('|------|-----------|----------|---------------|---------|');
+            lines.push('> Data engineer view: for each source, which physical tables were loaded, how columns were renamed, and which model measures and report visuals consume them.');
+            lines.push('');
             for (const src of dataSources) {
                 const server = src.serverResolved || src.server || src.url || src.path || '';
-                const db = src.databaseResolved || src.database || '';
-                const gw = src.gatewayRequired === true ? 'Required' : src.gatewayRequired === false ? 'No' : '';
-                lines.push(`| ${src.type} | ${server} | ${db} | ${src.parameterized ? 'Yes' : 'No'} | ${gw} |`);
+                const db     = src.databaseResolved || src.database || '';
+                const gw     = src.gatewayRequired === true ? ' · Gateway Required' : src.gatewayRequired === false ? '' : '';
+                const paramStr = src.parameterized ? ' · Parameterized' : '';
+                const sourceId = `source:${MExpressionParser._sourceKey(src)}`;
+                const consumers = this.lineageEngine.getDataSourceConsumers(sourceId);
+
+                const header = [src.type, server, db].filter(Boolean).join(' / ');
+                lines.push(`### ${this._escMd(header)}${paramStr}${gw}`);
+                lines.push('');
+
+                if (consumers.tables.length > 0) {
+                    lines.push(`**Physical tables loaded: ${consumers.tables.length}**`);
+                    lines.push('');
+                    for (const t of consumers.tables) {
+                        const physLabel = [t.physicalSchema, t.physicalTable].filter(Boolean).join('.');
+                        const arrow = physLabel ? ` ← \`${physLabel}\`` : '';
+                        lines.push(`- **${this._escMd(t.name)}**${arrow}`);
+                        if (t.renames.length > 0) {
+                            const renameStr = t.renames.map(r => `\`${r.sourceName}\` → \`${r.modelName}\``).join(', ');
+                            lines.push(`  - Column renames: ${renameStr}`);
+                        }
+                        if (t.addedColumns.length > 0) {
+                            lines.push(`  - Computed columns: ${t.addedColumns.map(c => `\`${c}\``).join(', ')}`);
+                        }
+                    }
+                    lines.push('');
+                }
+
+                const mCount = consumers.measures.length;
+                const vCount = consumers.visuals.length;
+                const pCount = consumers.pages.length;
+                if (mCount > 0 || vCount > 0) {
+                    lines.push(`**Consumed by:** ${mCount} measure${mCount !== 1 ? 's' : ''} · ${vCount} visual${vCount !== 1 ? 's' : ''} across ${pCount} page${pCount !== 1 ? 's' : ''}`);
+                    lines.push('');
+                    if (consumers.measures.length > 0) {
+                        lines.push('Measures: ' + consumers.measures.slice(0, 10).map(m => `\`[${m.name}]\``).join(', ') +
+                            (consumers.measures.length > 10 ? ` *(+${consumers.measures.length - 10} more)*` : ''));
+                        lines.push('');
+                    }
+                }
             }
-            lines.push('');
         }
 
         // Measure Dependencies section
@@ -1529,6 +1652,33 @@ details > .details-content {
 </tr>`;
                 }
                 html += `</table>`;
+
+                // Column Where Used — data engineer perspective
+                if (this.lineageEngine) {
+                    const usedCols = [];
+                    for (const col of table.columns) {
+                        if (col.isHidden) continue;
+                        const consumers = this.lineageEngine.getColumnConsumers(table.name, col.name);
+                        if (consumers.measures.length === 0 && consumers.directVisuals.length === 0) continue;
+                        usedCols.push({ col, consumers });
+                    }
+                    if (usedCols.length > 0) {
+                        html += `<details style="margin-top:8px"><summary style="font-size:13px;font-weight:600;cursor:pointer;color:var(--primary,#1a3a5c)">Column Usage — Where Used (${usedCols.length} columns)</summary><div class="details-content">
+<p style="font-size:12px;color:var(--text-secondary,#666);margin:6px 0">Data engineer view: which measures and visuals consume each column in this table.</p>
+<table><tr><th>Column</th><th>Referenced by Measures</th><th>Used in Visuals</th></tr>`;
+                        for (const { col, consumers } of usedCols) {
+                            const measuresHtml = consumers.measures.map(m =>
+                                `<span style="display:inline-block;background:#fff8e1;border:1px solid #ffe082;border-radius:2px;padding:1px 5px;font-family:monospace;font-size:11px;margin:1px">[${this._escHtml(m.name)}]</span>`
+                            ).join(' ');
+                            const visualsHtml = consumers.directVisuals.slice(0, 5).map(v =>
+                                `<span style="font-size:11px;color:#555">${this._escHtml(v.page)}: ${this._escHtml(v.name)}</span>`
+                            ).join('<br>') + (consumers.directVisuals.length > 5 ? `<br><span style="font-size:11px;color:#888">+${consumers.directVisuals.length - 5} more</span>` : '');
+                            html += `<tr><td style="font-weight:500">${this._escHtml(col.name)}</td><td>${measuresHtml || '<span style="color:#aaa;font-size:11px">—</span>'}</td><td>${visualsHtml || '<span style="color:#aaa;font-size:11px">—</span>'}</td></tr>`;
+                        }
+                        html += `</table></div></details>`;
+                    }
+                }
+
                 if (table.columns.length > 5) {
                     html += `</div></details>`;
                 }
@@ -1787,18 +1937,59 @@ ${rects}
             html += `</table>`;
         }
 
-        // Data Lineage Section
+        // Data Sources — expanded with physical table mapping and consumer catalog
         if (this.lineageEngine) {
             const dataSources = this.lineageEngine.getAllDataSources();
             if (dataSources.length > 0) {
                 html += `<h2 id="data-sources">Data Sources</h2>
-<table><tr><th>Type</th><th>Server/URL</th><th>Database</th><th>Parameterized</th></tr>`;
+<p style="font-size:13px;color:var(--text-secondary,#666);margin-bottom:16px">Data engineer view: physical tables loaded, column renames, and which measures &amp; visuals consume each source.</p>`;
                 for (const src of dataSources) {
                     const server = src.serverResolved || src.server || src.url || src.path || '';
-                    const db = src.databaseResolved || src.database || '';
-                    html += `<tr><td>${this._escHtml(src.type)}</td><td>${this._escHtml(server)}</td><td>${this._escHtml(db)}</td><td>${src.parameterized ? 'Yes' : 'No'}</td></tr>`;
+                    const db     = src.databaseResolved || src.database || '';
+                    const gw     = src.gatewayRequired === true ? '<span style="margin-left:6px;font-size:11px;color:#c62828;background:#ffebee;padding:1px 6px;border-radius:2px">Gateway Required</span>' : '';
+                    const param  = src.parameterized ? '<span style="margin-left:6px;font-size:11px;color:#1565c0;background:#e3f2fd;padding:1px 6px;border-radius:2px">Parameterized</span>' : '';
+                    const sourceId   = `source:${MExpressionParser._sourceKey(src)}`;
+                    const consumers  = this.lineageEngine.getDataSourceConsumers(sourceId);
+
+                    html += `<div class="ds-source-card" style="margin:12px 0;padding:14px 16px;background:var(--surface,#f8f6f1);border:1px solid var(--border,#d0ccc4);border-left:4px solid var(--primary,#1a3a5c);border-radius:2px">`;
+                    html += `<h4 style="margin:0 0 6px;font-size:14px">${this._escHtml(src.type)}`;
+                    if (server) html += ` <code style="font-size:12px;font-weight:normal">${this._escHtml(server)}</code>`;
+                    if (db) html += ` / <code style="font-size:12px;font-weight:normal">${this._escHtml(db)}</code>`;
+                    html += `${param}${gw}</h4>`;
+
+                    if (consumers.tables.length > 0) {
+                        html += `<p style="font-size:12px;margin:6px 0 4px;font-weight:600">Physical tables loaded (${consumers.tables.length}):</p><ul style="margin:0 0 8px;padding-left:20px;font-size:12px">`;
+                        for (const t of consumers.tables) {
+                            const physLabel = [t.physicalSchema, t.physicalTable].filter(Boolean).join('.');
+                            html += `<li><strong>${this._escHtml(t.name)}</strong>`;
+                            if (physLabel) html += ` ← <code>${this._escHtml(physLabel)}</code>`;
+                            if (t.renames.length > 0) {
+                                const rs = t.renames.map(r => `<code>${this._escHtml(r.sourceName)}</code> → <code>${this._escHtml(r.modelName)}</code>`).join(', ');
+                                html += `<br><span style="color:#555;font-size:11px">Renames: ${rs}</span>`;
+                            }
+                            if (t.addedColumns.length > 0) {
+                                html += `<br><span style="color:#555;font-size:11px">Computed: ${t.addedColumns.map(c => `<code>${this._escHtml(c)}</code>`).join(', ')}</span>`;
+                            }
+                            html += `</li>`;
+                        }
+                        html += `</ul>`;
+                    }
+
+                    const mCount = consumers.measures.length;
+                    const vCount = consumers.visuals.length;
+                    if (mCount > 0 || vCount > 0) {
+                        html += `<p style="font-size:12px;margin:4px 0;color:var(--text-secondary,#666)">Consumed by: <strong>${mCount}</strong> measure${mCount !== 1 ? 's' : ''} · <strong>${vCount}</strong> visual${vCount !== 1 ? 's' : ''} across <strong>${consumers.pages.length}</strong> page${consumers.pages.length !== 1 ? 's' : ''}</p>`;
+                        if (consumers.measures.length > 0) {
+                            html += `<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:3px">`;
+                            for (const m of consumers.measures.slice(0, 12)) {
+                                html += `<span style="display:inline-block;background:#fff;border:1px solid var(--border,#d0ccc4);border-radius:2px;padding:1px 6px;font-family:monospace;font-size:11px">[${this._escHtml(m.name)}]</span>`;
+                            }
+                            if (consumers.measures.length > 12) html += `<span style="font-size:11px;color:#666;align-self:center">+${consumers.measures.length - 12} more</span>`;
+                            html += `</div>`;
+                        }
+                    }
+                    html += `</div>`;
                 }
-                html += `</table>`;
             }
 
             // Visual Lineage Summary
@@ -2083,7 +2274,20 @@ ${rects}
                 name: t.name,
                 description: t.description,
                 isHidden: t.isHidden,
-                columns: t.columns,
+                columns: t.columns.map(col => {
+                    const base = { ...col };
+                    if (this.lineageEngine && !col.isHidden) {
+                        const consumers = this.lineageEngine.getColumnConsumers(t.name, col.name);
+                        if (consumers.measures.length > 0 || consumers.directVisuals.length > 0) {
+                            base.whereUsed = {
+                                measures: consumers.measures,
+                                visuals:  consumers.directVisuals,
+                                pages:    consumers.pages
+                            };
+                        }
+                    }
+                    return base;
+                }),
                 measures: t.measures.map(m => ({
                     ...m,
                     references: this.measureRefs[m.name] || null,
@@ -2095,7 +2299,12 @@ ${rects}
             relationships: this.model.relationships,
             roles: this.model.roles,
             expressions: this.model.expressions,
-            visualUsage: this.visualUsage
+            visualUsage: this.visualUsage,
+            dataSources: this.lineageEngine ? this.lineageEngine.getAllDataSources().map(src => {
+                const sourceId = `source:${MExpressionParser._sourceKey(src)}`;
+                const consumers = this.lineageEngine.getDataSourceConsumers(sourceId);
+                return { ...src, consumers };
+            }) : []
         };
 
         return JSON.stringify(output, null, 2);

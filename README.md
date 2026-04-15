@@ -1,100 +1,137 @@
 # PBIP Documenter
 
-**Generate comprehensive documentation from Power BI PBIP/TMDL semantic models — instantly, in your browser.**
+**Generate comprehensive, bidirectional documentation from Power BI PBIP/TMDL semantic models — instantly, in your browser.**
 
 [![Try It Now](https://img.shields.io/badge/Try%20It%20Now-▶%20Live%20Demo-1a3a5c?style=for-the-badge&logo=powerbi)](https://jonathanjihwankim.github.io/pbip-documenter/)
 [![Fund This Tool](https://img.shields.io/badge/Fund_This_Tool-❤_from_7_EUR/mo-ea4aaa?style=for-the-badge)](https://github.com/sponsors/JonathanJihwanKim)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-☕-orange?style=for-the-badge)](https://buymeacoffee.com/jihwankim)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 
-> **No PBIP file?** [Try the live demo with Contoso sample data](https://jonathanjihwankim.github.io/pbip-documenter/) — no setup required.
+> **No PBIP file?** [Try the live demo with Contoso sample data](https://jonathanjihwankim.github.io/pbip-documenter/) — no setup required, runs entirely in your browser.
 
-<!-- TODO: Capture a screenshot of the app with a real model loaded (relationship diagram or model overview), save as docs/screenshot.png, and uncomment below -->
-<!-- ![PBIP Documenter Screenshot](docs/screenshot.png) -->
+<!-- Screenshot: capture from D:\sample_powerbi overview view and save as docs/screenshot-overview.png -->
+<!-- ![Model Overview](docs/screenshot-overview.png) -->
+
+---
+
+## What is PBIP / TMDL?
+
+**PBIP** (Power BI Project) is a developer-friendly file format introduced in Power BI Desktop that stores your semantic model and reports as plain text files instead of a binary `.pbix`. It integrates with Git and CI/CD pipelines.
+
+**TMDL** (Tabular Model Definition Language) is the text-based format within PBIP that describes every table, column, measure, relationship, and role in your semantic model — one `.tmdl` file per object, readable and diffable in any editor.
+
+If you've enabled "Save as Power BI Project" in Power BI Desktop (Preview → Developer mode), your workspace folder already contains PBIP files ready for this tool.
+
+---
+
+## Who is this for?
+
+### Power BI Developer
+You write DAX measures and want to know:
+- What tables and columns does each measure reference?
+- Where (which pages, which visuals) is each measure displayed?
+- Which measures depend on other measures?
+
+**What you get:** Measure Catalog with full DAX + referenced columns/measures, "Used in Visuals" grouped by page, and measure dependency chains.
+
+### Data Engineer
+You own the source systems and want to know:
+- Which physical tables (e.g. `dbo.FactSales`) were loaded into the model?
+- Were columns renamed between source and model?
+- Which DAX measures and report visuals ultimately consume each source table or column?
+
+**What you get:** Expanded Data Sources view showing physical→model table mapping, column renames detected from Power Query, and a "Where Used" catalog per model column.
+
+### Product Owner / Manager
+You need the big picture:
+- How large is this model? How many measures, tables, visuals, data sources?
+- What are the most-used measures and source tables?
+- Are there any dynamic features (field parameters, calculation groups) that behave differently than PBIR JSON suggests?
+
+**What you get:** Executive Summary at the top of every export with model stats, top measures by visual coverage, and top source tables by consumption.
+
+---
+
+## Quick Start
+
+1. Open the tool: **[jonathanjihwankim.github.io/pbip-documenter](https://jonathanjihwankim.github.io/pbip-documenter/)**
+2. Select your persona (Power BI Developer / Data Engineer / Product Owner) — the app highlights the most relevant section after parsing
+3. Click **Open Project Folder** and select your PBIP project folder
+4. The tool auto-discovers `.SemanticModel` and `.Report` folders
+5. Browse the parsed model in the sidebar — tables, measures, relationships, data sources, visuals, and more
+6. Download documentation:
+   - **Full Report (.html)** — self-contained with DAX highlighting, collapsible sections, column usage, data source drill-down
+   - **Full Report (.md)** — clean Markdown with tables, ASCII layout grids, ideal for Git wikis
+   - **JSON** — machine-readable with `whereUsed` blocks per column and `consumers` blocks per data source
 
 ### Manual documentation vs. PBIP Documenter
 
 | | Manual | PBIP Documenter |
 |---|---|---|
 | 10 tables, 11 measures, 15 visuals | ~45 minutes | **< 10 seconds** |
+| Source → model column lineage | Spreadsheet by hand | Auto-detected from M queries |
 | Visual lineage tracing | Not feasible | Built-in |
 | Relationship diagrams | Draw by hand | Auto-generated SVG |
 | Keeps up with model changes | Start over | Re-run instantly |
 | Privacy | Varies | 100% client-side |
 
+---
+
 ## What You Get
 
-Point the tool at your PBIP project folder and get instant, professional documentation:
+Point the tool at your PBIP project folder and get professional, bidirectional documentation:
 
-- **Full model documentation** — tables, columns, measures with DAX syntax highlighting, and cross-references
-- **Interactive relationship diagram** — SVG visualization with pan/zoom, showing all table connections
-- **Visual usage mapping** — see exactly which report visuals use each measure and column
-- **Page layout minimaps** — pixel-accurate SVG previews of visual positions on each report page
-- **Field parameter & calculation group detection** — automatically identified and annotated
-- **Export as self-contained HTML or Markdown** — ready for wikis, Git repos, or printing to PDF
+### For Power BI Developers (forward view)
+- **Measure Catalog** — DAX expressions with syntax highlighting, display folders, format strings, referenced columns and measures, "Used in Visuals" by page
+- **Table Inventory** — columns with data types, descriptions, sort-by, summarize-by, and hidden status
+- **Relationships** — from/to columns, cardinality, cross-filter direction, active/inactive
+- **Roles** — permission levels and RLS filter expressions per table
+
+### For Data Engineers (reverse view)
+- **Data Sources** — expanded view with physical table names (schema + table from Navigation steps), Power Query column renames, computed columns, and full consumer catalog (measures + visuals + pages)
+- **Column Usage (Where Used)** — per table, every visible column shows which measures reference it and which visuals display it
+- **Source Trace Lineage** — click a physical source table to open a forward lineage diagram: source → model table → measures → visuals
+
+### For Product Owners (summary view)
+- **Executive Summary** — model stats at a glance: tables, measures, relationships, pages, visuals, data sources, dynamic features, broken references
+- **Top Measures** — ranked by number of visuals they appear in
+- **Top Source Tables** — ranked by downstream visual coverage
+- **Dynamic Features** — field parameters and calculation groups that PBIR JSON doesn't fully represent
+
+### Interactive Diagrams
+- **Relationship Diagram** — SVG with pan, zoom, and zoom-to-fit; star-schema layout
+- **Visual Lineage** — full model, visual trace, measure impact, column impact, and source trace modes
+- **Visual Usage Diagram** — field-to-visual mapping
+
+### Export
+- **HTML** — fully self-contained, embeds CSS + SVG, DAX syntax highlighting, collapsible sections, table of contents
+- **Markdown** — clean document with fenced DAX blocks, ASCII page layout grids, and structured tables
+- **JSON** — machine-readable with `whereUsed` and `consumers` blocks for downstream tooling
 
 > Your files never leave your browser. All parsing happens client-side — nothing is uploaded anywhere.
 
-## Quick Start
-
-1. Open the tool: **[jonathanjihwankim.github.io/pbip-documenter](https://jonathanjihwankim.github.io/pbip-documenter/)**
-2. Click **Open Project Folder** and select your PBIP project folder
-3. The tool auto-discovers your `.SemanticModel` and `.Report` folders (if multiple models exist, a discovery panel lets you choose)
-4. Browse the parsed model using the sidebar — tables, measures, relationships, visuals, and more
-5. Download documentation:
-   - **Full Report (.html)** — self-contained with embedded diagrams, collapsible sections, and DAX highlighting
-   - **Full Report (.md)** — clean Markdown with ASCII layout grids, ideal for Git repos and wikis
-   - Each format offers three scopes: **All**, **Semantic Model Only**, or **Visuals Only**
-
-## Support Development
-
-This tool is **free forever** — built and maintained solo by [Jihwan Kim](https://github.com/JonathanJihwanKim) (Microsoft MVP). If PBIP Documenter saves you even 30 minutes of manual documentation work, please consider sponsoring. Every contribution goes directly toward new features and maintenance.
-
-**Funding goal: 0 / 200 EUR per month** `░░░░░░░░░░░░░░░░░░░░ 0%`
-
-<a href="https://github.com/sponsors/JonathanJihwanKim"><img src="https://img.shields.io/badge/GitHub%20Sponsors-❤%20Monthly%20from%207%20EUR-ea4aaa?style=for-the-badge" alt="GitHub Sponsors" /></a> <a href="https://buymeacoffee.com/jihwankim"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-☕%20One--time%20support-orange?style=for-the-badge" alt="Buy Me a Coffee" /></a>
-
-## Features
-
-### Semantic Model Documentation
-- **Model Overview** — database name, compatibility level, culture, and aggregate counts
-- **Table Inventory** — columns with data types, descriptions, format strings, hidden status
-- **Measure Catalog** — DAX expressions with syntax highlighting, display folders, format strings, and automatic cross-reference extraction (which columns and measures each formula uses)
-- **Relationships** — from/to columns, cardinality, cross-filter direction, active/inactive status
-- **Roles** — role names, permission levels, RLS filter expressions per table
-- **Expressions** — shared and parameter M expressions
-
-### Report Analysis
-- **Visual Field Mapping** — every visual's fields organized by role (Values, Category, Series, Filters, Tooltips)
-- **Page Layout Minimap** — SVG canvas showing actual visual positions, color-coded by type (tables, charts, slicers, cards); hover for names, click to jump to details
-- **Visual Usage Map** — two views: "By Visual" (which fields each visual uses) and "By Field" (which visuals use each field)
-
-### Smart Detection
-- **Field Parameters** — automatically detected via NAMEOF/SWITCH patterns in expressions; available fields listed as clickable chips
-- **Calculation Groups** — identified and rendered with individual calc item cards and collapsible DAX expressions
-
-### Interactive Diagrams
-- **Relationship Diagram** — SVG with pan, zoom, and zoom-to-fit controls; shows only relationship-participating columns; disconnected tables displayed as compact standalone cards
-- **Visual Usage Diagram** — SVG mapping of fields to the visuals that consume them
-
-### Export
-- **HTML** — fully self-contained file with embedded CSS, SVG diagrams, DAX syntax highlighting, collapsible sections, table of contents with anchor links
-- **Markdown** — clean document with ASCII page layout grids, fenced DAX code blocks, structured tables, and visual field breakdowns
-
-> **Free forever, no paywalls.** Help keep it that way — [support development](https://github.com/sponsors/JonathanJihwanKim).
+---
 
 ## Browser Support
 
 Requires the [File System Access API](https://developer.mozilla.org/en-US/docs/Web/API/File_System_Access_API):
-- ✅ Chrome 86+
-- ✅ Edge 86+
-- ✅ Opera 72+
-- ❌ Firefox (not supported)
-- ❌ Safari (not supported)
+
+| Browser | Support |
+|---------|---------|
+| Chrome 86+ | ✅ Supported |
+| Edge 86+ | ✅ Supported |
+| Opera 72+ | ✅ Supported |
+| Firefox | ❌ Not supported |
+| Safari | ❌ Not supported |
+
+---
 
 ## PBIP Folder Structure
 
-The tool expects a standard PBIP project structure:
+The tool expects a standard PBIP project layout:
+
+<details>
+<summary>Show folder structure</summary>
 
 ```
 MyProject/
@@ -103,33 +140,42 @@ MyProject/
 │       ├── database.tmdl
 │       ├── model.tmdl
 │       ├── relationships.tmdl
-│       ├── expressions.tmdl (optional)
+│       ├── expressions.tmdl        (optional — shared M expressions / parameters)
 │       ├── tables/
 │       │   ├── Sales.tmdl
 │       │   ├── Product.tmdl
 │       │   └── ...
-│       └── roles/ (optional)
+│       └── roles/                  (optional)
 │           └── Reader.tmdl
-├── MyProject.Report/ (optional, for visual analysis)
-│   └── definition/
-│       └── pages/
-│           └── Page1/
-│               ├── page.json
-│               └── visuals/
-│                   └── visual1/
-│                       └── visual.json
+└── MyProject.Report/               (optional — enables visual analysis)
+    └── definition/
+        └── pages/
+            └── Page1/
+                ├── page.json
+                └── visuals/
+                    └── visual1/
+                        └── visual.json
 ```
 
-## Sponsors & Support
+</details>
 
-I'm **Jihwan Kim** ([Microsoft MVP](https://github.com/JonathanJihwanKim)), and I build PBIP tools so Power BI developers can work faster. This project is **free forever** — no paywalls, no premium tiers. Sponsoring keeps it that way and funds what comes next.
+---
+
+## Also by Jihwan Kim
+
+| Tool | Description |
+|------|-------------|
+| [PBIR Visual Manager](https://jonathanjihwankim.github.io/isHiddenInViewMode/) | Manage `isHiddenInViewMode` and visual properties in PBIR reports |
+| [PBIP Impact Analyzer](https://jonathanjihwankim.github.io/pbip-impact-analyzer/) | Analyze what breaks when you change a measure, column, or table |
+| **PBIP Documenter** | Generate bidirectional documentation from TMDL (you are here) |
+
+---
+
+## Support Development
+
+This tool is **free forever** — built and maintained solo by [Jihwan Kim](https://github.com/JonathanJihwanKim) (Microsoft MVP). If PBIP Documenter saves you even 30 minutes of documentation work, please consider sponsoring.
 
 <a href="https://github.com/sponsors/JonathanJihwanKim"><img src="https://img.shields.io/badge/GitHub%20Sponsors-❤%20Monthly%20from%207%20EUR-ea4aaa?style=for-the-badge" alt="GitHub Sponsors" /></a> <a href="https://buymeacoffee.com/jihwankim"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-☕%20One--time%20support-orange?style=for-the-badge" alt="Buy Me a Coffee" /></a>
-
-### What Your Support Funds
-- New features (lineage diagrams, DAX formatting, CI/CD integration)
-- Bug fixes, browser compatibility, and performance improvements
-- Community support and documentation
 
 ### Sponsor Tiers
 
@@ -146,27 +192,10 @@ I'm **Jihwan Kim** ([Microsoft MVP](https://github.com/JonathanJihwanKim)), and 
 |------|------|
 | [Alessandro Tiberti Bertin](https://www.linkedin.com/in/aletb/) | Bronze |
 
-> Your name could be here too! [Become a sponsor](https://github.com/sponsors/JonathanJihwanKim) and join the wall.
-
-## Also by Jihwan Kim
-
-| Tool | Description |
-|------|-------------|
-| [PBIR Visual Manager](https://jonathanjihwankim.github.io/isHiddenInViewMode/) | Manage visual properties in Power BI PBIR reports |
-| [PBIP Impact Analyzer](https://jonathanjihwankim.github.io/pbip-impact-analyzer/) | Analyze dependencies and safely refactor semantic models |
-| **PBIP Documenter** | Generate documentation from TMDL (you are here) |
+---
 
 ## License
 
 [MIT](LICENSE) — Jihwan Kim
 
----
-
-### Who is this for?
-
-- **Enterprise BI architects** managing governance across large semantic model estates
-- **Power BI developers** who need instant documentation from PBIP/TMDL metadata
-- **Data governance teams** implementing documentation standards at scale
-- **DevOps engineers** integrating documentation into CI/CD pipelines for Power BI
-
-**Built for:** Power BI | Microsoft Fabric | PBIP | PBIR | TMDL | Semantic Models | DAX | Data Governance | CI/CD | Developer Tools
+**Built for:** Power BI · Microsoft Fabric · PBIP · PBIR · TMDL · Semantic Models · DAX · Data Governance · CI/CD · Developer Tools

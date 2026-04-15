@@ -2797,3 +2797,162 @@ tr:hover {
         height: 32px;
     }
 }
+
+/* ── PERSONA CHIPS ── */
+
+.persona-chips {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 16px 0;
+}
+
+.persona-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.persona-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 12px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--card-bg);
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition);
+    font-family: inherit;
+}
+
+.persona-chip:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: var(--surface);
+}
+
+.persona-chip.active {
+    border-color: var(--primary);
+    background: var(--primary);
+    color: #fff;
+}
+
+/* ── DATA SOURCES EXPANDED VIEW ── */
+
+.ds-consumer-summary {
+    display: flex;
+    gap: 10px;
+    margin: 6px 0 8px;
+    flex-wrap: wrap;
+}
+
+.ds-consumer-summary span {
+    font-size: 12px;
+    color: var(--text-secondary);
+    background: var(--surface);
+    border: 1px solid var(--border-light);
+    border-radius: 12px;
+    padding: 2px 10px;
+}
+
+.ds-physical-tables {
+    margin: 8px 0;
+    border-top: 1px solid var(--border-light);
+    padding-top: 8px;
+}
+
+.ds-section-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 0 0 6px;
+    cursor: pointer;
+}
+
+.ds-physical-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border-light);
+    font-size: 12px;
+}
+
+.ds-physical-row:last-child { border-bottom: none; }
+
+.ds-model-table {
+    font-weight: 600;
+    color: var(--primary);
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.ds-model-table:hover { color: var(--primary-light); }
+
+.ds-arrow {
+    color: var(--text-light);
+    font-size: 11px;
+}
+
+.ds-phys-label {
+    font-size: 11px;
+    background: var(--surface);
+    border: 1px solid var(--border-light);
+    padding: 1px 5px;
+    border-radius: 2px;
+}
+
+.ds-computed-note {
+    font-size: 10px;
+    color: var(--text-light);
+    background: var(--surface);
+    border: 1px dashed var(--border);
+    border-radius: 2px;
+    padding: 1px 5px;
+}
+
+.ds-renames-details {
+    display: inline-block;
+}
+
+.ds-renames-details summary {
+    font-size: 11px;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.ds-renames-details ul {
+    list-style: none;
+    padding: 4px 0 2px 8px;
+    margin: 0;
+    font-size: 11px;
+    color: var(--text);
+}
+
+.ds-measures-details { margin-top: 8px; }
+
+.ds-measures-details summary {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    margin-bottom: 4px;
+}
+
+.ds-measure-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 4px 0;
+}

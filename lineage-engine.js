@@ -34,6 +34,9 @@ class LineageEngine {
     buildGraph() {
         this.measureLookup = DAXReferenceExtractor.buildMeasureLookup(this.parsedModel.tables);
 
+        // Build physical table lineage map: tableName → {physicalSchema, physicalTable, renames, ...}
+        this.tableLineage = MExpressionParser.extractTableLineageFromModel(this.parsedModel);
+
         // 1. Add data sources from M expressions
         this.dataSources = MExpressionParser.extractAllFromModel(this.parsedModel);
         for (const source of this.dataSources) {
@@ -127,14 +130,24 @@ class LineageEngine {
                 }
             }
 
-            // Partitions → data sources
+            // Partitions → data sources (enrich with physical table lineage)
+            const tblLineage = this.tableLineage.get(table.name) || null;
             for (const partition of table.partitions) {
                 if (partition.source) {
                     const sources = MExpressionParser.extractDataSources(partition.source);
                     for (const src of sources) {
                         const sourceId = `source:${MExpressionParser._sourceKey(src)}`;
                         if (this.nodes.has(sourceId)) {
-                            this.edges.push({ from: tableId, to: sourceId, type: 'connects_to_source' });
+                            this.edges.push({
+                                from: tableId,
+                                to: sourceId,
+                                type: 'connects_to_source',
+                                physicalSchema: tblLineage?.physicalSchema || null,
+                                physicalTable: tblLineage?.physicalTable || null,
+                                renames: tblLineage?.renames || [],
+                                selectedColumns: tblLineage?.selectedColumns || null,
+                                addedColumns: tblLineage?.addedColumns || []
+                            });
                         }
                     }
                 }
@@ -794,6 +807,195 @@ class LineageEngine {
         }
 
         return parts.join(' \u2192 ');
+    }
+
+    /**
+     * Catalog: which model tables / measures / visuals / pages consume a given data source.
+     * Pure listing — no impact framing.
+     * @param {string} sourceId - e.g. "source:sql server|srv|db"
+     * @returns {{ tables: Array, measures: Array, visuals: Array, pages: string[] }}
+     */
+    getDataSourceConsumers(sourceId) {
+        // 1. Model tables that connect to this source
+        const tables = [];
+        for (const edge of this.edges) {
+            if (edge.type === 'connects_to_source' && edge.to === sourceId) {
+                const node = this.nodes.get(edge.from);
+                if (node) tables.push({
+                    name: node.name,
+                    physicalSchema: edge.physicalSchema || null,
+                    physicalTable:  edge.physicalTable  || null,
+                    renames: edge.renames || [],
+                    selectedColumns: edge.selectedColumns || null,
+                    addedColumns: edge.addedColumns || []
+                });
+            }
+        }
+
+        // 2. Measures that reference those tables (directly or via column refs)
+        const tableIds = new Set(tables.map(t => `table:${t.name}`));
+        const measuresSet = new Set();
+        for (const edge of this.edges) {
+            if ((edge.type === 'defined_in_table' || edge.type === 'references_table') && tableIds.has(edge.to)) {
+                const mn = this.nodes.get(edge.from);
+                if (mn && mn.type === 'measure') measuresSet.add(`${mn.table}|${mn.name}`);
+            }
+        }
+        // Also via references_column → column belongs_to_table
+        for (const edge of this.edges) {
+            if (edge.type === 'references_column') {
+                const colNode = this.nodes.get(edge.to);
+                if (colNode && tableIds.has(`table:${colNode.table}`)) {
+                    const mn = this.nodes.get(edge.from);
+                    if (mn && mn.type === 'measure') measuresSet.add(`${mn.table}|${mn.name}`);
+                }
+            }
+        }
+        const measures = [...measuresSet].map(k => {
+            const [table, name] = k.split('|');
+            return { name, table };
+        });
+
+        // 3. Visuals that use columns/measures from those tables
+        const visualsSet = new Set();
+        const pagesSet   = new Set();
+        for (const edge of this.edges) {
+            if (edge.type === 'uses_field') {
+                const target = this.nodes.get(edge.to);
+                if (!target) continue;
+                const belongsToSource = tableIds.has(`table:${target.table}`)
+                    || (target.type === 'column'  && tableIds.has(`table:${target.table}`))
+                    || (target.type === 'measure' && measuresSet.has(`${target.table}|${target.name}`));
+                if (belongsToSource) {
+                    const vn = this.nodes.get(edge.from);
+                    if (vn && vn.type === 'visual') {
+                        visualsSet.add(`${vn.pageName}|${vn.name}`);
+                        pagesSet.add(vn.pageName);
+                    }
+                }
+            }
+        }
+        const visuals = [...visualsSet].map(k => {
+            const sep = k.indexOf('|');
+            return { page: k.slice(0, sep), name: k.slice(sep + 1) };
+        });
+
+        return { tables, measures, visuals, pages: [...pagesSet] };
+    }
+
+    /**
+     * Catalog: which measures / visuals use a given model column.
+     * Thin wrapper over getColumnImpact — re-labels for "Where Used" context.
+     * @param {string} tableName
+     * @param {string} columnName
+     * @returns {{ measures: Array, directVisuals: Array, allVisuals: Array, pages: string[] }}
+     */
+    getColumnConsumers(tableName, columnName) {
+        const impact = this.getColumnImpact(tableName, columnName);
+        const allVisuals = [...impact.directVisuals, ...impact.transitiveVisuals];
+        const pages = [...new Set(allVisuals.map(v => v.page))];
+        return {
+            measures:     impact.directMeasures,
+            directVisuals: impact.directVisuals,
+            allVisuals,
+            pages
+        };
+    }
+
+    /**
+     * Catalog: which model tables consume a given physical source table.
+     * @param {string} physicalTable - e.g. "FactSales"
+     * @param {string} [physicalSchema] - optional schema filter e.g. "dbo"
+     * @returns {{ modelTables: Array, measures: Array, visuals: Array, pages: string[] }}
+     */
+    getPhysicalTableConsumers(physicalTable, physicalSchema) {
+        const matchingSourceIds = new Set();
+        for (const edge of this.edges) {
+            if (edge.type === 'connects_to_source') {
+                const ptMatch = edge.physicalTable && edge.physicalTable.toLowerCase() === physicalTable.toLowerCase();
+                const psMatch = !physicalSchema || !edge.physicalSchema ||
+                    edge.physicalSchema.toLowerCase() === physicalSchema.toLowerCase();
+                if (ptMatch && psMatch) matchingSourceIds.add(edge.to);
+            }
+        }
+
+        const combined = { tables: [], measures: [], visuals: [], pages: [] };
+        const measuresSet = new Set();
+        const visualsSet  = new Set();
+        const pagesSet    = new Set();
+
+        for (const sourceId of matchingSourceIds) {
+            const consumers = this.getDataSourceConsumers(sourceId);
+            for (const t of consumers.tables) {
+                if (!combined.tables.some(x => x.name === t.name)) combined.tables.push(t);
+            }
+            for (const m of consumers.measures) {
+                const key = `${m.table}|${m.name}`;
+                if (!measuresSet.has(key)) { measuresSet.add(key); combined.measures.push(m); }
+            }
+            for (const v of consumers.visuals) {
+                const key = `${v.page}|${v.name}`;
+                if (!visualsSet.has(key)) { visualsSet.add(key); combined.visuals.push(v); }
+            }
+            for (const p of consumers.pages) {
+                if (!pagesSet.has(p)) { pagesSet.add(p); combined.pages.push(p); }
+            }
+        }
+        return combined;
+    }
+
+    /**
+     * Return the top N measures ranked by number of visuals that display them.
+     * @param {number} n
+     * @returns {Array<{name:string, table:string, visualCount:number, pageCount:number}>}
+     */
+    getTopMeasuresByVisualCount(n = 5) {
+        if (!this.visualData) return [];
+        const counts = new Map(); // "table|measure" → { name, table, visuals: Set, pages: Set }
+        for (const visual of this.visualData.visuals) {
+            for (const field of (visual.fields || [])) {
+                if (field.type !== 'measure') continue;
+                const key = `${field.table || field.entity}|${field.name}`;
+                if (!counts.has(key)) counts.set(key, {
+                    name:  field.name,
+                    table: field.table || field.entity,
+                    visuals: new Set(),
+                    pages:   new Set()
+                });
+                counts.get(key).visuals.add(visual.visualName);
+                counts.get(key).pages.add(visual.pageName);
+            }
+        }
+        return [...counts.values()]
+            .map(c => ({ name: c.name, table: c.table, visualCount: c.visuals.size, pageCount: c.pages.size }))
+            .sort((a, b) => b.visualCount - a.visualCount || b.pageCount - a.pageCount)
+            .slice(0, n);
+    }
+
+    /**
+     * Return the top N source tables ranked by number of consuming visuals.
+     * @param {number} n
+     * @returns {Array<{physicalTable:string, physicalSchema:string|null, modelTable:string, visualCount:number, measureCount:number}>}
+     */
+    getTopSourceTablesByConsumption(n = 5) {
+        const seen = new Map(); // "schema|table" → entry
+        for (const edge of this.edges) {
+            if (edge.type !== 'connects_to_source' || !edge.physicalTable) continue;
+            const key = `${edge.physicalSchema || ''}|${edge.physicalTable}`;
+            if (!seen.has(key)) {
+                const consumers = this.getPhysicalTableConsumers(edge.physicalTable, edge.physicalSchema);
+                seen.set(key, {
+                    physicalTable:  edge.physicalTable,
+                    physicalSchema: edge.physicalSchema || null,
+                    modelTable:     (this.nodes.get(edge.from) || {}).name || '',
+                    visualCount:    consumers.visuals.length,
+                    measureCount:   consumers.measures.length
+                });
+            }
+        }
+        return [...seen.values()]
+            .sort((a, b) => b.visualCount - a.visualCount || b.measureCount - a.measureCount)
+            .slice(0, n);
     }
 
     /**
