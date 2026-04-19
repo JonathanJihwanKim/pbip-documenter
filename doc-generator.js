@@ -14,6 +14,7 @@ class DocGenerator {
         this.visualUsage = visualUsage || {};
         this.measureRefs = measureRefs || {};
         this.lineageEngine = lineageEngine || null;
+        this.mSteps = lineageEngine?.mSteps || null;
     }
 
     /**
@@ -469,6 +470,20 @@ class DocGenerator {
                 lines.push('');
             }
 
+            // M Steps (parsed Power Query steps)
+            if (this.mSteps) {
+                const steps = this.mSteps.get(table.name);
+                if (steps && steps.length > 0) {
+                    lines.push('#### Power Query Steps');
+                    lines.push('');
+                    steps.forEach((step, idx) => {
+                        const preview = step.exprText.length > 120 ? step.exprText.slice(0, 120) + '…' : step.exprText;
+                        lines.push(`${idx + 1}. **${step.name}** \`[${step.kind}]\` — \`${preview.replace(/`/g, "'")}\``);
+                    });
+                    lines.push('');
+                }
+            }
+
             // Partitions
             if (table.partitions.length > 0) {
                 lines.push('#### Partitions');
@@ -739,6 +754,48 @@ class DocGenerator {
             }
         }
 
+        // Physical-Source Index — keyed by physical schema.table, listing model consumers
+        if (this.lineageEngine && this.lineageEngine.tableLineage && this.lineageEngine.tableLineage.size > 0) {
+            // Build index: physicalKey → { schema, table, modelTables[], measures[], visuals[] }
+            const physIndex = new Map();
+            for (const [tableName, lineage] of this.lineageEngine.tableLineage) {
+                if (!lineage.physicalTable) continue;
+                const key = [lineage.physicalSchema, lineage.physicalTable].filter(Boolean).join('.');
+                if (!physIndex.has(key)) {
+                    physIndex.set(key, {
+                        physicalSchema: lineage.physicalSchema,
+                        physicalTable: lineage.physicalTable,
+                        modelTables: [],
+                        renames: lineage.renames || []
+                    });
+                }
+                physIndex.get(key).modelTables.push(tableName);
+            }
+
+            if (physIndex.size > 0) {
+                lines.push('## Physical-Source Index');
+                lines.push('');
+                lines.push('> Maps every physical database object to the model tables and downstream visuals that depend on it.');
+                lines.push('');
+                lines.push('| Physical Object | Model Table(s) | Consumers |');
+                lines.push('|-----------------|----------------|-----------|');
+                for (const [key, entry] of physIndex) {
+                    const modelList = entry.modelTables.join(', ');
+                    // Count downstream consumers through lineage engine
+                    let measureCount = 0, visualCount = 0;
+                    for (const mt of entry.modelTables) {
+                        const consumers = this.lineageEngine.getPhysicalTableConsumers
+                            ? this.lineageEngine.getPhysicalTableConsumers(entry.physicalSchema, entry.physicalTable)
+                            : null;
+                        if (consumers) { measureCount += consumers.measures?.length || 0; visualCount += consumers.visuals?.length || 0; }
+                    }
+                    const consumerStr = measureCount || visualCount ? `${measureCount} measure${measureCount!==1?'s':''} · ${visualCount} visual${visualCount!==1?'s':''}` : '—';
+                    lines.push(`| \`${this._escMd(key)}\` | ${this._escMd(modelList)} | ${consumerStr} |`);
+                }
+                lines.push('');
+            }
+        }
+
         // Measure Dependencies section
         const allMeasures = [];
         for (const table of this._getVisibleTables()) {
@@ -761,19 +818,68 @@ class DocGenerator {
             lines.push('');
         }
 
-        // Visual Lineage summaries
-        if (visualData && visualData.visuals && visualData.visuals.length > 0) {
-            lines.push('## Visual Lineage Summary');
-            lines.push('');
-            lines.push('| Visual | Page | Lineage |');
-            lines.push('|--------|------|---------|');
-            for (const visual of visualData.visuals) {
-                const summary = this.lineageEngine.getLineageSummary(visual.pageName, visual.visualName);
-                if (summary) {
-                    lines.push(`| ${visual.visualName} | ${visual.pageName} | ${summary} |`);
+        // Visual Lineage — per-visual back-trace
+        if (visualData && visualData.visuals && visualData.visuals.length > 0 && this.lineageEngine) {
+            const DECORATION_TYPES = new Set(['actionButton','shape','textbox','bookmarkNavigator','pageNavigator','image','groupContainer']);
+            const dataBoundVisuals = visualData.visuals.filter(v => !DECORATION_TYPES.has(v.visualType) && v.fields && v.fields.length > 0);
+
+            if (dataBoundVisuals.length > 0) {
+                lines.push('## Visual Lineage');
+                lines.push('');
+
+                for (const visual of dataBoundVisuals) {
+                    lines.push(`### ${visual.visualName || visual.visualType} — *${visual.pageName}*`);
+                    lines.push('');
+
+                    const lineage = this.lineageEngine.getVisualLineage(visual.pageName, visual.visualName);
+                    if (!lineage) { lines.push('*(no lineage resolved)*'); lines.push(''); continue; }
+
+                    // Fields used
+                    if (lineage.fields && lineage.fields.length > 0) {
+                        lines.push('**Fields:**');
+                        for (const f of lineage.fields) {
+                            const badge = f.type === 'measure' ? 'Measure' : f.type === 'column' ? 'Column' : 'Hierarchy';
+                            lines.push(`- \`[${badge}]\` \`${f.table || f.entity}\`[\`${f.name}\`]`);
+                        }
+                        lines.push('');
+                    }
+
+                    // Tables referenced
+                    if (lineage.tables && lineage.tables.length > 0) {
+                        lines.push('**Tables → Physical Source:**');
+                        for (const t of lineage.tables) {
+                            let row = `- **${t.name}**`;
+                            if (t.physicalSchema || t.physicalTable) {
+                                row += ` → \`${[t.physicalSchema, t.physicalTable].filter(Boolean).join('.')}\``;
+                            }
+                            if (t.renames && t.renames.length > 0) {
+                                row += ` (${t.renames.length} rename${t.renames.length !== 1 ? 's' : ''})`;
+                            }
+                            lines.push(row);
+
+                            // First M step
+                            if (this.mSteps) {
+                                const steps = this.mSteps.get(t.name);
+                                if (steps && steps.length > 0) {
+                                    const src = steps.find(s => s.kind === 'Source') || steps[0];
+                                    const preview = src.exprText.length > 100 ? src.exprText.slice(0, 100) + '…' : src.exprText;
+                                    lines.push(`  - First M step: **${src.name}** \`[${src.kind}]\` — \`${preview.replace(/`/g, "'")}\``);
+                                }
+                            }
+                        }
+                        lines.push('');
+                    }
+
+                    // Measures chain
+                    if (lineage.measures && lineage.measures.length > 0) {
+                        lines.push('**Measures:**');
+                        for (const m of lineage.measures) {
+                            lines.push(`- \`${m.table}\`[\`${m.name}\`]`);
+                        }
+                        lines.push('');
+                    }
                 }
             }
-            lines.push('');
         }
 
         // Broken References section
@@ -1054,6 +1160,52 @@ blockquote {
 
             if (table.description) {
                 html += `<blockquote>${this._escHtml(table.description)}</blockquote>`;
+            }
+
+            // Incremental Refresh Policy badge
+            if (table.refreshPolicy) {
+                const rp = table.refreshPolicy;
+                html += `<p><span class="badge" style="background:#e3f2fd;color:#1565c0">Incremental Refresh</span> `;
+                if (rp.rollingWindowPeriods != null) html += `rolling ${rp.rollingWindowPeriods} ${this._escHtml(rp.rollingWindowGranularity || '')}${rp.rollingWindowPeriods !== 1 ? 's' : ''} · `;
+                if (rp.incrementalPeriods != null) html += `incremental ${rp.incrementalPeriods} ${this._escHtml(rp.incrementalGranularity || '')}${rp.incrementalPeriods !== 1 ? 's' : ''}`;
+                html += `</p>`;
+            }
+
+            // Source connection inline
+            if (this.lineageEngine) {
+                const allSrc = this.lineageEngine.getAllDataSources();
+                for (const src of allSrc) {
+                    const sid = `source:${MExpressionParser._sourceKey(src)}`;
+                    const consumers = this.lineageEngine.getDataSourceConsumers(sid);
+                    const te = consumers.tables.find(t => t.name === table.name);
+                    if (!te) continue;
+                    const server = src.serverResolved || src.server || '';
+                    const db = src.databaseResolved || src.database || '';
+                    const physLabel = [te.physicalSchema, te.physicalTable].filter(Boolean).join('.');
+                    html += `<p class="table-source-inline"><span class="badge lineage-badge source">${this._escHtml(src.type)}</span>`;
+                    if (server) html += ` <code>${this._escHtml(server)}</code>`;
+                    if (db) html += ` / <code>${this._escHtml(db)}</code>`;
+                    if (src.url) html += ` <code>${this._escHtml(src.url)}</code>`;
+                    if (physLabel) html += ` ← <code>${this._escHtml(physLabel)}</code>`;
+                    if (src.parameterized) html += ` <span class="badge badge-field-param">Parameterized</span>`;
+                    if (src.gatewayRequired) html += ` <span class="badge" style="background:#ffebee;color:#c62828">Gateway Required</span>`;
+                    if (te.renames && te.renames.length > 0) {
+                        html += ` <details style="display:inline-block;margin-left:6px"><summary style="font-size:11px;cursor:pointer">${te.renames.length} rename${te.renames.length !== 1 ? 's' : ''}</summary><ul style="font-size:11px;margin:2px 0 0 12px">`;
+                        for (const r of te.renames) html += `<li><code>${this._escHtml(r.sourceName)}</code> → <code>${this._escHtml(r.modelName)}</code></li>`;
+                        html += `</ul></details>`;
+                    }
+                    html += `</p>`;
+                    break; // show first matching source only (primary source)
+                }
+            }
+
+            // Partitions (M queries) — parity with Markdown output
+            if (table.partitions.length > 0) {
+                for (const p of table.partitions) {
+                    if (!p.source) continue;
+                    html += `<details class="partition-details"><summary>Partition: ${this._escHtml(p.name)} · <code>${this._escHtml(p.mode || 'import')}</code></summary>
+<div class="dax-block" style="font-size:11px">${this._escHtml(p.source)}</div></details>`;
+                }
             }
 
             // Columns
@@ -1992,17 +2144,62 @@ ${rects}
                 }
             }
 
-            // Visual Lineage Summary
+            // Visual Lineage — per-visual back-trace
             if (scope !== 'model' && visualData && visualData.visuals && visualData.visuals.length > 0) {
-                html += `<h2 id="data-lineage">Visual Lineage</h2>
-<table><tr><th>Visual</th><th>Page</th><th>Lineage</th></tr>`;
-                for (const visual of visualData.visuals) {
-                    const summary = this.lineageEngine.getLineageSummary(visual.pageName, visual.visualName);
-                    if (summary) {
-                        html += `<tr><td>${this._escHtml(visual.visualName)}</td><td>${this._escHtml(visual.pageName)}</td><td>${this._escHtml(summary)}</td></tr>`;
+                const DECORATION_TYPES = new Set(['actionButton','shape','textbox','bookmarkNavigator','pageNavigator','image','groupContainer']);
+                const dataBoundVisuals = visualData.visuals.filter(v => !DECORATION_TYPES.has(v.visualType) && v.fields && v.fields.length > 0);
+
+                if (dataBoundVisuals.length > 0) {
+                    html += `<h2 id="data-lineage">Visual Lineage</h2>`;
+                    for (const visual of dataBoundVisuals) {
+                        const lineage = this.lineageEngine.getVisualLineage(visual.pageName, visual.visualName);
+                        html += `<div style="margin:16px 0;padding:14px 16px;background:var(--code-bg,#f5f2ed);border:1px solid var(--border,#d0ccc4);border-left:4px solid var(--accent,#c89632);border-radius:2px">`;
+                        html += `<h4 style="margin:0 0 8px">${this._escHtml(visual.visualName || visual.visualType)} <span style="font-size:12px;font-weight:normal;color:#666">— ${this._escHtml(visual.pageName)}</span></h4>`;
+
+                        if (!lineage) { html += `<p style="font-size:12px;color:#999">No lineage resolved.</p></div>`; continue; }
+
+                        if (lineage.fields && lineage.fields.length > 0) {
+                            html += `<p style="font-size:12px;font-weight:600;margin:0 0 4px">Fields:</p><div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">`;
+                            for (const f of lineage.fields) {
+                                const badge = f.type === 'measure' ? '#c8a200' : '#1565c0';
+                                html += `<span style="font-size:11px;font-family:monospace;background:#fff;border:1px solid #ccc;border-left:3px solid ${badge};border-radius:2px;padding:1px 6px">${this._escHtml((f.table||f.entity)+'['+f.name+']')}</span>`;
+                            }
+                            html += `</div>`;
+                        }
+
+                        if (lineage.tables && lineage.tables.length > 0) {
+                            html += `<p style="font-size:12px;font-weight:600;margin:0 0 4px">Tables → Physical Source:</p><ul style="margin:0 0 8px;padding-left:20px;font-size:12px">`;
+                            for (const t of lineage.tables) {
+                                html += `<li><strong>${this._escHtml(t.name)}</strong>`;
+                                if (t.physicalSchema || t.physicalTable) {
+                                    html += ` → <code>${this._escHtml([t.physicalSchema,t.physicalTable].filter(Boolean).join('.'))}</code>`;
+                                }
+                                if (t.renames && t.renames.length > 0) {
+                                    html += ` <span style="color:#888;font-size:11px">(${t.renames.length} rename${t.renames.length!==1?'s':''})</span>`;
+                                }
+                                if (this.mSteps) {
+                                    const steps = this.mSteps.get(t.name);
+                                    if (steps && steps.length > 0) {
+                                        const src = steps.find(s => s.kind === 'Source') || steps[0];
+                                        const preview = src.exprText.length > 80 ? src.exprText.slice(0,80)+'…' : src.exprText;
+                                        html += `<br><span style="font-size:11px;color:#555">First step: <strong>${this._escHtml(src.name)}</strong> [${src.kind}] <code>${this._escHtml(preview)}</code></span>`;
+                                    }
+                                }
+                                html += `</li>`;
+                            }
+                            html += `</ul>`;
+                        }
+
+                        if (lineage.measures && lineage.measures.length > 0) {
+                            html += `<p style="font-size:12px;font-weight:600;margin:0 0 4px">Measures:</p><div style="display:flex;flex-wrap:wrap;gap:3px">`;
+                            for (const m of lineage.measures) {
+                                html += `<span style="font-size:11px;font-family:monospace;background:#fff8e1;border:1px solid #ffe082;border-radius:2px;padding:1px 6px">${this._escHtml('['+m.name+']')}</span>`;
+                            }
+                            html += `</div>`;
+                        }
+                        html += `</div>`;
                     }
                 }
-                html += `</table>`;
             }
         }
 

@@ -634,11 +634,11 @@ class App {
                 if (banner) {
                     const totalMeasures = this.parsedModel.tables.reduce((s, t) => s + t.measures.length, 0);
                     const totalTables = this.parsedModel.tables.length;
-                    const totalVisuals = this.visualData?.visuals?.length || 0;
+                    const visualCounts = this._countDataBoundVisuals();
                     const bannerText = document.getElementById('sponsorBannerText');
                     if (bannerText) {
                         const dynSummary = this._getDynamicFeaturesSummary();
-                        let bannerMsg = `Documented <strong>${totalMeasures} measure${totalMeasures !== 1 ? 's' : ''}</strong> across <strong>${totalTables} table${totalTables !== 1 ? 's' : ''}</strong>${totalVisuals ? ` and <strong>${totalVisuals} visual${totalVisuals !== 1 ? 's' : ''}</strong>` : ''}`;
+                        let bannerMsg = `Documented <strong>${totalMeasures} measure${totalMeasures !== 1 ? 's' : ''}</strong> across <strong>${totalTables} table${totalTables !== 1 ? 's' : ''}</strong>${visualCounts.dataBound ? ` and <strong>${visualCounts.dataBound} data-bound visual${visualCounts.dataBound !== 1 ? 's' : ''}</strong>` : ''}`;
                         if (dynSummary.total > 0) {
                             bannerMsg += ` — including <strong>${dynSummary.total} dynamic feature${dynSummary.total !== 1 ? 's' : ''}</strong> hidden from PBIR JSON`;
                         }
@@ -892,6 +892,7 @@ class App {
             // Try reading page.json for display name and dimensions
             let pageWidth = null;
             let pageHeight = null;
+            let pageBinding = null;
             try {
                 const pageJsonHandle = await pageEntry.getFileHandle('page.json');
                 const pageContent = await this.readFile(pageJsonHandle);
@@ -900,6 +901,7 @@ class App {
                 pageName = pageData.name || pageEntry.name;
                 pageWidth = pageData.width || null;
                 pageHeight = pageData.height || null;
+                pageBinding = pageData.pageBinding || null;
             } catch {
                 // OK, use folder name
             }
@@ -934,6 +936,7 @@ class App {
                 displayName,
                 pageWidth,
                 pageHeight,
+                pageBinding,
                 visuals
             });
         }
@@ -960,7 +963,8 @@ class App {
         document.getElementById('statColumns').textContent = totalColumns;
         document.getElementById('statMeasures').textContent = totalMeasures;
         document.getElementById('statRelationships').textContent = m.relationships.length;
-        document.getElementById('statVisuals').textContent = totalVisuals;
+        const visualCounts = this._countDataBoundVisuals();
+        document.getElementById('statVisuals').textContent = visualCounts.dataBound;
 
         // Data sources count
         const totalDataSources = this.lineageEngine ? this.lineageEngine.getAllDataSources().length : 0;
@@ -972,12 +976,14 @@ class App {
         if (!this.reportHandle) {
             visualsCard.classList.add('dimmed');
             visualsHint.textContent = 'No .Report folder found';
-        } else if (totalVisuals === 0) {
+        } else if (visualCounts.total === 0) {
             visualsCard.classList.remove('dimmed');
             visualsHint.textContent = 'No visuals detected';
         } else {
             visualsCard.classList.remove('dimmed');
-            visualsHint.textContent = '';
+            visualsHint.textContent = visualCounts.decoration > 0
+                ? `+ ${visualCounts.decoration} decoration (buttons/shapes)`
+                : '';
         }
     }
 
@@ -1235,6 +1241,50 @@ class App {
             }
         }
 
+        // Source connection info
+        if (this.lineageEngine) {
+            const allSources = this.lineageEngine.getAllDataSources();
+            const tableSourceRows = [];
+            for (const src of allSources) {
+                const sid = `source:${MExpressionParser._sourceKey(src)}`;
+                const consumers = this.lineageEngine.getDataSourceConsumers(sid);
+                const te = consumers.tables.find(t => t.name === tableName);
+                if (te) tableSourceRows.push({ src, te });
+            }
+            if (tableSourceRows.length > 0) {
+                html += `<h3>Data Source</h3>`;
+                for (const { src, te } of tableSourceRows) {
+                    const server = src.serverResolved || src.server || '';
+                    const db = src.databaseResolved || src.database || '';
+                    const physLabel = [te.physicalSchema, te.physicalTable].filter(Boolean).join('.');
+                    const gwBadge = src.gatewayRequired === true ? '<span class="badge" style="background:#ffebee;color:#c62828;margin-left:4px">Gateway Required</span>' : '';
+                    const paramBadge = src.parameterized ? '<span class="badge badge-field-param" style="margin-left:4px">Parameterized</span>' : '';
+                    html += `<div class="table-source-panel">
+                        <div class="source-meta-row">
+                            <span class="lineage-badge source">${this._esc(src.type)}</span>`;
+                    if (server) html += ` <code>${this._esc(server)}</code>`;
+                    if (db) html += ` <span style="color:var(--text-secondary)">/</span> <code>${this._esc(db)}</code>`;
+                    if (src.url) html += ` <code>${this._esc(src.url)}</code>`;
+                    if (src.path) html += ` <code>${this._esc(src.path)}</code>`;
+                    html += `${paramBadge}${gwBadge}
+                        </div>`;
+                    if (physLabel) {
+                        html += `<div class="source-meta-row" style="margin-top:6px">
+                            Physical table: <button type="button" class="ds-phys-label" title="Trace to visuals" onclick="app._tracePhysicalTable(${JSON.stringify(te.physicalSchema||'')}, ${JSON.stringify(te.physicalTable||'')})">${this._esc(physLabel)} <span style="font-size:10px;opacity:0.7">↗</span></button>
+                        </div>`;
+                    }
+                    if (te.renames && te.renames.length > 0) {
+                        html += `<details style="margin-top:6px"><summary style="font-size:12px;cursor:pointer">${te.renames.length} column rename${te.renames.length !== 1 ? 's' : ''}</summary><ul style="font-size:12px;margin:4px 0 0 16px">`;
+                        for (const r of te.renames) {
+                            html += `<li><code>${this._esc(r.sourceName)}</code> → <code>${this._esc(r.modelName)}</code></li>`;
+                        }
+                        html += `</ul></details>`;
+                    }
+                    html += `</div>`;
+                }
+            }
+        }
+
         // Columns
         if (table.columns.length > 0) {
             html += `<h3>Columns (${table.columns.length})</h3>`;
@@ -1275,11 +1325,59 @@ class App {
             }
         }
 
+        // Incremental Refresh Policy
+        if (table.refreshPolicy) {
+            const rp = table.refreshPolicy;
+            html += `<h3>Incremental Refresh <span class="badge" style="background:#e3f2fd;color:#1565c0">Policy</span></h3>`;
+            html += `<div class="table-source-panel" style="border-left-color:#1565c0">
+                <div class="source-meta-row">
+                    <span class="badge" style="background:#e3f2fd;color:#1565c0">${this._esc(rp.policyType || 'basic')}</span>`;
+            if (rp.rollingWindowPeriods != null && rp.rollingWindowGranularity) {
+                html += `<span>Rolling window: <strong>${rp.rollingWindowPeriods} ${this._esc(rp.rollingWindowGranularity)}${rp.rollingWindowPeriods !== 1 ? 's' : ''}</strong></span>`;
+            }
+            if (rp.incrementalPeriods != null && rp.incrementalGranularity) {
+                html += `<span>· Incremental: <strong>${rp.incrementalPeriods} ${this._esc(rp.incrementalGranularity)}${rp.incrementalPeriods !== 1 ? 's' : ''}</strong></span>`;
+            }
+            html += `</div>`;
+            if (rp.sourceExpression) {
+                const rpId = `rp-${Math.random().toString(36).substr(2, 9)}`;
+                const lines = rp.sourceExpression.split('\n');
+                const shouldTruncate = lines.length > 5;
+                html += `<details style="margin-top:8px"><summary style="font-size:12px;cursor:pointer">Source Expression (M)</summary>
+                    <div class="dax-block${shouldTruncate ? ' truncated' : ''}" id="${rpId}">${this._esc(rp.sourceExpression)}</div>
+                    ${shouldTruncate ? `<button type="button" class="btn-dax-toggle" data-target="${rpId}">Show more</button>` : ''}
+                </details>`;
+            }
+            html += `</div>`;
+        }
+
+        // M Steps — parsed Power Query steps
+        if (this.lineageEngine && this.lineageEngine.mSteps) {
+            const steps = this.lineageEngine.mSteps.get(tableName);
+            if (steps && steps.length > 0) {
+                html += `<h3>Power Query Steps (${steps.length})</h3>`;
+                html += `<ol class="m-steps-list">`;
+                for (const step of steps) {
+                    const kindClass = `m-step-kind-${step.kind.toLowerCase()}`;
+                    const truncated = step.exprText.length > 200 ? step.exprText.slice(0, 200) + '…' : step.exprText;
+                    html += `<li class="m-step-item">
+                        <span class="m-step-name">${this._esc(step.name)}</span>
+                        <span class="m-step-kind ${kindClass}">${this._esc(step.kind)}</span>
+                        <code class="m-step-expr">${this._esc(truncated)}</code>
+                    </li>`;
+                }
+                html += `</ol>`;
+            }
+        }
+
         // Partitions
         if (table.partitions.length > 0) {
             html += `<h3>Partitions</h3>`;
             for (const p of table.partitions) {
-                html += `<p><strong>${this._esc(p.name)}</strong> — mode: ${p.mode || 'default'}</p>`;
+                const stateLabel = p.lastRefreshState === 'Exception'
+                    ? `<span class="badge" style="background:#ffebee;color:#c62828;margin-left:8px">Last refresh: Exception</span>`
+                    : p.lastRefreshState ? `<span class="badge" style="background:#f1f8e9;color:#33691e;margin-left:8px">Last refresh: ${this._esc(p.lastRefreshState)}</span>` : '';
+                html += `<p><strong>${this._esc(p.name)}</strong> — mode: ${p.mode || 'default'}${stateLabel}</p>`;
                 if (p.source) {
                     const lines = p.source.split('\n');
                     const shouldTruncate = lines.length > 5;
@@ -1323,7 +1421,10 @@ class App {
 
         if (m.database?.name) html += `<tr><td>Database</td><td>${this._esc(m.database.name)}</td></tr>`;
         if (m.database?.compatibilityLevel) html += `<tr><td>Compatibility Level</td><td>${m.database.compatibilityLevel}</td></tr>`;
-        if (m.model?.culture) html += `<tr><td>Culture</td><td>${m.model.culture}</td></tr>`;
+        if (m.model?.culture) html += `<tr><td>Culture</td><td>${this._esc(m.model.culture)}</td></tr>`;
+        if (m.model?.defaultPowerBIDataSourceVersion) html += `<tr><td>Data Source Version</td><td>${this._esc(m.model.defaultPowerBIDataSourceVersion)}</td></tr>`;
+        if (m.model?.legacyRedirects != null) html += `<tr><td>Legacy Redirects</td><td>${this._esc(m.model.legacyRedirects)}</td></tr>`;
+        if (m.model?.returnErrorValuesAsNull != null) html += `<tr><td>Return Errors as Null</td><td>${this._esc(m.model.returnErrorValuesAsNull)}</td></tr>`;
 
         html += `<tr><td>Tables</td><td>${m.tables.length}</td></tr>`;
         html += `<tr><td>Total Columns</td><td>${totalColumns}</td></tr>`;
@@ -1333,8 +1434,9 @@ class App {
         html += `<tr><td>Expressions</td><td>${m.expressions.length}</td></tr>`;
 
         if (this.visualData) {
+            const vc = this._countDataBoundVisuals();
             html += `<tr><td>Report Pages</td><td>${this.visualData.pages.length}</td></tr>`;
-            html += `<tr><td>Visuals</td><td>${this.visualData.visuals.length}</td></tr>`;
+            html += `<tr><td>Data-bound Visuals</td><td>${vc.dataBound}${vc.decoration > 0 ? ` <span style="color:var(--text-light);font-size:11px">+ ${vc.decoration} decoration</span>` : ''}</td></tr>`;
         }
 
         if (this.lineageEngine) {
@@ -1628,11 +1730,13 @@ class App {
                 btn.classList.add('active');
                 document.getElementById('lineageFullView').classList.toggle('hidden', view !== 'full');
                 document.getElementById('lineageTraceView').classList.toggle('hidden', view !== 'trace');
+                document.getElementById('lineageSourceView').classList.toggle('hidden', view !== 'source-trace');
                 document.getElementById('lineageImpactView').classList.toggle('hidden', view !== 'impact');
                 document.getElementById('lineageColumnImpactView').classList.toggle('hidden', view !== 'column-impact');
                 document.getElementById('lineageDetailPanel').classList.add('hidden');
                 if (view === 'full' && !this._lineageRendered) this._renderFullLineage();
                 if (view === 'trace') this._populateVisualSelect();
+                if (view === 'source-trace') this._populatePhysicalTableSelect();
                 if (view === 'impact') this._populateMeasureSelect();
                 if (view === 'column-impact') this._populateTableSelect();
             });
@@ -1666,6 +1770,17 @@ class App {
                 const container = document.getElementById('lineageColumnImpactDiagram');
                 const renderer = new LineageDiagramRenderer(container, this.lineageEngine);
                 renderer.renderColumnImpact(container, tableSel.value, colSel.value);
+            });
+
+            // Source Trace button
+            document.getElementById('lineageSourceTraceBtn').addEventListener('click', () => {
+                const sel = document.getElementById('lineagePhysicalTableSelect');
+                const val = sel.value;
+                if (!val) return;
+                const [schema, table] = val.includes('|||') ? val.split('|||') : ['', val];
+                const container = document.getElementById('lineageSourceTraceDiagram');
+                const renderer = new LineageDiagramRenderer(container, this.lineageEngine);
+                renderer.renderSourceTrace(container, table, schema || null);
             });
 
             // Table select cascade for Column Impact
@@ -1716,6 +1831,48 @@ class App {
                 sel.appendChild(opt);
             }
         }
+    }
+
+    _populatePhysicalTableSelect(preselectSchema, preselectTable) {
+        const sel = document.getElementById('lineagePhysicalTableSelect');
+        sel.innerHTML = '';
+        if (!this.lineageEngine) return;
+
+        const seen = new Set();
+        for (const src of this.lineageEngine.getAllDataSources()) {
+            const consumers = this.lineageEngine.getDataSourceConsumers(`source:${MExpressionParser._sourceKey(src)}`);
+            for (const t of consumers.tables) {
+                if (!t.physicalTable) continue;
+                const key = `${t.physicalSchema || ''}|||${t.physicalTable}`;
+                if (seen.has(key)) continue;
+                seen.add(key);
+                const label = t.physicalSchema ? `${t.physicalSchema}.${t.physicalTable}` : t.physicalTable;
+                const opt = document.createElement('option');
+                opt.value = key;
+                opt.textContent = label;
+                sel.appendChild(opt);
+            }
+        }
+        if (preselectTable) {
+            const key = `${preselectSchema || ''}|||${preselectTable}`;
+            if ([...sel.options].some(o => o.value === key)) sel.value = key;
+        }
+    }
+
+    _tracePhysicalTable(schema, table) {
+        this.showSection('lineage');
+        const toggle = document.getElementById('lineageToggle');
+        toggle.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.remove('active'));
+        toggle.querySelector('[data-view="source-trace"]').classList.add('active');
+        document.getElementById('lineageFullView').classList.add('hidden');
+        document.getElementById('lineageTraceView').classList.add('hidden');
+        document.getElementById('lineageSourceView').classList.remove('hidden');
+        document.getElementById('lineageImpactView').classList.add('hidden');
+        document.getElementById('lineageColumnImpactView').classList.add('hidden');
+        this._populatePhysicalTableSelect(schema, table);
+        const container = document.getElementById('lineageSourceTraceDiagram');
+        const renderer = new LineageDiagramRenderer(container, this.lineageEngine);
+        renderer.renderSourceTrace(container, table, schema || null);
     }
 
     // ── Lineage Detail Panel ──
@@ -2091,7 +2248,16 @@ class App {
             return;
         }
 
-        let html = '<p class="section-subtitle">Data engineer view — physical tables loaded from each source, column renames, and downstream consumers.</p>';
+        let html = `<p class="section-subtitle">Data engineer view — physical tables loaded from each source, column renames, and downstream consumers.</p>
+        <div class="ds-filter-bar">
+            <input type="text" id="dsFilterInput" placeholder="Filter by connector type, server, database…" class="ds-filter-input" oninput="app._filterDataSources(this.value)">
+            <div class="ds-filter-chips" id="dsFilterChips">
+                ${[...new Set(sources.map(s => s.type))].map(t => `<button type="button" class="ds-filter-chip" onclick="app._filterDataSourcesByType(this, ${JSON.stringify(t)})">${this._esc(t)}</button>`).join('')}
+                ${sources.some(s => s.gatewayRequired === true) ? `<button type="button" class="ds-filter-chip" onclick="app._filterDataSourcesByGateway(this)">Gateway Required</button>` : ''}
+                ${sources.some(s => s.parameterized) ? `<button type="button" class="ds-filter-chip" onclick="app._filterDataSourcesByParam(this)">Parameterized</button>` : ''}
+            </div>
+        </div>
+        <div id="dsCardsContainer">`;
 
         for (const src of sources) {
             const server    = src.serverResolved || src.server;
@@ -2103,12 +2269,22 @@ class App {
             const gwBadge   = src.gatewayRequired === true ? '<span class="badge" style="background:#ffebee;color:#c62828;margin-left:4px">Gateway Required</span>' : '';
             const paramBadge = src.parameterized ? '<span class="badge badge-field-param" style="margin-left:4px">Parameterized</span>' : '';
 
-            html += `<div class="data-source-card">
+            const searchText = [src.type, server||'', db||'', src.url||'', src.path||''].join(' ').toLowerCase();
+            html += `<div class="data-source-card" data-ds-type="${this._esc(src.type)}" data-ds-gw="${src.gatewayRequired === true}" data-ds-param="${!!src.parameterized}" data-ds-search="${this._esc(searchText)}">
                 <h4><span class="lineage-badge source">${this._esc(src.type)}</span>`;
-            if (server) html += ` <code style="font-size:12px;font-weight:normal">${this._esc(server)}</code>`;
-            if (db)     html += ` <span style="color:var(--text-secondary);font-size:12px">/ ${this._esc(db)}</span>`;
-            if (src.url)  html += ` <code style="font-size:12px;font-weight:normal">${this._esc(src.url)}</code>`;
-            if (src.path) html += ` <code style="font-size:12px;font-weight:normal">${this._esc(src.path)}</code>`;
+            if (src.isInline) {
+                html += ` <span style="font-size:12px;color:var(--text-secondary)">Compressed binary / base64 data embedded in M</span>`;
+            } else if (src.isNativeQuery) {
+                html += ` <span class="badge" style="background:#fff3e0;color:#e65100;margin-left:4px">Native SQL</span>`;
+                if (server) html += ` <code style="font-size:12px;font-weight:normal">${this._esc(server)}</code>`;
+                if (db)     html += ` <span style="color:var(--text-secondary);font-size:12px">/ ${this._esc(db)}</span>`;
+                if (src.nativeQuery) html += ` <details style="display:inline-block;font-size:11px;margin-left:8px"><summary style="cursor:pointer;color:var(--text-secondary)">SQL</summary><code style="display:block;margin-top:4px;font-size:11px;white-space:pre-wrap">${this._esc(src.nativeQuery.slice(0, 500))}${src.nativeQuery.length > 500 ? '…' : ''}</code></details>`;
+            } else {
+                if (server) html += ` <code style="font-size:12px;font-weight:normal">${this._esc(server)}</code>`;
+                if (db)     html += ` <span style="color:var(--text-secondary);font-size:12px">/ ${this._esc(db)}</span>`;
+                if (src.url)  html += ` <code style="font-size:12px;font-weight:normal">${this._esc(src.url)}</code>`;
+                if (src.path) html += ` <code style="font-size:12px;font-weight:normal">${this._esc(src.path)}</code>`;
+            }
             html += `${paramBadge}${gwBadge}</h4>`;
 
             // Consumer summary pills
@@ -2128,7 +2304,7 @@ class App {
                     const physLabel = [t.physicalSchema, t.physicalTable].filter(Boolean).join('.');
                     html += `<div class="ds-physical-row">
                         <span class="ds-model-table" onclick="app.navigateTo('tables', ${JSON.stringify(t.name)})" title="Click to open table">${this._esc(t.name)}</span>`;
-                    if (physLabel) html += `<span class="ds-arrow">←</span><code class="ds-phys-label">${this._esc(physLabel)}</code>`;
+                    if (physLabel) html += `<span class="ds-arrow">←</span><button type="button" class="ds-phys-label" title="Trace ${this._esc(physLabel)} to visuals" onclick="app._tracePhysicalTable(${JSON.stringify(t.physicalSchema||'')}, ${JSON.stringify(t.physicalTable||'')})">${this._esc(physLabel)} <span style="font-size:10px;opacity:0.7">↗</span></button>`;
                     if (t.renames.length > 0) {
                         html += ` <details class="ds-renames-details"><summary>${t.renames.length} rename${t.renames.length !== 1 ? 's' : ''}</summary><ul>`;
                         for (const r of t.renames) {
@@ -2156,8 +2332,48 @@ class App {
 
             html += `</div>`;
         }
+        html += `</div>`; // close dsCardsContainer
 
         content.innerHTML = html;
+    }
+
+    _filterDataSources(query) {
+        const q = query.toLowerCase();
+        document.querySelectorAll('#dsCardsContainer .data-source-card').forEach(card => {
+            const text = card.dataset.dsSearch || '';
+            card.style.display = (!q || text.includes(q)) ? '' : 'none';
+        });
+    }
+
+    _filterDataSourcesByType(btn, type) {
+        const active = btn.classList.toggle('active');
+        document.querySelectorAll('#dsCardsContainer .data-source-card').forEach(card => {
+            if (!active) { card.style.display = ''; return; }
+            card.style.display = card.dataset.dsType === type ? '' : 'none';
+        });
+        if (!active) { // deselect other chips when cleared
+            document.querySelectorAll('#dsFilterChips .ds-filter-chip').forEach(c => c.classList.remove('active'));
+        } else {
+            document.querySelectorAll('#dsFilterChips .ds-filter-chip').forEach(c => { if (c !== btn) c.classList.remove('active'); });
+        }
+    }
+
+    _filterDataSourcesByGateway(btn) {
+        const active = btn.classList.toggle('active');
+        document.querySelectorAll('#dsCardsContainer .data-source-card').forEach(card => {
+            card.style.display = (!active || card.dataset.dsGw === 'true') ? '' : 'none';
+        });
+        if (!active) document.querySelectorAll('#dsFilterChips .ds-filter-chip').forEach(c => c.classList.remove('active'));
+        else document.querySelectorAll('#dsFilterChips .ds-filter-chip').forEach(c => { if (c !== btn) c.classList.remove('active'); });
+    }
+
+    _filterDataSourcesByParam(btn) {
+        const active = btn.classList.toggle('active');
+        document.querySelectorAll('#dsCardsContainer .data-source-card').forEach(card => {
+            card.style.display = (!active || card.dataset.dsParam === 'true') ? '' : 'none';
+        });
+        if (!active) document.querySelectorAll('#dsFilterChips .ds-filter-chip').forEach(c => c.classList.remove('active'));
+        else document.querySelectorAll('#dsFilterChips .ds-filter-chip').forEach(c => { if (c !== btn) c.classList.remove('active'); });
     }
 
     // ──────────────────────────────────────────────
@@ -2396,7 +2612,11 @@ class App {
 
         document.querySelectorAll('.section-view').forEach(el => el.classList.remove('active'));
         document.getElementById('view-report-page').classList.add('active');
-        document.getElementById('reportPageName').textContent = page.displayName;
+        const nameEl = document.getElementById('reportPageName');
+        nameEl.textContent = page.displayName;
+        if (page.isDrillthrough) {
+            nameEl.insertAdjacentHTML('afterend', '<span class="badge" style="background:#fff3e0;color:#e65100;margin-left:6px;vertical-align:middle">Drillthrough</span>');
+        }
 
         // Add breadcrumb back link
         const pageBreadcrumb = document.getElementById('pageDetailBreadcrumb');
@@ -2470,24 +2690,39 @@ class App {
         );
     }
 
+    _toggleDataBoundOnly(dataBoundOnly) {
+        const DECORATION_TYPES = new Set(['actionButton','shape','textbox','bookmarkNavigator','pageNavigator','image','groupContainer']);
+        document.querySelectorAll('#visualUsageByVisual .visual-card').forEach(card => {
+            const vtype = card.dataset.visualType || '';
+            if (dataBoundOnly && DECORATION_TYPES.has(vtype)) {
+                card.style.display = 'none';
+            } else {
+                card.style.display = '';
+            }
+        });
+    }
+
     _renderByVisualView() {
+        const DECORATION_TYPES = new Set(['actionButton','shape','textbox','bookmarkNavigator','pageNavigator','image','groupContainer']);
         let html = '';
         for (const page of this.visualData.pages) {
+            const visuals = page.visuals;
+            const dataBound = visuals.filter(v => !DECORATION_TYPES.has(v.visualType));
             html += `<div class="page-group">
                 <div class="page-group-header" data-page-group="${this._esc(page.id)}">
                     <span class="material-symbols-outlined">auto_stories</span>
                     ${this._esc(page.displayName)}
                     <span style="font-size:12px;font-weight:400;color:var(--text-secondary);margin-left:auto">
-                        ${page.visuals.length} visual${page.visuals.length !== 1 ? 's' : ''}
+                        ${dataBound.length} data-bound · ${visuals.length - dataBound.length} decoration
                     </span>
                     <span class="material-symbols-outlined chevron-icon">expand_more</span>
                 </div>
                 <div class="page-group-content">`;
 
-            if (page.visuals.length === 0) {
+            if (visuals.length === 0) {
                 html += '<p class="visual-card-empty">No visuals on this page.</p>';
             } else {
-                for (const visual of page.visuals) {
+                for (const visual of visuals) {
                     html += this._renderVisualCard(visual);
                 }
             }
@@ -2649,7 +2884,7 @@ class App {
             }
         }
 
-        let html = `<div class="visual-card">
+        let html = `<div class="visual-card" data-visual-type="${this._esc(vType)}">
             <div class="visual-card-header">
                 <h4>${this._esc(vName)}</h4>
                 <span class="badge-visual-type">${this._esc(vType)}</span>`;
@@ -2741,15 +2976,24 @@ class App {
 
                     const fpItems = this.docGenerator._getFieldParameterItems(t);
                     if (fpItems !== null && fpItems.length > 0) {
+                        const fpSel = visual.fpSelections?.[t];
+                        const selectedIdx = fpSel?.selectedIndex ?? null;
+                        const selectedItem = (selectedIdx !== null && fpItems[selectedIdx]) ? fpItems[selectedIdx] : null;
                         html += `<div class="visual-special-block fp-block">
                             <div class="visual-special-header"><span class="badge badge-field-param"><span class="material-symbols-outlined" style="font-size:12px;vertical-align:middle">tune</span> Field Parameter</span> <strong>'${this._esc(t)}'</strong> — ${fpItems.length} available field${fpItems.length !== 1 ? 's' : ''}:</div>
                             <div class="dynamic-card-insight" style="margin:6px 0 8px">
                                 <span class="material-symbols-outlined" style="font-size:14px;color:#e65100">visibility_off</span>
-                                <span>JSON shows: <code>${this._esc(t)}[${this._esc(t)}]</code>. Reality: switches between ${fpItems.length} field${fpItems.length !== 1 ? 's' : ''}: ${fpItems.map(i => `'${i.table}'[${i.column}]`).join(', ')}</span>
-                            </div>
+                                <span>PBIR JSON shows only the last-saved selection. Semantic model defines ${fpItems.length} field${fpItems.length !== 1 ? 's' : ''} — user can switch at runtime.</span>
+                            </div>`;
+                        if (selectedItem) {
+                            html += `<div style="margin:4px 0 6px;font-size:12px"><strong>Last selected:</strong> <span class="fp-item-chip fp-item-selected">'${this._esc(selectedItem.table)}'[${this._esc(selectedItem.column)}]</span></div>`;
+                        }
+                        html += `<div style="font-size:12px;margin-bottom:4px"><strong>All ${fpItems.length} options (from semantic model):</strong></div>
                             <div class="fp-items-list">`;
-                        for (const item of fpItems) {
-                            html += `<span class="fp-item-chip">'${this._esc(item.table)}'[${this._esc(item.column)}]</span>`;
+                        for (let i = 0; i < fpItems.length; i++) {
+                            const item = fpItems[i];
+                            const isSelected = i === selectedIdx;
+                            html += `<span class="fp-item-chip${isSelected ? ' fp-item-selected' : ''}" title="${isSelected ? 'Last selected' : ''}">'${this._esc(item.table)}'[${this._esc(item.column)}]${isSelected ? ' ✓' : ''}</span>`;
                         }
                         html += `</div></div>`;
                     } else {
@@ -2779,6 +3023,20 @@ class App {
 
         html += '</div>';
         return html;
+    }
+
+    _countDataBoundVisuals() {
+        if (!this.visualData?.visuals) return { dataBound: 0, decoration: 0, total: 0 };
+        const DECORATION_TYPES = new Set([
+            'actionButton', 'shape', 'textbox', 'bookmarkNavigator',
+            'pageNavigator', 'image', 'groupContainer'
+        ]);
+        let dataBound = 0, decoration = 0;
+        for (const v of this.visualData.visuals) {
+            if (DECORATION_TYPES.has(v.visualType)) decoration++;
+            else dataBound++;
+        }
+        return { dataBound, decoration, total: dataBound + decoration };
     }
 
     _normalizeRoleName(projectionName) {
@@ -2982,6 +3240,7 @@ class App {
             'visual-usage': 'visualUsageByVisual',
             'lineage-full': 'lineageDiagramContainer',
             'lineage-trace': 'lineageTraceDiagram',
+            'lineage-source-trace': 'lineageSourceTraceDiagram',
             'lineage-impact': 'lineageImpactDiagram',
             'lineage-column': 'lineageColumnImpactDiagram'
         };

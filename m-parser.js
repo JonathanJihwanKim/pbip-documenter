@@ -252,6 +252,45 @@ class MExpressionParser {
             });
         }
 
+        // Inline literal data — Binary.Decompress / Binary.FromText (base64 embedded data)
+        const inlinePat = /Binary\.(?:Decompress|FromText)\s*\(/g;
+        while ((match = inlinePat.exec(mExpression)) !== null) {
+            sources.push({ type: 'Inline Literal', isInline: true });
+            break; // one entry is enough per M expression
+        }
+
+        // Value.NativeQuery — wraps any connector with a passthrough SQL string
+        // e.g. Value.NativeQuery(GoogleBigQuery.Database(...){...}[Data], "SELECT ...", null, [...])
+        const nativeQueryPat = /Value\.NativeQuery\s*\(/g;
+        while ((match = nativeQueryPat.exec(mExpression)) !== null) {
+            const afterOpen = mExpression.slice(match.index + match[0].length);
+            // Extract the SQL string (second argument after first comma at depth 0)
+            let depth = 0;
+            let firstComma = -1;
+            for (let i = 0; i < afterOpen.length; i++) {
+                const ch = afterOpen[i];
+                if (ch === '(' || ch === '[' || ch === '{') depth++;
+                else if (ch === ')' || ch === ']' || ch === '}') { if (depth === 0) break; depth--; }
+                else if (ch === ',' && depth === 0) { firstComma = i; break; }
+            }
+            let sqlText = null;
+            if (firstComma !== -1) {
+                const sqlArg = afterOpen.slice(firstComma + 1).trimStart();
+                const sqlMatch = sqlArg.match(/^"((?:[^"\\]|\\.)*)"/);
+                if (sqlMatch) sqlText = sqlMatch[1];
+            }
+            // Detect the backing connector from within the first argument
+            const firstArg = firstComma !== -1 ? afterOpen.slice(0, firstComma) : afterOpen.slice(0, 500);
+            const innerSources = this.extractDataSources(firstArg);
+            if (innerSources.length > 0) {
+                for (const inner of innerSources) {
+                    sources.push({ ...inner, nativeQuery: sqlText, isNativeQuery: true });
+                }
+            } else {
+                sources.push({ type: 'Native Query', nativeQuery: sqlText, isNativeQuery: true });
+            }
+        }
+
         return sources;
     }
 
@@ -404,6 +443,31 @@ class MExpressionParser {
             result.addedColumns.push(ac[1]);
         }
 
+        // 4b. Table.NestedJoin — record joined step names and key columns
+        // Table.NestedJoin(left, {"leftKey"}, right, {"rightKey"}, "newCol", JoinKind.Inner)
+        result.joins = [];
+        const joinPat = /Table\.NestedJoin\s*\(\s*([^,\n]+),\s*\{([^}]*)\}\s*,\s*([^,\n]+),\s*\{([^}]*)\}/g;
+        let jm;
+        while ((jm = joinPat.exec(mExpression)) !== null) {
+            const leftKeys  = (jm[2].match(/"([^"]+)"/g) || []).map(s => s.replace(/"/g, ''));
+            const rightKeys = (jm[4].match(/"([^"]+)"/g) || []).map(s => s.replace(/"/g, ''));
+            result.joins.push({
+                type: 'NestedJoin',
+                leftStep:  jm[1].trim(),
+                rightStep: jm[3].trim(),
+                leftKeys,
+                rightKeys
+            });
+        }
+
+        // 4c. Table.Combine — collect combined step names
+        const combinePat = /Table\.Combine\s*\(\s*\{([^}]+)\}/g;
+        let cm;
+        while ((cm = combinePat.exec(mExpression)) !== null) {
+            const stepNames = cm[1].split(',').map(s => s.trim()).filter(Boolean);
+            result.joins.push({ type: 'Combine', steps: stepNames });
+        }
+
         // 5. Table.RemoveColumns — if we have a selectedColumns list, prune it
         if (result.selectedColumns !== null) {
             const removePat = /Table\.RemoveColumns\b/g;
@@ -433,17 +497,80 @@ class MExpressionParser {
      * @param {Object} parsedModel
      * @returns {Map<string, Object>}
      */
+    /**
+     * If an M expression's first step is a bare identifier reference to a shared expression
+     * (not a function call), return that expression name. Otherwise null.
+     * e.g.  "let\n  Source = bu_dim_src\nin\n  Source"  →  "bu_dim_src"
+     * e.g.  "let\n  Source = #\"bu_dim_src\"\nin\n  ..."  →  "bu_dim_src"
+     */
+    static _extractSharedExpressionRef(mExpr) {
+        if (!mExpr) return null;
+        // Match: let <any_step_name> = <identifier_without_parens>
+        const m = mExpr.match(
+            /^\s*let\s+(?:#"[^"]+"|[A-Za-z_][A-Za-z0-9_ ]*)\s*=\s*(?:#"([^"]+)"|([A-Za-z_][A-Za-z0-9_]*))\s*(?![ \t]*\()/i
+        );
+        if (!m) return null;
+        return m[1] || m[2] || null;
+    }
+
+    /**
+     * Extract lineage for a single partition M, resolving shared expression references.
+     * Returns merged lineage: physical source from the shared expression body,
+     * column renames from the partition itself.
+     */
+    static _extractLineageResolvingRef(mExpr, expressionBodies, visited = new Set()) {
+        const refName = this._extractSharedExpressionRef(mExpr);
+        const refBody = refName && !visited.has(refName) && expressionBodies[refName];
+
+        if (refBody) {
+            visited.add(refName);
+            // Recurse to get base lineage (handles chains of references)
+            const baseLineage = this._extractLineageResolvingRef(refBody, expressionBodies, visited);
+            // Get partition-level renames/projections on top of the reference
+            const partitionLineage = this.extractTableLineage(mExpr);
+            if (!baseLineage) return partitionLineage;
+            return {
+                physicalSchema: baseLineage.physicalSchema,
+                physicalTable: baseLineage.physicalTable,
+                renames: [
+                    ...(partitionLineage?.renames || []),
+                    ...(baseLineage.renames || [])
+                ],
+                selectedColumns: partitionLineage?.selectedColumns || baseLineage.selectedColumns,
+                addedColumns: [
+                    ...(partitionLineage?.addedColumns || []),
+                    ...(baseLineage.addedColumns || [])
+                ]
+            };
+        }
+
+        return this.extractTableLineage(mExpr);
+    }
+
     static extractTableLineageFromModel(parsedModel) {
-        const map = new Map();
+        const map = new Map(); // tableName → first resolved lineage (best effort)
+
+        const expressionBodies = {};
+        for (const expr of (parsedModel.expressions || [])) {
+            if (expr.name && expr.expression) expressionBodies[expr.name] = expr.expression;
+        }
+
+        const _tryLineage = (mExpr) => {
+            if (!mExpr) return null;
+            const lineage = this._extractLineageResolvingRef(mExpr, expressionBodies);
+            return (lineage && (lineage.physicalTable || lineage.renames.length > 0)) ? lineage : null;
+        };
+
         for (const table of (parsedModel.tables || [])) {
+            // Try refreshPolicy.sourceExpression first (most specific for IR tables)
+            const rpLineage = _tryLineage(table.refreshPolicy?.sourceExpression);
+            if (rpLineage && !map.has(table.name)) map.set(table.name, rpLineage);
+
+            // Try all partitions — take the first one that yields a physical table
             for (const partition of (table.partitions || [])) {
-                if (partition.source) {
-                    const lineage = this.extractTableLineage(partition.source);
-                    if (lineage && (lineage.physicalTable || lineage.renames.length > 0)) {
-                        // First partition with real lineage wins
-                        if (!map.has(table.name)) map.set(table.name, lineage);
-                    }
-                }
+                if (map.has(table.name)) break; // already resolved
+                const lineage = _tryLineage(partition.source);
+                if (lineage) map.set(table.name, lineage);
             }
         }
         return map;
@@ -495,16 +622,31 @@ class MExpressionParser {
         );
         MExpressionParser._declaredParams = declaredParams;
 
+        // Build map of shared expression bodies for delegation resolution
+        const expressionBodies = {};
+        for (const expr of (parsedModel.expressions || [])) {
+            if (expr.name && expr.expression) expressionBodies[expr.name] = expr.expression;
+        }
+
         for (const table of (parsedModel.tables || [])) {
             for (const partition of (table.partitions || [])) {
-                if (partition.source) {
-                    const sources = this.extractDataSources(partition.source);
-                    for (const src of sources) {
-                        src.tableName = table.name;
-                        src.partitionName = partition.name;
+                if (!partition.source) continue;
+                let sources = this.extractDataSources(partition.source);
+
+                // If partition M is a simple delegation, resolve through the shared expression
+                if (sources.length === 0) {
+                    const refName = this._extractSharedExpressionRef(partition.source);
+                    const refBody = refName && expressionBodies[refName];
+                    if (refBody) {
+                        sources = this.extractDataSources(refBody);
                     }
-                    allSources.push(...sources);
                 }
+
+                for (const src of sources) {
+                    src.tableName = table.name;
+                    src.partitionName = partition.name;
+                }
+                allSources.push(...sources);
             }
         }
 
@@ -543,6 +685,175 @@ class MExpressionParser {
         ];
         if (cloudConnectors.includes(source.type)) return false;
         return null; // unknown
+    }
+
+    /**
+     * Parse a Power Query M let...in expression into ordered named steps.
+     * Resolves shared expression references before parsing when expressionBodies is provided.
+     *
+     * @param {string} mExpr - Raw M expression text
+     * @param {Object} [expressionBodies] - Map of shared expression name → body text
+     * @returns {Array<{name:string, kind:string, exprText:string, refs:string[]}>}
+     *   kind values: Source | Navigation | Projection | Rename | Filter | Join |
+     *                AddColumn | TypeChange | Expand | Custom
+     */
+    static parseMSteps(mExpr, expressionBodies = {}) {
+        if (!mExpr) return [];
+
+        // Resolve shared expression delegation
+        let resolved = mExpr;
+        const refName = this._extractSharedExpressionRef(mExpr);
+        if (refName && expressionBodies[refName]) {
+            resolved = expressionBodies[refName];
+        }
+
+        // Strip optional ``` fences
+        resolved = resolved.replace(/^\s*```\s*\n?/, '').replace(/\n?\s*```\s*$/, '');
+
+        // Find the let...in block
+        const letMatch = /^\s*let\b/i.exec(resolved);
+        if (!letMatch) return [];
+
+        const afterLet = resolved.slice(letMatch.index + letMatch[0].length);
+
+        // Split into step definitions respecting nested parens/brackets/braces and string literals
+        const steps = [];
+        let buf = '';
+        let depth = 0;
+        let inStr = false;
+        let strChar = '';
+        let i = 0;
+
+        while (i < afterLet.length) {
+            const ch = afterLet[i];
+
+            // Handle string literals ("..." style)
+            if (inStr) {
+                buf += ch;
+                if (ch === strChar && afterLet[i - 1] !== '\\') inStr = false;
+                i++; continue;
+            }
+            if (ch === '"' || ch === "'") {
+                inStr = true; strChar = ch; buf += ch; i++; continue;
+            }
+
+            // Track depth for parens/brackets/braces
+            if (ch === '(' || ch === '[' || ch === '{') { depth++; buf += ch; i++; continue; }
+            if (ch === ')' || ch === ']' || ch === '}') { depth--; buf += ch; i++; continue; }
+
+            // Top-level comma = step boundary
+            if (ch === ',' && depth === 0) {
+                const step = this._parseOneStep(buf.trim());
+                if (step) steps.push(step);
+                buf = '';
+                i++; continue;
+            }
+
+            // "in" keyword at depth 0 ends the let block
+            if (depth === 0 && ch === 'i' && afterLet[i + 1] === 'n' && /\s/.test(afterLet[i + 2] || ' ')) {
+                // Confirm we're not in the middle of an identifier
+                const prev = afterLet[i - 1] || ' ';
+                if (/[\s,]/.test(prev)) {
+                    const step = this._parseOneStep(buf.trim());
+                    if (step) steps.push(step);
+                    buf = '';
+                    break;
+                }
+            }
+
+            buf += ch;
+            i++;
+        }
+
+        // Trailing step if "in" not seen
+        if (buf.trim()) {
+            const step = this._parseOneStep(buf.trim());
+            if (step) steps.push(step);
+        }
+
+        return steps;
+    }
+
+    /**
+     * Parse a single "Name = expr" step text into a step descriptor.
+     */
+    static _parseOneStep(text) {
+        if (!text) return null;
+
+        // Extract name (quoted or unquoted) and expression
+        const nameMatch = text.match(/^(?:#"([^"]+)"|([A-Za-z_\u00C0-\u024F][A-Za-z0-9_ \u00C0-\u024F]*))\s*=\s*([\s\S]*)/);
+        if (!nameMatch) return null;
+
+        const name = nameMatch[1] || nameMatch[2];
+        const exprText = nameMatch[3].trim();
+        const kind = this._classifyStepKind(exprText);
+        const refs = this._extractStepRefs(exprText);
+
+        return { name, kind, exprText, refs };
+    }
+
+    /**
+     * Classify a step expression into a kind bucket.
+     */
+    static _classifyStepKind(expr) {
+        if (/^(?:Sql\.|GoogleBigQuery\.|AzureDataExplorer\.|Kusto\.|Lakehouse\.|Fabric\.|Databricks\.|Snowflake\.|PostgreSQL\.|MySQL\.|Teradata\.|SapHana\.|Odbc\.|Oracle\.|Excel\.|Csv\.|OData\.|SharePoint\.|PowerBI\.|Web\.|Value\.NativeQuery)/i.test(expr)) return 'Source';
+        if (/^\w+\s*\{\s*\[/.test(expr)) return 'Navigation'; // item{[Schema=...,Item=...]}[Data]
+        if (/^\w+\s*\[/.test(expr) && !/^Table\./.test(expr)) return 'Navigation'; // step["column"]
+        if (/^Table\.SelectColumns\b/.test(expr)) return 'Projection';
+        if (/^Table\.RenameColumns\b/.test(expr)) return 'Rename';
+        if (/^Table\.SelectRows\b/.test(expr)) return 'Filter';
+        if (/^Table\.NestedJoin\b/.test(expr)) return 'Join';
+        if (/^Table\.Combine\b/.test(expr)) return 'Join';
+        if (/^Table\.AddColumn\b/.test(expr)) return 'AddColumn';
+        if (/^Table\.TransformColumnTypes\b/.test(expr)) return 'TypeChange';
+        if (/^Table\.ExpandTableColumn\b/.test(expr)) return 'Expand';
+        if (/^Table\.RemoveColumns\b/.test(expr)) return 'Projection';
+        if (/^Table\.ReorderColumns\b/.test(expr)) return 'Projection';
+        return 'Custom';
+    }
+
+    /**
+     * Extract step-name references from a step expression (identifiers before Table.* calls).
+     */
+    static _extractStepRefs(expr) {
+        // Match unquoted identifiers and #"quoted" that likely refer to prior steps
+        const refs = [];
+        const pat = /(?:^|[,({\s])(?:#"([^"]+)"|([A-Za-z_][A-Za-z0-9_]*))\s*(?=[,\[{)]|$)/g;
+        let m;
+        while ((m = pat.exec(expr)) !== null) {
+            const name = m[1] || m[2];
+            // Skip M built-ins and common keywords
+            if (/^(let|in|if|then|else|each|try|otherwise|true|false|null|and|or|not|meta|type|error|section|shared|Table|Text|Number|List|Record|Date|DateTime|Duration|Binary|Value|Function|Type|Logical|Web|Sql|Csv|Excel|Json|OData|SharePoint|Power|Fabric|Google|Azure|Snowflake|Databricks|Odbc|Oracle|Teradata|Kusto|SapHana|MySQL|PostgreSQL)$/i.test(name)) continue;
+            refs.push(name);
+        }
+        return [...new Set(refs)];
+    }
+
+    /**
+     * Parse M steps for every table in a model, resolving shared expression refs.
+     * Returns Map<tableName, Array<step>>
+     */
+    static parseMStepsFromModel(parsedModel) {
+        const expressionBodies = {};
+        for (const expr of (parsedModel.expressions || [])) {
+            if (expr.name && expr.expression) expressionBodies[expr.name] = expr.expression;
+        }
+
+        const map = new Map();
+        for (const table of (parsedModel.tables || [])) {
+            // Try refreshPolicy.sourceExpression first
+            const rp = table.refreshPolicy?.sourceExpression;
+            if (rp) {
+                const steps = this.parseMSteps(rp, expressionBodies);
+                if (steps.length > 0) { map.set(table.name, steps); continue; }
+            }
+            for (const partition of (table.partitions || [])) {
+                if (!partition.source) continue;
+                const steps = this.parseMSteps(partition.source, expressionBodies);
+                if (steps.length > 0) { map.set(table.name, steps); break; }
+            }
+        }
+        return map;
     }
 }
 

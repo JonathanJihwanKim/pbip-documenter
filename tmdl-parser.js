@@ -102,7 +102,7 @@ class TMDLParser {
      * Parse model.tmdl
      */
     parseModel(content) {
-        const result = { name: null, culture: null, defaultPowerBIDataSourceVersion: null };
+        const result = { name: null, culture: null, defaultPowerBIDataSourceVersion: null, legacyRedirects: null, returnErrorValuesAsNull: null };
         const lines = content.split('\n');
 
         for (const line of lines) {
@@ -113,6 +113,10 @@ class TMDLParser {
                 result.culture = trimmed.split(':')[1]?.trim();
             } else if (trimmed.startsWith('defaultPowerBIDataSourceVersion:')) {
                 result.defaultPowerBIDataSourceVersion = trimmed.split(':')[1]?.trim();
+            } else if (trimmed.startsWith('legacyRedirects:')) {
+                result.legacyRedirects = trimmed.split(':')[1]?.trim();
+            } else if (trimmed.startsWith('returnErrorValuesAsNull:')) {
+                result.returnErrorValuesAsNull = trimmed.split(':')[1]?.trim();
             }
         }
 
@@ -132,7 +136,8 @@ class TMDLParser {
             measures: [],
             hierarchies: [],
             partitions: [],
-            calculationGroup: null
+            calculationGroup: null,
+            refreshPolicy: null
         };
 
         let state = 'IDLE';
@@ -254,7 +259,7 @@ class TMDLParser {
                 }
                 if (indent > baseIndent && trimmed.includes(':')) {
                     // Check for 'expression =' or 'source =' which starts a new expression block
-                    if (/^(?:expression|source)\s*=/.test(trimmed)) {
+                    if (/^(?:expression|source|sourceExpression)\s*=/.test(trimmed)) {
                         const afterEq = trimmed.split('=').slice(1).join('=').trim();
                         if (afterEq) {
                             currentExpression.push(afterEq);
@@ -281,7 +286,11 @@ class TMDLParser {
 
                 // Check for annotation or extendedProperty blocks
                 if (indent > baseIndent && (trimmed.startsWith('annotation') || trimmed.startsWith('extendedProperty'))) {
-                    // Skip annotation/extendedProperty blocks
+                    // Capture PBI_ResultType for partition refresh state
+                    if (currentObject && trimmed.startsWith('annotation PBI_ResultType =')) {
+                        const val = trimmed.split('=')[1]?.trim().replace(/^['"]|['"]$/g, '');
+                        currentObject.properties.pbiResultType = val;
+                    }
                     continue;
                 }
             }
@@ -310,7 +319,7 @@ class TMDLParser {
      * Detect object type from a line
      */
     _detectObjectType(line) {
-        const types = ['column', 'measure', 'hierarchy', 'partition', 'calculationGroup', 'calculationItem', 'level', 'role'];
+        const types = ['column', 'measure', 'hierarchy', 'partition', 'calculationGroup', 'calculationItem', 'level', 'role', 'refreshPolicy'];
         for (const type of types) {
             if (line === type || line.startsWith(type + ' ') || line.startsWith(type + '\t')) {
                 return type;
@@ -382,7 +391,8 @@ class TMDLParser {
                     name: currentObject.name,
                     mode: currentObject.properties.mode || null,
                     source: expressionText,
-                    sourceType: currentObject.properties.type || null
+                    sourceType: currentObject.properties.type || null,
+                    lastRefreshState: currentObject.properties.pbiResultType || null
                 });
                 break;
 
@@ -404,6 +414,20 @@ class TMDLParser {
                         formatStringExpression: currentObject.properties.formatStringExpression || null
                     });
                 }
+                break;
+
+            case 'refreshPolicy':
+                table.refreshPolicy = {
+                    policyType: currentObject.properties.policyType || null,
+                    rollingWindowGranularity: currentObject.properties.rollingWindowGranularity || null,
+                    rollingWindowPeriods: currentObject.properties.rollingWindowPeriods != null
+                        ? parseInt(currentObject.properties.rollingWindowPeriods, 10) : null,
+                    incrementalGranularity: currentObject.properties.incrementalGranularity || null,
+                    incrementalPeriods: currentObject.properties.incrementalPeriods != null
+                        ? parseInt(currentObject.properties.incrementalPeriods, 10) : null,
+                    pollingExpression: currentObject.properties.pollingExpression || null,
+                    sourceExpression: expressionText
+                };
                 break;
         }
     }
@@ -607,10 +631,29 @@ class TMDLParser {
         let currentExpr = null;
         let exprLines = [];
         let inExpression = false;
+        let inBacktickBlock = false;
 
         for (const line of lines) {
             const trimmed = line.trim();
             const indent = line.search(/\S/);
+
+            // Triple-backtick fence toggle
+            if (trimmed === '```') {
+                if (inBacktickBlock) {
+                    // End of backtick block — close current expression body
+                    inBacktickBlock = false;
+                } else if (currentExpr) {
+                    // Start of backtick block
+                    inBacktickBlock = true;
+                    inExpression = true;
+                }
+                continue;
+            }
+
+            if (inBacktickBlock) {
+                exprLines.push(line);
+                continue;
+            }
 
             if (indent === 0 && trimmed.startsWith('expression')) {
                 if (currentExpr) {
@@ -625,11 +668,18 @@ class TMDLParser {
                 exprLines = [];
                 inExpression = false;
 
-                // Check for '=' on the same line
+                // Check for '=' on the same line (may be followed by ``` or inline M)
                 if (trimmed.includes('=')) {
                     const afterEq = trimmed.substring(trimmed.indexOf('=') + 1).trim();
-                    if (afterEq) exprLines.push(afterEq);
-                    inExpression = true;
+                    if (afterEq && afterEq !== '```') {
+                        exprLines.push(afterEq);
+                        inExpression = true;
+                    } else if (afterEq === '```') {
+                        inBacktickBlock = true;
+                        inExpression = true;
+                    } else {
+                        inExpression = true;
+                    }
                 }
                 continue;
             }
@@ -640,10 +690,19 @@ class TMDLParser {
                     continue;
                 }
 
+                if (trimmed.startsWith('annotation ')) {
+                    // Skip annotation lines inside expressions block
+                    continue;
+                }
+
                 if (indent > 0 && (inExpression || trimmed.startsWith('='))) {
                     if (trimmed.startsWith('=')) {
                         const afterEq = trimmed.substring(1).trim();
-                        if (afterEq) exprLines.push(afterEq);
+                        if (afterEq && afterEq !== '```') {
+                            exprLines.push(afterEq);
+                        } else if (afterEq === '```') {
+                            inBacktickBlock = true;
+                        }
                     } else {
                         exprLines.push(trimmed);
                     }

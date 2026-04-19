@@ -37,6 +37,9 @@ class LineageEngine {
         // Build physical table lineage map: tableName → {physicalSchema, physicalTable, renames, ...}
         this.tableLineage = MExpressionParser.extractTableLineageFromModel(this.parsedModel);
 
+        // Build M-step map: tableName → [{name, kind, exprText, refs}]
+        this.mSteps = MExpressionParser.parseMStepsFromModel(this.parsedModel);
+
         // 1. Add data sources from M expressions
         this.dataSources = MExpressionParser.extractAllFromModel(this.parsedModel);
         for (const source of this.dataSources) {
@@ -149,6 +152,32 @@ class LineageEngine {
                                 addedColumns: tblLineage?.addedColumns || []
                             });
                         }
+                    }
+                }
+            }
+
+            // Column → physical-column edges (from rename pairs)
+            if (tblLineage && tblLineage.renames && tblLineage.renames.length > 0) {
+                for (const rename of tblLineage.renames) {
+                    const colId = `column:${table.name}.${rename.modelName}`;
+                    if (this.nodes.has(colId)) {
+                        const physColId = `physicalColumn:${tblLineage.physicalSchema || ''}.${tblLineage.physicalTable || ''}.${rename.sourceName}`;
+                        if (!this.nodes.has(physColId)) {
+                            this.nodes.set(physColId, {
+                                id: physColId,
+                                type: 'physicalColumn',
+                                name: rename.sourceName,
+                                physicalSchema: tblLineage.physicalSchema,
+                                physicalTable: tblLineage.physicalTable
+                            });
+                        }
+                        this.edges.push({
+                            from: colId,
+                            to: physColId,
+                            type: 'maps_to_physical_column',
+                            modelName: rename.modelName,
+                            sourceName: rename.sourceName
+                        });
                     }
                 }
             }
@@ -556,23 +585,27 @@ class LineageEngine {
             }
         }
 
-        // Resolve tables to sources
+        // Resolve tables to sources (use engine's pre-built lineage to carry physical-table metadata)
         const tableSourceMap = {};
+        const tableLineageMap = {};
         for (const tableName of tables) {
+            tableSourceMap[tableName] = [];
+            // Pull physical-table info from the pre-built tableLineage
+            const tl = this.tableLineage?.get(tableName);
+            if (tl) tableLineageMap[tableName] = tl;
+
             const table = this.parsedModel.tables.find(t => t.name === tableName);
             if (!table) continue;
-            tableSourceMap[tableName] = [];
-            for (const partition of (table.partitions || [])) {
-                if (partition.source) {
-                    const partSources = MExpressionParser.extractDataSources(partition.source);
-                    for (const src of partSources) {
-                        const key = MExpressionParser._sourceKey(src);
-                        if (!sources.has(key)) {
-                            sources.set(key, src);
-                        }
-                        tableSourceMap[tableName].push(src);
-                    }
-                }
+
+            // Walk pre-built connects_to_source edges for this table
+            const sid = `table:${tableName}`;
+            for (const edge of this.edges) {
+                if (edge.type !== 'connects_to_source' || edge.from !== sid) continue;
+                const srcNode = this.nodes.get(edge.to);
+                if (!srcNode) continue;
+                const key = MExpressionParser._sourceKey(srcNode);
+                if (!sources.has(key)) sources.set(key, srcNode);
+                tableSourceMap[tableName].push(srcNode);
             }
         }
 
@@ -584,7 +617,10 @@ class LineageEngine {
             expandedFPItems,
             tables: Array.from(tables).map(t => ({
                 name: t,
-                sources: tableSourceMap[t] || []
+                sources: tableSourceMap[t] || [],
+                physicalSchema: tableLineageMap[t]?.physicalSchema || null,
+                physicalTable: tableLineageMap[t]?.physicalTable || null,
+                renames: tableLineageMap[t]?.renames || []
             })),
             dataSources: Array.from(sources.values())
         };

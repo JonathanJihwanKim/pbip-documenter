@@ -21,12 +21,16 @@ class VisualParser {
         this.fieldUsageMap = new Map();
 
         for (const page of pagesData) {
+            const pageBinding = page.pageBinding || null;
             const pageInfo = {
                 id: page.pageId,
                 name: page.pageName || page.displayName || page.pageId,
                 displayName: page.displayName || page.pageName || page.pageId,
                 pageWidth: page.pageWidth || null,
                 pageHeight: page.pageHeight || null,
+                isDrillthrough: pageBinding?.type === 'Drillthrough',
+                drillthroughFilters: pageBinding?.type === 'Drillthrough'
+                    ? (pageBinding.boundFilter || []) : [],
                 visuals: []
             };
 
@@ -57,7 +61,7 @@ class VisualParser {
     parseVisual(visualData, pageName) {
         const visualType = visualData.visual?.visualType || visualData.visualType || 'unknown';
         const visualName = this._extractVisualName(visualData) || visualType;
-        const fields = this._extractFieldReferences(visualData);
+        const { fields, fpSelections } = this._extractFieldReferences(visualData);
 
         // Register each field in the usage map
         for (const field of fields) {
@@ -80,6 +84,7 @@ class VisualParser {
             visualName,
             pageName,
             fields,
+            fpSelections,
             position: visualData.position || visualData.visual?.position || null
         };
     }
@@ -164,16 +169,19 @@ class VisualParser {
     }
 
     /**
-     * Extract all field references from visual data
+     * Extract all field references from visual data.
+     * Returns { fields, fpSelections } where fpSelections maps tableName → { selectedIndex, length }.
      */
     _extractFieldReferences(visualData) {
         const fieldMap = new Map();
+        const fpSelections = {};
 
         try {
             // Query state projections
             this._extractFromQueryState(
                 visualData.visual?.query?.queryState || visualData.query?.queryState,
-                fieldMap
+                fieldMap,
+                fpSelections
             );
 
             // Sort definitions
@@ -183,19 +191,19 @@ class VisualParser {
             this._extractFromFilterConfig(visualData.filterConfig, fieldMap);
 
             // Visual objects (conditional formatting, etc.)
-            this._extractFromVisualObjects(visualData.visual?.objects, fieldMap);
-            this._extractFromVisualObjects(visualData.visual?.visualContainerObjects, fieldMap);
+            this._extractFromVisualObjects(visualData.visual?.objects, fieldMap, 'conditionalFormatting');
+            this._extractFromVisualObjects(visualData.visual?.visualContainerObjects, fieldMap, 'containerObjects');
         } catch (err) {
             console.error('Error extracting field references:', err);
         }
 
-        return Array.from(fieldMap.values());
+        return { fields: Array.from(fieldMap.values()), fpSelections };
     }
 
     /**
      * Extract from query state projections
      */
-    _extractFromQueryState(queryState, fieldMap) {
+    _extractFromQueryState(queryState, fieldMap, fpSelections) {
         if (!queryState) return;
 
         for (const [projectionName, projection] of Object.entries(queryState)) {
@@ -213,6 +221,17 @@ class VisualParser {
                             projectionName,
                             fieldMap
                         );
+                        // Record which FP item index is currently selected
+                        if (fpSelections) {
+                            const entity = fp.parameterExpr?.Column?.Expression?.SourceRef?.Entity
+                                || fp.parameterExpr?.Measure?.Expression?.SourceRef?.Entity;
+                            if (entity && fp.index !== undefined) {
+                                fpSelections[entity] = {
+                                    selectedIndex: fp.index,
+                                    length: fp.length ?? null
+                                };
+                            }
+                        }
                     }
                 }
             }
@@ -248,7 +267,7 @@ class VisualParser {
     /**
      * Extract from visual objects (buttons, conditional formatting)
      */
-    _extractFromVisualObjects(objects, fieldMap) {
+    _extractFromVisualObjects(objects, fieldMap, role = 'visualObjects') {
         if (!objects) return;
 
         const search = (obj, depth = 0) => {
@@ -265,7 +284,7 @@ class VisualParser {
                             table: entity,
                             column: property,
                             name: property,
-                            projectionName: 'visualObjects'
+                            projectionName: role
                         });
                     }
                 }
@@ -280,7 +299,7 @@ class VisualParser {
                             table: entity,
                             entity: entity,
                             name: property,
-                            projectionName: 'visualObjects'
+                            projectionName: role
                         });
                     }
                 }

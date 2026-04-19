@@ -422,6 +422,10 @@
                     <div class="view-toggle" id="visualUsageToggle">
                         <button type="button" class="view-toggle-btn active" data-view="by-visual">By Visual</button>
                         <button type="button" class="view-toggle-btn" data-view="by-field">By Field</button>
+                        <label class="ds-filter-chip" style="cursor:pointer;user-select:none;margin-left:auto;display:flex;align-items:center;gap:4px">
+                            <input type="checkbox" id="visualDataBoundOnly" onchange="app._toggleDataBoundOnly(this.checked)">
+                            Data-bound only
+                        </label>
                     </div>
                     <div id="visualUsageByVisual" class="diagram-container diagram-interactive">
                         <div class="diagram-controls diagram-controls-lineage">
@@ -439,6 +443,7 @@
                     <div class="view-toggle" id="lineageToggle">
                         <button type="button" class="view-toggle-btn active" data-view="full">Full Lineage</button>
                         <button type="button" class="view-toggle-btn" data-view="trace">Visual Trace</button>
+                        <button type="button" class="view-toggle-btn" data-view="source-trace">Source Trace</button>
                         <button type="button" class="view-toggle-btn" data-view="impact">Impact Analysis</button>
                         <button type="button" class="view-toggle-btn" data-view="column-impact">Column Impact</button>
                     </div>
@@ -489,6 +494,33 @@
                                 </button>
                                 <div class="diagram-ctrl-separator"></div>
                                 <button class="diagram-ctrl-btn" data-export="svg" data-diagram="lineage-trace" title="Download SVG">
+                                    <span class="material-symbols-outlined">download</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="lineageSourceView" class="hidden">
+                        <div class="lineage-select-row">
+                            <label for="lineagePhysicalTableSelect">Physical table:</label>
+                            <select id="lineagePhysicalTableSelect" class="lineage-select"></select>
+                            <button type="button" id="lineageSourceTraceBtn" class="btn-trace-lineage">
+                                <span class="material-symbols-outlined" style="font-size:16px">account_tree</span>
+                                Trace to Visuals
+                            </button>
+                        </div>
+                        <div id="lineageSourceTraceDiagram" class="lineage-diagram-container diagram-interactive">
+                            <div class="diagram-controls diagram-controls-lineage">
+                                <button class="diagram-ctrl-btn" data-zoom="in" data-target="lineageSourceTraceDiagram" title="Zoom In">
+                                    <span class="material-symbols-outlined">add</span>
+                                </button>
+                                <button class="diagram-ctrl-btn" data-zoom="out" data-target="lineageSourceTraceDiagram" title="Zoom Out">
+                                    <span class="material-symbols-outlined">remove</span>
+                                </button>
+                                <button class="diagram-ctrl-btn" data-zoom="reset" data-target="lineageSourceTraceDiagram" title="Fit to View">
+                                    <span class="material-symbols-outlined">fit_screen</span>
+                                </button>
+                                <div class="diagram-ctrl-separator"></div>
+                                <button class="diagram-ctrl-btn" data-export="svg" data-diagram="lineage-source-trace" title="Download SVG">
                                     <span class="material-symbols-outlined">download</span>
                                 </button>
                             </div>

@@ -636,6 +636,27 @@ tr:hover {
     font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
     font-size: 12px;
 }
+.fp-item-selected {
+    background: #e8f5e9;
+    border-color: #43a047;
+    font-weight: 600;
+}
+
+.table-source-panel {
+    background: var(--surface);
+    border: 1px solid var(--border-light);
+    border-left: 3px solid var(--primary);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    margin: 8px 0 12px;
+    font-size: 13px;
+}
+.source-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
 
 .calc-item-card {
     background: var(--card-bg);
@@ -2124,6 +2145,76 @@ tr:hover {
     font-size: 11px;
     font-weight: 600;
 }
+.table-source-inline {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin: 4px 0 8px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+.partition-details {
+    margin: 4px 0 8px;
+    font-size: 12px;
+}
+.partition-details summary {
+    cursor: pointer;
+    color: var(--text-secondary);
+}
+
+/* M Steps */
+.m-steps-list {
+    list-style: decimal inside;
+    margin: 0 0 16px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.m-step-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border-light);
+    border-radius: 4px;
+    padding: 6px 10px;
+}
+.m-step-name {
+    font-weight: 600;
+    white-space: nowrap;
+    min-width: 80px;
+    color: var(--text-primary);
+}
+.m-step-kind {
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 10px;
+    white-space: nowrap;
+    background: var(--border-light);
+    color: var(--text-secondary);
+}
+.m-step-kind-source { background: #e8f5e9; color: #2e7d32; }
+.m-step-kind-navigation { background: #e3f2fd; color: #1565c0; }
+.m-step-kind-filter { background: #fff3e0; color: #e65100; }
+.m-step-kind-join { background: #f3e5f5; color: #6a1b9a; }
+.m-step-kind-projection { background: #e0f7fa; color: #00695c; }
+.m-step-kind-rename { background: #fce4ec; color: #880e4f; }
+.m-step-kind-addcolumn { background: #f9fbe7; color: #558b2f; }
+.m-step-kind-typechange { background: #eceff1; color: #37474f; }
+.m-step-kind-expand { background: #e8eaf6; color: #283593; }
+.m-step-expr {
+    font-family: monospace;
+    font-size: 11px;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    max-width: 400px;
+}
 
 .lineage-badge.source {
     background: #e8f5e9;
@@ -2295,6 +2386,42 @@ tr:hover {
     fill: #666;
     cursor: pointer;
 }
+
+/* Data Sources filter bar */
+.ds-filter-bar {
+    margin-bottom: 16px;
+}
+.ds-filter-input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius);
+    font-size: 13px;
+    background: var(--card-bg);
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+.ds-filter-input:focus {
+    outline: 2px solid var(--accent);
+    border-color: var(--accent);
+}
+.ds-filter-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.ds-filter-chip {
+    padding: 3px 10px;
+    border: 1px solid var(--border-light);
+    border-radius: 12px;
+    font-size: 12px;
+    background: var(--surface);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+.ds-filter-chip:hover { background: var(--border-light); }
+.ds-filter-chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 
 /* Data Source Cards */
 .data-source-card {
@@ -2904,11 +3031,20 @@ tr:hover {
 }
 
 .ds-phys-label {
+    font-family: var(--mono-font, monospace);
     font-size: 11px;
     background: var(--surface);
     border: 1px solid var(--border-light);
     padding: 1px 5px;
     border-radius: 2px;
+    cursor: pointer;
+    color: var(--primary);
+    text-decoration: none;
+    transition: background 0.15s, border-color 0.15s;
+}
+.ds-phys-label:hover {
+    background: var(--primary-bg, #e8f5e9);
+    border-color: var(--primary);
 }
 
 .ds-computed-note {
