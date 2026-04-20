@@ -219,6 +219,7 @@ class DetailedERDRenderer {
                 columnYOffsets,
                 storageMode,
                 isCalcGroup: isCalc,
+                isFieldParameter: !!table._isFieldParameter,
                 calcItems: isCalc ? table.calculationGroup.items : [],
                 x: 0,
                 y: 0
@@ -328,14 +329,17 @@ class DetailedERDRenderer {
             let dx = startX;
             let dy = disconnectedStartY;
             const maxRowWidth = Math.max(currentX, 1200);
+            let rowMaxHeight = 0;
 
             for (const node of disconnected) {
                 if (dx + node.width > maxRowWidth && dx > startX) {
                     dx = startX;
-                    dy += 300 + this.ROW_GAP; // approximate max height
+                    dy += rowMaxHeight + this.ROW_GAP;
+                    rowMaxHeight = 0;
                 }
                 node.x = dx;
                 node.y = dy;
+                rowMaxHeight = Math.max(rowMaxHeight, node.height);
                 dx += node.width + this.COL_GAP;
             }
         }
@@ -395,7 +399,9 @@ class DetailedERDRenderer {
         }));
 
         // Header
-        const headerColor = node.isCalcGroup ? '#5c3d1a' : this.colors.headerBg;
+        const headerColor = node.isFieldParameter ? '#6a1b9a'
+            : node.isCalcGroup ? '#5c3d1a'
+            : this.colors.headerBg;
         g.appendChild(this._createRect(node.x, node.y, node.width, this.HEADER_H, {
             fill: headerColor, rx: '6'
         }));
@@ -428,7 +434,8 @@ class DetailedERDRenderer {
         const parts = [];
         if (node.columns.length > 0) parts.push(`${node.columns.length} col${node.columns.length !== 1 ? 's' : ''}`);
         if (node.measures.length > 0) parts.push(`${node.measures.length} meas`);
-        if (node.isCalcGroup) parts.push('Calc Group');
+        if (node.isFieldParameter) parts.push('Field Param');
+        else if (node.isCalcGroup) parts.push('Calc Group');
         g.appendChild(this._createText(parts.join(' · '), node.x + 10, subtitleY + 14, {
             fontSize: '10px', fill: this.colors.textLight
         }));

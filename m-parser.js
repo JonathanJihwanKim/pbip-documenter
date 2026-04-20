@@ -365,6 +365,8 @@ class MExpressionParser {
         const result = {
             physicalSchema: null,
             physicalTable: null,
+            physicalDataset: null,  // BigQuery dataset or ADLS container
+            physicalProject: null,  // BigQuery project or cloud account
             renames: [],         // [{sourceName, modelName}] source col name → model col name
             selectedColumns: null, // null = all columns, array = explicit projection
             addedColumns: []     // columns added via Table.AddColumn (computed in PQ)
@@ -384,10 +386,14 @@ class MExpressionParser {
             }
         }
 
-        // Fallback: simple Name-based navigation (e.g. Lakehouse, OData)
+        // Fallback: chained Name-based navigation (Lakehouse, OData, BigQuery dataset→table chain)
+        // Collect all {[Name="x"]}[Data] steps in order; last = table, second-to-last = dataset
         if (!result.physicalTable) {
-            const navName = /\{\s*\[\s*Name\s*=\s*"([^"]+)"\s*\]\s*\}\s*\[Data\]/i.exec(mExpression);
-            if (navName) result.physicalTable = navName[1];
+            const nameMatches = [...mExpression.matchAll(/\{\s*\[\s*Name\s*=\s*"([^"]+)"\s*\]\s*\}(?:\[Data\]|\s*\[Data\])/gi)]
+                .map(m => m[1]);
+            if (nameMatches.length >= 1) result.physicalTable   = nameMatches[nameMatches.length - 1];
+            if (nameMatches.length >= 2) result.physicalDataset = nameMatches[nameMatches.length - 2];
+            if (nameMatches.length >= 3) result.physicalProject = nameMatches[nameMatches.length - 3];
         }
 
         // 2. Table.RenameColumns — find all calls and collect {"OldName","NewName"} pairs

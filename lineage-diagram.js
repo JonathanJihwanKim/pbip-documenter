@@ -78,6 +78,7 @@ class LineageDiagramRenderer {
         }
 
         // Build focused columns from lineage result
+        const hasPhysicalCols = (lineage.physicalColumns || []).length > 0;
         const columns = [
             {
                 label: 'Data Sources',
@@ -90,6 +91,18 @@ class LineageDiagramRenderer {
                     detail: s.type
                 }))
             },
+            ...(hasPhysicalCols ? [{
+                label: 'Physical Columns',
+                color: '#00796b',
+                colorBg: '#e0f2f1',
+                items: (lineage.physicalColumns || []).map(pc => ({
+                    id: pc.id,
+                    name: pc.name,
+                    type: 'physicalColumn',
+                    detail: [pc.physicalDataset, pc.physicalTable].filter(Boolean).join('.')
+                        || pc.physicalTable || ''
+                }))
+            }] : []),
             {
                 label: 'Tables',
                 color: this.colors.table,
@@ -230,8 +243,21 @@ class LineageDiagramRenderer {
         }
 
         const allVisuals = [...impact.directVisuals, ...impact.transitiveVisuals];
+        const hasPhysical = (impact.physicalColumns || []).length > 0;
 
         const columns = [
+            ...(hasPhysical ? [{
+                label: 'Physical Source',
+                color: '#00796b',
+                colorBg: '#e0f2f1',
+                items: (impact.physicalColumns || []).map(pc => ({
+                    id: pc.id,
+                    name: pc.name,
+                    type: 'physicalColumn',
+                    detail: [pc.physicalDataset, pc.physicalTable].filter(Boolean).join('.')
+                        || pc.physicalTable || ''
+                }))
+            }] : []),
             {
                 label: 'Source Column',
                 color: this.colors.column,
@@ -280,6 +306,11 @@ class LineageDiagramRenderer {
 
         const sourceItem = posMap.get(`column:${tableName}.${columnName}`);
         if (sourceItem) {
+            // Physical Column → Model Column (upstream)
+            for (const pc of (impact.physicalColumns || [])) {
+                const pcItem = posMap.get(pc.id);
+                if (pcItem) this._drawEdge(svg, pcItem, sourceItem, 'maps_to_physical_column');
+            }
             // Column → Measures
             for (const dm of impact.directMeasures) {
                 const dmItem = posMap.get(`measure:${dm.table}.${dm.name}`);
@@ -663,6 +694,10 @@ class LineageDiagramRenderer {
     }
 
     _renderLayout(layout, columns, title) {
+        // Pre-compute broken-ref sources for highlighting
+        const brokenRefs = this.lineageEngine.brokenRefs || [];
+        this._brokenRefSources = new Set(brokenRefs.map(b => b.visual));
+
         const svg = this._createSVG(layout.width, layout.height);
 
         // Title
@@ -891,6 +926,22 @@ class LineageDiagramRenderer {
             dot.setAttribute('r', dotR);
             dot.setAttribute('fill', color);
             g.appendChild(dot);
+        }
+
+        // Broken-ref overlay: red dashed border + warning icon on the visual node
+        if (this._brokenRefSources && this._brokenRefSources.has(item.id)) {
+            const overlay = this._createRect(item._x, item._y, item._w, item._h, {
+                fill: 'none', stroke: '#c62828', strokeWidth: '2', rx: '4'
+            });
+            overlay.setAttribute('stroke-dasharray', '5,3');
+            g.appendChild(overlay);
+            const warn = this._createText('⚠', item._x + item._w - 12, item._y + 11, {
+                fontSize: '10px', fill: '#c62828', textAnchor: 'middle', title: 'Broken field reference'
+            });
+            g.appendChild(warn);
+            const t = document.createElementNS(this.SVG_NS, 'title');
+            t.textContent = 'This visual has broken field references';
+            g.appendChild(t);
         }
 
         svg.appendChild(g);

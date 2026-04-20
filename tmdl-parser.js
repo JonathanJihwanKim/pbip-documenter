@@ -53,6 +53,18 @@ class TMDLParser {
                     if (/^LocalDateTable_|^DateTableTemplate_/.test(table.name)) {
                         table._isAutoDate = true;
                     }
+                    // Tag calc-group tables
+                    if (table.calculationGroup) {
+                        table._isCalcGroup = true;
+                    }
+                    // Tag field-parameter tables (any partition source or column expression uses NAMEOF)
+                    const fpExpressions = [
+                        ...table.partitions.map(p => p.source || ''),
+                        ...table.columns.map(c => c.expression || '')
+                    ];
+                    if (fpExpressions.some(expr => /\bNAMEOF\s*\(/i.test(expr))) {
+                        table._isFieldParameter = true;
+                    }
                     this.model.tables.push(table);
                 }
             } catch (err) {
@@ -473,7 +485,7 @@ class TMDLParser {
             const indent = line.search(/\S/);
 
             if (indent === 0 && trimmed.startsWith('relationship')) {
-                if (currentRel) relationships.push(currentRel);
+                if (currentRel) relationships.push(this._finalizeRel(currentRel));
                 currentRel = {
                     id: this._extractName(trimmed, 'relationship'),
                     fromTable: null,
@@ -524,8 +536,15 @@ class TMDLParser {
             }
         }
 
-        if (currentRel) relationships.push(currentRel);
+        if (currentRel) relationships.push(this._finalizeRel(currentRel));
         return relationships;
+    }
+
+    _finalizeRel(rel) {
+        const from = rel.fromCardinality || 'many';
+        const to   = rel.toCardinality   || 'one';
+        rel.cardinality = `${from}:${to}`;
+        return rel;
     }
 
     /**

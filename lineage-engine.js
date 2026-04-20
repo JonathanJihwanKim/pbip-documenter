@@ -145,39 +145,89 @@ class LineageEngine {
                                 from: tableId,
                                 to: sourceId,
                                 type: 'connects_to_source',
-                                physicalSchema: tblLineage?.physicalSchema || null,
-                                physicalTable: tblLineage?.physicalTable || null,
-                                renames: tblLineage?.renames || [],
+                                physicalSchema:  tblLineage?.physicalSchema  || null,
+                                physicalTable:   tblLineage?.physicalTable   || null,
+                                physicalDataset: tblLineage?.physicalDataset || null,
+                                physicalProject: tblLineage?.physicalProject || null,
+                                renames:         tblLineage?.renames         || [],
                                 selectedColumns: tblLineage?.selectedColumns || null,
-                                addedColumns: tblLineage?.addedColumns || []
+                                addedColumns:    tblLineage?.addedColumns    || []
                             });
                         }
                     }
                 }
             }
 
-            // Column → physical-column edges (from rename pairs)
-            if (tblLineage && tblLineage.renames && tblLineage.renames.length > 0) {
-                for (const rename of tblLineage.renames) {
-                    const colId = `column:${table.name}.${rename.modelName}`;
-                    if (this.nodes.has(colId)) {
-                        const physColId = `physicalColumn:${tblLineage.physicalSchema || ''}.${tblLineage.physicalTable || ''}.${rename.sourceName}`;
-                        if (!this.nodes.has(physColId)) {
-                            this.nodes.set(physColId, {
-                                id: physColId,
-                                type: 'physicalColumn',
-                                name: rename.sourceName,
-                                physicalSchema: tblLineage.physicalSchema,
-                                physicalTable: tblLineage.physicalTable
-                            });
-                        }
-                        this.edges.push({
-                            from: colId,
-                            to: physColId,
-                            type: 'maps_to_physical_column',
-                            modelName: rename.modelName,
-                            sourceName: rename.sourceName
+            // Column → physical-column edges
+            // Emit for ALL model columns when we know the source table (not just renamed ones).
+            // For renamed columns use the sourceName; otherwise default to the model column name.
+            if (tblLineage && tblLineage.physicalTable) {
+                const renameMap = new Map((tblLineage.renames || []).map(r => [r.modelName, r.sourceName]));
+                const physPrefix = `${tblLineage.physicalSchema || ''}.${tblLineage.physicalTable}`;
+                for (const col of table.columns) {
+                    if (col.expression) continue; // calc columns handled separately below
+                    const colId = `column:${table.name}.${col.name}`;
+                    if (!this.nodes.has(colId)) continue;
+                    const sourceName = renameMap.get(col.name) || col.name;
+                    const physColId = `physicalColumn:${physPrefix}.${sourceName}`;
+                    if (!this.nodes.has(physColId)) {
+                        this.nodes.set(physColId, {
+                            id: physColId,
+                            type: 'physicalColumn',
+                            name: sourceName,
+                            physicalSchema:  tblLineage.physicalSchema,
+                            physicalTable:   tblLineage.physicalTable,
+                            physicalDataset: tblLineage.physicalDataset || null,
+                            physicalProject: tblLineage.physicalProject || null
                         });
+                    }
+                    this.edges.push({
+                        from: colId,
+                        to: physColId,
+                        type: 'maps_to_physical_column',
+                        modelName: col.name,
+                        sourceName
+                    });
+                }
+            }
+
+            // Calculated-column DAX edges
+            for (const col of table.columns) {
+                if (!col.expression) continue;
+                const colKey = `${table.name}[${col.name}]`;
+                const colId  = `column:${table.name}.${col.name}`;
+                const refs   = this.measureRefs[colKey];
+                if (!refs) continue;
+                for (const cr of (refs.columnRefs || [])) {
+                    this.edges.push({ from: colId, to: `column:${cr.table}.${cr.column}`, type: 'references_column' });
+                }
+                for (const mr of (refs.measureRefs || [])) {
+                    const mt = this.measureLookup.get(mr);
+                    if (mt) this.edges.push({ from: colId, to: `measure:${mt}.${mr}`, type: 'depends_on_measure' });
+                }
+                for (const tr of (refs.tableRefs || [])) {
+                    this.edges.push({ from: colId, to: `table:${tr}`, type: 'references_table' });
+                }
+            }
+        }
+
+        // M-step join/merge edges: derived_from_table between model tables
+        for (const [tableName, steps] of (this.mSteps || new Map())) {
+            const tableId = `table:${tableName}`;
+            if (!this.nodes.has(tableId)) continue;
+            for (const step of steps) {
+                for (const join of (step.joins || [])) {
+                    // Map M step names to model table names via partition source cross-reference
+                    for (const otherTable of this.parsedModel.tables) {
+                        if (otherTable.name === tableName) continue;
+                        // If another table's name appears as a step reference, link them
+                        const otherStepNames = [join.leftStep, join.rightStep, ...(join.steps || [])];
+                        if (otherStepNames.some(s => s && (s === otherTable.name || s.replace(/^#"(.+)"$/, '$1') === otherTable.name))) {
+                            const otherId = `table:${otherTable.name}`;
+                            if (this.nodes.has(otherId)) {
+                                this.edges.push({ from: tableId, to: otherId, type: 'derived_from_table' });
+                            }
+                        }
                     }
                 }
             }
@@ -609,17 +659,34 @@ class LineageEngine {
             }
         }
 
+        // Collect physical columns reachable from columns in this trace
+        const physicalColumns = new Map(); // physColId → node
+        for (const [, col] of columns) {
+            const colId = `column:${col.table}.${col.column}`;
+            for (const edge of this.edges) {
+                if (edge.type === 'maps_to_physical_column' && edge.from === colId) {
+                    const physNode = this.nodes.get(edge.to);
+                    if (physNode && !physicalColumns.has(edge.to)) {
+                        physicalColumns.set(edge.to, physNode);
+                    }
+                }
+            }
+        }
+
         const result = {
             visual: { name: visualName, page: pageName, type: visual.visualType },
             measures: Array.from(measures.values()),
             columns: Array.from(columns.values()),
             expandedCalcItems,
             expandedFPItems,
+            physicalColumns: Array.from(physicalColumns.values()),
             tables: Array.from(tables).map(t => ({
                 name: t,
                 sources: tableSourceMap[t] || [],
                 physicalSchema: tableLineageMap[t]?.physicalSchema || null,
                 physicalTable: tableLineageMap[t]?.physicalTable || null,
+                physicalDataset: tableLineageMap[t]?.physicalDataset || null,
+                physicalProject: tableLineageMap[t]?.physicalProject || null,
                 renames: tableLineageMap[t]?.renames || []
             })),
             dataSources: Array.from(sources.values())
@@ -744,8 +811,18 @@ class LineageEngine {
             }
         }
 
+        // Upstream: find physical column(s) this model column maps to
+        const physicalColumns = [];
+        for (const edge of this.edges) {
+            if (edge.type === 'maps_to_physical_column' && edge.from === columnId) {
+                const physNode = this.nodes.get(edge.to);
+                if (physNode) physicalColumns.push(physNode);
+            }
+        }
+
         return {
             column: { table: tableName, name: columnName },
+            physicalColumns,
             directMeasures,
             directVisuals,
             transitiveVisuals

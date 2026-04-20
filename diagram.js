@@ -85,7 +85,9 @@ class DiagramRenderer {
                     columns,
                     totalColumns: tableData.columns.length,
                     measures,
-                    isDisconnected: false
+                    isDisconnected: false,
+                    _isFieldParameter: !!tableData._isFieldParameter,
+                    _isCalcGroup: !!tableData._isCalcGroup
                 });
             } else {
                 // Disconnected: compact node
@@ -94,7 +96,9 @@ class DiagramRenderer {
                     columns: [],
                     totalColumns: tableData.columns.length,
                     measures,
-                    isDisconnected: true
+                    isDisconnected: true,
+                    _isFieldParameter: !!tableData._isFieldParameter,
+                    _isCalcGroup: !!tableData._isCalcGroup
                 });
             }
         }
@@ -176,12 +180,26 @@ class DiagramRenderer {
             fontSize: '18px', fontWeight: '700', fill: this.colors.primary, textAnchor: 'middle'
         }));
 
+        // Pre-compute perpendicular offsets so parallel edges between the same pair don't overlap
+        const pairGroups = new Map();
+        for (const rel of relationships) {
+            const key = [rel.fromTable, rel.toTable].sort().join('|||');
+            if (!pairGroups.has(key)) pairGroups.set(key, []);
+            pairGroups.get(key).push(rel);
+        }
+        const relOffset = new Map();
+        const PARALLEL_GAP = 14;
+        for (const group of pairGroups.values()) {
+            const n = group.length;
+            group.forEach((r, i) => relOffset.set(r, (i - (n - 1) / 2) * PARALLEL_GAP));
+        }
+
         // Draw relationship bezier lines first (behind nodes)
         for (const rel of relationships) {
             const fromNode = tableMap.get(rel.fromTable);
             const toNode = tableMap.get(rel.toTable);
             if (!fromNode || !toNode) continue;
-            this._drawRelationshipBezier(svg, fromNode, toNode, rel);
+            this._drawRelationshipBezier(svg, fromNode, toNode, rel, relOffset.get(rel) || 0);
         }
 
         // Draw "Standalone Tables" section label if needed
@@ -284,41 +302,44 @@ class DiagramRenderer {
             }
         }
 
-        // 4. Position nodes in concentric rings (dynamic radius for large models)
+        // 4. Position nodes in concentric rings — per-ring radius
         const nodeMap = new Map(nodes.map(n => [n.name, n]));
 
-        // Calculate dynamic ring radius based on nodes per ring to prevent overlap
-        const maxNodesInRing = Math.max(...rings.slice(1).map(r => r.length), 1);
         const avgNodeWidth = nodes.reduce((s, n) => s + n.width, 0) / nodes.length;
-        const minCircumference = maxNodesInRing * (avgNodeWidth + 40);
-        const ringRadius = Math.max(250, minCircumference / (2 * Math.PI));
+        // Compute each ring's radius individually so inner rings stay tight
+        const ringRadii = [0];
+        let cumulativeRadius = 0;
+        for (let ri = 1; ri < rings.length; ri++) {
+            const needed = rings[ri].length * (avgNodeWidth + 40) / (2 * Math.PI);
+            const gap = ri === 1 ? Math.max(180, needed) : Math.max(needed, 100);
+            cumulativeRadius += gap;
+            ringRadii.push(cumulativeRadius);
+        }
 
-        const centerX = ringRadius * Math.max(rings.length - 1, 1) + 150;
-        const centerY = centerX;
+        const totalRadius = Math.max(cumulativeRadius, 200);
+        const centerX = totalRadius + 150;
+        const centerY = totalRadius + 150;
 
         for (let ringIdx = 0; ringIdx < rings.length; ringIdx++) {
             const ring = rings[ringIdx];
-            const radius = ringIdx * ringRadius;
-
             if (ringIdx === 0) {
                 const node = nodeMap.get(ring[0]);
                 node.x = centerX - node.width / 2;
                 node.y = centerY - node.height / 2;
             } else {
-                // Scale radius for rings with many nodes
-                const circumNeeded = ring.length * (avgNodeWidth + 40);
-                const effectiveRadius = Math.max(radius, circumNeeded / (2 * Math.PI));
+                const r = ringRadii[ringIdx];
                 for (let i = 0; i < ring.length; i++) {
                     const angle = (2 * Math.PI * i / ring.length) - Math.PI / 2;
                     const node = nodeMap.get(ring[i]);
-                    node.x = centerX + effectiveRadius * Math.cos(angle) - node.width / 2;
-                    node.y = centerY + effectiveRadius * Math.sin(angle) - node.height / 2;
+                    node.x = centerX + r * Math.cos(angle) - node.width / 2;
+                    node.y = centerY + r * Math.sin(angle) - node.height / 2;
                 }
             }
         }
 
-        // 5. Collision resolution pass — push overlapping nodes apart
-        for (let pass = 0; pass < 3; pass++) {
+        // 5. Collision resolution — damped passes until stable or cap reached
+        for (let pass = 0; pass < 20; pass++) {
+            let moved = false;
             for (let i = 0; i < nodes.length; i++) {
                 for (let j = i + 1; j < nodes.length; j++) {
                     const a = nodes[i], b = nodes[j];
@@ -326,15 +347,17 @@ class DiagramRenderer {
                     const overlapY = (a.height / 2 + b.height / 2 + 20) - Math.abs((a.y + a.height / 2) - (b.y + b.height / 2));
                     if (overlapX > 0 && overlapY > 0) {
                         const pushAxis = overlapX < overlapY ? 'x' : 'y';
-                        const push = (pushAxis === 'x' ? overlapX : overlapY) / 2 + 5;
+                        const push = ((pushAxis === 'x' ? overlapX : overlapY) / 2 + 5) * 0.8;
                         const sign = (pushAxis === 'x')
                             ? (a.x < b.x ? -1 : 1)
                             : (a.y < b.y ? -1 : 1);
                         a[pushAxis] += sign * push;
                         b[pushAxis] -= sign * push;
+                        moved = true;
                     }
                 }
             }
+            if (!moved) break;
         }
 
         // 6. Normalize to positive coordinates
@@ -396,8 +419,11 @@ class DiagramRenderer {
         });
         g.appendChild(bg);
 
-        // Header
-        const headerColor = node.isDisconnected ? '#78909c' : this.colors.tableHeader;
+        // Header — color by table type
+        const headerColor = node._isFieldParameter ? '#6a1b9a'
+            : node._isCalcGroup ? '#5c3d1a'
+            : node.isDisconnected ? '#78909c'
+            : this.colors.tableHeader;
         const header = this._createRect(node.x, node.y, node.width, 32, {
             fill: headerColor, rx: '6'
         });
@@ -409,8 +435,21 @@ class DiagramRenderer {
         });
         g.appendChild(headerBottom);
 
+        // FP / CG badge in top-right corner
+        const typeTag = node._isFieldParameter ? 'FP' : node._isCalcGroup ? 'CG' : null;
+        const maxNameLen = node.isDisconnected ? 18 : (typeTag ? 17 : 22);
+        if (typeTag) {
+            const tagX = node.x + node.width - 28;
+            const tagBg = this._createRect(tagX - 2, node.y + 6, 24, 14, {
+                fill: 'rgba(255,255,255,0.25)', rx: '4'
+            });
+            g.appendChild(tagBg);
+            g.appendChild(this._createText(typeTag, tagX + 10, node.y + 17,
+                { fontSize: '9px', fontWeight: '700', fill: '#ffffff', textAnchor: 'middle' }
+            ));
+        }
+
         // Table name
-        const maxNameLen = node.isDisconnected ? 18 : 22;
         const nameText = this._createText(
             this._truncate(node.name, maxNameLen),
             node.x + node.width / 2,
@@ -478,7 +517,7 @@ class DiagramRenderer {
     /**
      * Draw a bezier curve relationship between two table nodes
      */
-    _drawRelationshipBezier(svg, fromNode, toNode, rel) {
+    _drawRelationshipBezier(svg, fromNode, toNode, rel, perpendicularOffset = 0) {
         const from = this._getConnectionPoint(fromNode, toNode);
         const to = this._getConnectionPoint(toNode, fromNode);
 
@@ -487,13 +526,13 @@ class DiagramRenderer {
         g.setAttribute('data-from', rel.fromTable);
         g.setAttribute('data-to', rel.toTable);
 
-        // Calculate bezier control points with gentle curve
+        // Calculate bezier control points with gentle curve + perpendicular offset for parallel edges
         const dx = to.x - from.x;
         const dy = to.y - from.y;
         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        const curvature = Math.min(dist * 0.2, 60);
-        const nx = -dy / dist * curvature;
-        const ny = dx / dist * curvature;
+        const totalCurvature = Math.min(dist * 0.2, 60) + perpendicularOffset;
+        const nx = -dy / dist * totalCurvature;
+        const ny = dx / dist * totalCurvature;
 
         const cp1x = from.x + dx * 0.33 + nx;
         const cp1y = from.y + dy * 0.33 + ny;

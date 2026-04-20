@@ -18,6 +18,7 @@ class App {
         this._diagramRendered = false;
         this._detailedERDRendered = false;
         this._lineageRendered = false;
+        this._fieldDiagramRendered = false;
 
         this.parseErrors = [];
 
@@ -566,10 +567,56 @@ class App {
     }
 
     // ──────────────────────────────────────────────
+    // STATE RESET
+    // ──────────────────────────────────────────────
+
+    _resetState() {
+        // Lazy-render flags
+        this._diagramRendered = false;
+        this._detailedERDRendered = false;
+        this._lineageRendered = false;
+        this._fieldDiagramRendered = false;
+
+        // Clear all diagram containers so previous dataset SVGs don't linger
+        const DIAGRAM_CONTAINERS = [
+            'relationshipsDiagram', 'detailedERDContainer',
+            'lineageDiagramContainer', 'lineageTraceDiagram',
+            'lineageImpactDiagram', 'lineageColumnImpactDiagram',
+            'lineageSourceTraceDiagram', 'visualUsageByField',
+            'visualUsageByVisual'
+        ];
+        for (const id of DIAGRAM_CONTAINERS) {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = '';
+        }
+
+        // Clear lineage select options so they repopulate for the new dataset
+        for (const id of ['lineageVisualSelect', 'lineageMeasureSelect', 'lineageTableSelect', 'lineageColumnSelect', 'lineagePhysicalTableSelect']) {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = '';
+        }
+
+        // Hide warning banner (will be shown again if new parse has errors)
+        const banner = document.getElementById('warningBanner');
+        if (banner) banner.classList.add('hidden');
+
+        // Remove any milestone banners prepended during previous parse
+        document.querySelectorAll('#mainContent .milestone-banner').forEach(b => b.remove());
+
+        // Clear sidebar search input
+        const searchInput = document.getElementById('sidebarSearch');
+        if (searchInput) searchInput.value = '';
+
+        // Null out static M-parser cache so it doesn't bleed across datasets
+        if (typeof MExpressionParser !== 'undefined') MExpressionParser._declaredParams = null;
+    }
+
+    // ──────────────────────────────────────────────
     // PARSING
     // ──────────────────────────────────────────────
 
     async parseModel() {
+        this._resetState();
         this.showLoading(true, 'Reading TMDL files...');
 
         try {
@@ -646,10 +693,14 @@ class App {
                         bannerText.innerHTML = bannerMsg;
                     }
                     banner.classList.remove('hidden');
-                    document.getElementById('sponsorBannerClose').addEventListener('click', () => {
-                        banner.classList.add('hidden');
-                        localStorage.setItem('pbip-doc-banner-dismissed', '1');
-                    });
+                    const closeBtn = document.getElementById('sponsorBannerClose');
+                    if (closeBtn && !closeBtn.dataset.bound) {
+                        closeBtn.dataset.bound = '1';
+                        closeBtn.addEventListener('click', () => {
+                            banner.classList.add('hidden');
+                            localStorage.setItem('pbip-doc-banner-dismissed', '1');
+                        });
+                    }
                 }
             }
 
@@ -665,10 +716,6 @@ class App {
                     coffeeBtn.addEventListener('animationend', () => coffeeBtn.classList.remove('pulse'));
                 }
             }
-
-            // Diagram rendering is deferred until the relationships section is shown
-            this._diagramRendered = false;
-            this._detailedERDRendered = false;
 
             // Show warning banner if there were parse errors
             if (this.parseErrors.length > 0) {
@@ -734,6 +781,12 @@ class App {
         }
 
         try {
+            this._resetState();
+            // Clear file handles from a prior real-folder session
+            this.folderHandle = null;
+            this.semanticModelHandle = null;
+            this.reportHandle = null;
+
             const resp = await fetch('samples/contoso.json');
             if (!resp.ok) {
                 throw new Error(
@@ -805,14 +858,15 @@ class App {
                     bannerText.innerHTML = demoMsg;
                 }
                 banner.classList.remove('hidden');
-                document.getElementById('sponsorBannerClose').addEventListener('click', () => {
-                    banner.classList.add('hidden');
-                    localStorage.setItem('pbip-doc-banner-dismissed', '1');
-                });
+                const closeBtn = document.getElementById('sponsorBannerClose');
+                if (closeBtn && !closeBtn.dataset.bound) {
+                    closeBtn.dataset.bound = '1';
+                    closeBtn.addEventListener('click', () => {
+                        banner.classList.add('hidden');
+                        localStorage.setItem('pbip-doc-banner-dismissed', '1');
+                    });
+                }
             }
-
-            this._diagramRendered = false;
-            this._detailedERDRendered = false;
 
         } catch (err) {
             const msg = err.name === 'TypeError' && err.message.includes('fetch')
@@ -2681,8 +2735,9 @@ class App {
     }
 
     _ensureFieldDiagramRendered() {
+        if (this._fieldDiagramRendered) return;
+        this._fieldDiagramRendered = true;
         const container = document.getElementById('visualUsageByField');
-        if (container.children.length > 0) return;
         const renderer = new DiagramRenderer(container);
         renderer.renderVisualUsageDiagram(
             this.visualData.fieldUsageMap,
