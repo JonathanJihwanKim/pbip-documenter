@@ -509,10 +509,27 @@ class MExpressionParser {
      * e.g.  "let\n  Source = bu_dim_src\nin\n  Source"  →  "bu_dim_src"
      * e.g.  "let\n  Source = #\"bu_dim_src\"\nin\n  ..."  →  "bu_dim_src"
      */
+    /**
+     * When the TMDL parser encounters `partition 'x' = m`, it treats `= m` as an
+     * expression start and includes all partition properties (mode, queryGroup, source = …)
+     * inside partition.source. This helper extracts just the M expression body that
+     * follows the embedded `source =` marker, or returns the input unchanged if the
+     * TMDL wrapper is not present.
+     */
+    static _extractMExprFromPartitionSource(src) {
+        if (!src) return src;
+        const m = src.match(/\bsource\s*=\s*([\s\S]+)/i);
+        return m ? m[1].trim() : src;
+    }
+
     static _extractSharedExpressionRef(mExpr) {
         if (!mExpr) return null;
+        // Unwrap TMDL partition-body wrapper (partition.source may contain "m\nmode=…\nsource=\nlet…")
+        const unwrapped = this._extractMExprFromPartitionSource(mExpr);
+        // Strip triple-backtick fences before applying the ^ anchor
+        const stripped = unwrapped.replace(/^\s*```[^\n]*\n?/, '').replace(/\n?```\s*$/, '');
         // Match: let <any_step_name> = <identifier_without_parens>
-        const m = mExpr.match(
+        const m = stripped.match(
             /^\s*let\s+(?:#"[^"]+"|[A-Za-z_][A-Za-z0-9_ ]*)\s*=\s*(?:#"([^"]+)"|([A-Za-z_][A-Za-z0-9_]*))\s*(?![ \t]*\()/i
         );
         if (!m) return null;
@@ -601,6 +618,27 @@ class MExpressionParser {
     }
 
     /**
+     * Extract physical table names referenced in a SQL string (L9).
+     * Handles FROM/JOIN with optional schema qualification and backtick/bracket/double-quote quoting.
+     * Returns array of unqualified table name strings (last segment of schema.table).
+     */
+    static _extractSQLTableRefs(sql) {
+        if (!sql) return [];
+        const results = new Set();
+        // Match FROM or JOIN (any variant) followed by an optional schema-qualified table name
+        const pat = /\b(?:FROM|JOIN)\s+([`"\[]?[\w$]+[`"\]]?\s*\.\s*)?([`"\[]?[\w$]+[`"\]]?)/gi;
+        let m;
+        while ((m = pat.exec(sql)) !== null) {
+            // Strip backticks, brackets, double-quotes
+            const raw = m[2].replace(/[`"[\]]/g, '').trim();
+            if (raw && !/^(SELECT|WHERE|ON|AS|SET|VALUES|INTO|UPDATE|DELETE)$/i.test(raw)) {
+                results.add(raw);
+            }
+        }
+        return [...results];
+    }
+
+    /**
      * Generate a dedup key for a source
      */
     static _sourceKey(source) {
@@ -610,6 +648,37 @@ class MExpressionParser {
         if (source.url) parts.push(source.url);
         if (source.path) parts.push(source.path);
         return parts.join('|').toLowerCase();
+    }
+
+    /**
+     * Build a map of tableName → Set<resolvedSourceKey> using fully resolved sources.
+     * Used by lineage-engine to create connects_to_source edges without key mismatches
+     * caused by unresolved parameters or shared-expression delegations.
+     */
+    static buildTableSourceKeyMap(parsedModel) {
+        const expressionBodies = {};
+        for (const expr of (parsedModel.expressions || [])) {
+            if (expr.name && expr.expression) expressionBodies[expr.name] = expr.expression;
+        }
+        const map = new Map();
+        for (const table of (parsedModel.tables || [])) {
+            for (const partition of (table.partitions || [])) {
+                if (!partition.source) continue;
+                let sources = this.extractDataSources(partition.source);
+                if (sources.length === 0) {
+                    const refName = this._extractSharedExpressionRef(partition.source);
+                    const refBody = refName && expressionBodies[refName];
+                    if (refBody) sources = this.extractDataSources(refBody);
+                }
+                sources = this.resolveParameters(sources, parsedModel.expressions || []);
+                for (const src of sources) {
+                    const key = this._sourceKey(src);
+                    if (!map.has(table.name)) map.set(table.name, new Set());
+                    map.get(table.name).add(key);
+                }
+            }
+        }
+        return map;
     }
 
     /**

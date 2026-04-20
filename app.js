@@ -20,6 +20,11 @@ class App {
         this._lineageRendered = false;
         this._fieldDiagramRendered = false;
 
+        // Milestone tracking — per-dataset, not global (S8)
+        this._visitedMilestones = new Set();
+        this._dynamicPromptShown = false;
+        this._milestoneDismissed = false;
+
         this.parseErrors = [];
 
         this.init();
@@ -281,19 +286,16 @@ class App {
     _trackMilestone(section) {
         const HIGH_VALUE = ['relationships', 'lineage', 'visual-usage', 'table-detail', 'data-sources', 'dynamic-features'];
         if (!HIGH_VALUE.includes(section)) return;
-        if (sessionStorage.getItem('pbip-doc-milestone-dismissed')) return;
+        if (this._milestoneDismissed) return;
 
-        const visited = JSON.parse(sessionStorage.getItem('pbip-doc-milestones') || '[]');
-        if (!visited.includes(section)) {
-            visited.push(section);
-            sessionStorage.setItem('pbip-doc-milestones', JSON.stringify(visited));
-        }
+        this._visitedMilestones.add(section);
+        const visited = [...this._visitedMilestones];
 
-        // Value-moment prompt for Dynamic Features (first visit only)
-        if (section === 'dynamic-features' && !sessionStorage.getItem('pbip-doc-dynamic-prompt-shown')) {
+        // Value-moment prompt for Dynamic Features (first visit only per dataset)
+        if (section === 'dynamic-features' && !this._dynamicPromptShown) {
             const summary = this._getDynamicFeaturesSummary();
             if (summary.total > 0) {
-                sessionStorage.setItem('pbip-doc-dynamic-prompt-shown', '1');
+                this._dynamicPromptShown = true;
                 const contentEl = document.getElementById('dynamicFeaturesContent');
                 if (contentEl && !contentEl.querySelector('.value-moment-prompt')) {
                     const prompt = document.createElement('div');
@@ -319,7 +321,7 @@ class App {
             mc.prepend(banner);
             banner.querySelector('.milestone-banner-close').addEventListener('click', () => {
                 banner.remove();
-                sessionStorage.setItem('pbip-doc-milestone-dismissed', '1');
+                this._milestoneDismissed = true;
             });
         }
     }
@@ -576,6 +578,11 @@ class App {
         this._detailedERDRendered = false;
         this._lineageRendered = false;
         this._fieldDiagramRendered = false;
+
+        // Reset per-dataset milestone tracking so sponsor prompts re-fire on each new model (S8)
+        this._visitedMilestones = new Set();
+        this._dynamicPromptShown = false;
+        this._milestoneDismissed = false;
 
         // Clear all diagram containers so previous dataset SVGs don't linger
         const DIAGRAM_CONTAINERS = [

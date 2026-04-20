@@ -40,9 +40,8 @@ class MermaidExporter {
         const lines = ['erDiagram'];
         const MAX_COLS = 15;
 
-        const tables = model.tables.filter(t =>
-            !t._isAutoDate && (!t.isHidden || this._relTables.has(t.name))
-        );
+        // Include all non-auto-date tables — same set as on-screen renderer (D7)
+        const tables = model.tables.filter(t => !t._isAutoDate);
 
         // Entity blocks
         for (const table of tables) {

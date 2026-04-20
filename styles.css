@@ -2866,7 +2866,7 @@ tr:hover {
     :root:not([data-theme="light"]) .btn-time-saved-secondary:hover { background: var(--surface); }
 }
 
-/* Dark mode theme toggle button */
+/* Theme toggle button */
 .btn-theme-toggle {
     display: flex;
     align-items: center;
@@ -2885,6 +2885,36 @@ tr:hover {
 .btn-theme-toggle:hover {
     border-color: var(--primary);
     color: var(--primary);
+}
+
+/* In the header the bg is always var(--primary) — override toggle contrast for each mode */
+/* Light mode header: dark navy #1a3a5c → white outline */
+.app-header .btn-theme-toggle {
+    border-color: rgba(255, 255, 255, 0.55);
+    color: rgba(255, 255, 255, 0.8);
+}
+.app-header .btn-theme-toggle:hover {
+    border-color: #fff;
+    color: #fff;
+}
+/* Dark mode header: light blue #7ab4e0 → dark outline */
+[data-theme="dark"] .app-header .btn-theme-toggle {
+    border-color: rgba(26, 58, 92, 0.55);
+    color: rgba(26, 58, 92, 0.85);
+}
+[data-theme="dark"] .app-header .btn-theme-toggle:hover {
+    border-color: #1a3a5c;
+    color: #1a3a5c;
+}
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .app-header .btn-theme-toggle {
+        border-color: rgba(26, 58, 92, 0.55);
+        color: rgba(26, 58, 92, 0.85);
+    }
+    :root:not([data-theme="light"]) .app-header .btn-theme-toggle:hover {
+        border-color: #1a3a5c;
+        color: #1a3a5c;
+    }
 }
 
 /* ══════════════════════════════════════════════

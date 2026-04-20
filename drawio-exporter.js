@@ -41,14 +41,8 @@ class DrawioExporter {
             relTableNames.add(rel.fromTable);
             relTableNames.add(rel.toTable);
         }
-        const includedTables = tables.filter(t =>
-            relTableNames.has(t.name) || (t.measures && t.measures.length > 0)
-        );
-
-        // If no tables qualify, include all non-hidden tables
-        if (includedTables.length === 0) {
-            includedTables.push(...tables.filter(t => !t.isHidden));
-        }
+        // Include all non-auto-date tables — same set as on-screen renderer (D6)
+        const includedTables = tables.filter(t => !t._isAutoDate);
 
         // Layout: find fact table, arrange dimensions around it
         const layout = this._computeERDLayout(includedTables, relationships);

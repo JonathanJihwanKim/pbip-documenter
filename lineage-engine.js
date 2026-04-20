@@ -42,14 +42,20 @@ class LineageEngine {
 
         // 1. Add data sources from M expressions
         this.dataSources = MExpressionParser.extractAllFromModel(this.parsedModel);
+        // Build per-table source key map using fully resolved sources (handles params + shared exprs)
+        this._tableSourceKeys = MExpressionParser.buildTableSourceKeyMap(this.parsedModel);
         for (const source of this.dataSources) {
             const id = `source:${MExpressionParser._sourceKey(source)}`;
+            const sqlTableRefs = source.nativeQuery
+                ? MExpressionParser._extractSQLTableRefs(source.nativeQuery)
+                : [];
             this.nodes.set(id, {
                 ...source,
                 id,
                 type: 'dataSource',
                 name: this._formatSourceName(source),
-                sourceType: source.type
+                sourceType: source.type,
+                sqlTableRefs: sqlTableRefs.length ? sqlTableRefs : undefined
             });
         }
 
@@ -133,27 +139,25 @@ class LineageEngine {
                 }
             }
 
-            // Partitions → data sources (enrich with physical table lineage)
+            // Partitions → data sources (use pre-resolved key map to handle shared expressions + parameters)
             const tblLineage = this.tableLineage.get(table.name) || null;
-            for (const partition of table.partitions) {
-                if (partition.source) {
-                    const sources = MExpressionParser.extractDataSources(partition.source);
-                    for (const src of sources) {
-                        const sourceId = `source:${MExpressionParser._sourceKey(src)}`;
-                        if (this.nodes.has(sourceId)) {
-                            this.edges.push({
-                                from: tableId,
-                                to: sourceId,
-                                type: 'connects_to_source',
-                                physicalSchema:  tblLineage?.physicalSchema  || null,
-                                physicalTable:   tblLineage?.physicalTable   || null,
-                                physicalDataset: tblLineage?.physicalDataset || null,
-                                physicalProject: tblLineage?.physicalProject || null,
-                                renames:         tblLineage?.renames         || [],
-                                selectedColumns: tblLineage?.selectedColumns || null,
-                                addedColumns:    tblLineage?.addedColumns    || []
-                            });
-                        }
+            const srcKeys = this._tableSourceKeys?.get(table.name);
+            if (srcKeys) {
+                for (const srcKey of srcKeys) {
+                    const sourceId = `source:${srcKey}`;
+                    if (this.nodes.has(sourceId)) {
+                        this.edges.push({
+                            from: tableId,
+                            to: sourceId,
+                            type: 'connects_to_source',
+                            physicalSchema:  tblLineage?.physicalSchema  || null,
+                            physicalTable:   tblLineage?.physicalTable   || null,
+                            physicalDataset: tblLineage?.physicalDataset || null,
+                            physicalProject: tblLineage?.physicalProject || null,
+                            renames:         tblLineage?.renames         || [],
+                            selectedColumns: tblLineage?.selectedColumns || null,
+                            addedColumns:    tblLineage?.addedColumns    || []
+                        });
                     }
                 }
             }
@@ -228,6 +232,26 @@ class LineageEngine {
                                 this.edges.push({ from: tableId, to: otherId, type: 'derived_from_table' });
                             }
                         }
+                    }
+                }
+            }
+        }
+
+        // Calculated-table partition DAX edges: derived_from_table (L6)
+        for (const table of this.parsedModel.tables) {
+            const tableId = `table:${table.name}`;
+            for (const partition of (table.partitions || [])) {
+                if (partition.sourceType !== 'calculated') continue;
+                if (!partition.source) continue;
+                const refs = DAXReferenceExtractor.extract(partition.source);
+                const refTables = new Set([
+                    ...(refs.tableRefs || []),
+                    ...(refs.columnRefs || []).map(cr => cr.table)
+                ]);
+                for (const tRef of refTables) {
+                    const refId = `table:${tRef}`;
+                    if (this.nodes.has(refId) && tRef !== table.name) {
+                        this.edges.push({ from: tableId, to: refId, type: 'derived_from_table' });
                     }
                 }
             }
@@ -621,13 +645,12 @@ class LineageEngine {
             columns.delete(key);
         }
 
-        // Remove tables that only appear as NAMEOF targets of field param items.
-        // These measures are already represented by fpItem nodes; removing the
-        // defining table forces the diagram to draw edges to DAX-referenced
-        // data tables instead (e.g. sales instead of Measure).
+        // Remove FP *parameter* tables (sourceTable) from the diagram tables set —
+        // they are already represented by fpItem nodes. Keep NAMEOF target tables
+        // (fp.table, e.g. "Time Period") because they are the real data tables.
         if (expandedFPItems.length > 0) {
-            const fpNameofTables = new Set(expandedFPItems.map(fp => fp.table));
-            for (const ft of fpNameofTables) {
+            const fpSourceTables = new Set(expandedFPItems.map(fp => fp.sourceTable));
+            for (const ft of fpSourceTables) {
                 const hasDirectColumn = Array.from(columns.values()).some(c => c.table === ft);
                 if (!hasDirectColumn) {
                     tables.delete(ft);
@@ -635,10 +658,19 @@ class LineageEngine {
             }
         }
 
+        // Build source-lookup set: union of diagram tables + FP NAMEOF targets + resolvedTables.
+        // This is wider than `tables` so data sources are found even for tables removed from the
+        // diagram for visual clarity.
+        const sourceLookupTables = new Set(tables);
+        for (const fp of expandedFPItems) {
+            sourceLookupTables.add(fp.table);
+            if (fp.resolvedTables) for (const rt of fp.resolvedTables) sourceLookupTables.add(rt);
+        }
+
         // Resolve tables to sources (use engine's pre-built lineage to carry physical-table metadata)
         const tableSourceMap = {};
         const tableLineageMap = {};
-        for (const tableName of tables) {
+        for (const tableName of sourceLookupTables) {
             tableSourceMap[tableName] = [];
             // Pull physical-table info from the pre-built tableLineage
             const tl = this.tableLineage?.get(tableName);
