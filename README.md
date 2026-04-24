@@ -6,11 +6,22 @@
 [![Fund This Tool](https://img.shields.io/badge/Fund_This_Tool-❤_from_7_EUR/mo-ea4aaa?style=for-the-badge)](https://github.com/sponsors/JonathanJihwanKim)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-☕-orange?style=for-the-badge)](https://buymeacoffee.com/jihwankim)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/JonathanJihwanKim/pbip-documenter?style=for-the-badge&color=gold)](https://github.com/JonathanJihwanKim/pbip-documenter/stargazers)
+[![Last Commit](https://img.shields.io/github/last-commit/JonathanJihwanKim/pbip-documenter?style=for-the-badge&color=1a3a5c)](https://github.com/JonathanJihwanKim/pbip-documenter/commits/main)
+[![Microsoft MVP](https://img.shields.io/badge/Microsoft%20MVP-Power%20BI-0078d4?style=for-the-badge&logo=microsoft)](https://mvp.microsoft.com/en-us/PublicProfile/5005229)
 
 > **No PBIP file?** [Try the live demo with Contoso sample data](https://jonathanjihwankim.github.io/pbip-documenter/) — no setup required, runs entirely in your browser.
 
-<!-- Screenshot: capture from D:\sample_powerbi overview view and save as docs/screenshot-overview.png -->
-<!-- ![Model Overview](docs/screenshot-overview.png) -->
+[![Model Overview — click to open live demo](docs/screenshot-overview.png)](https://jonathanjihwankim.github.io/pbip-documenter/)
+
+*Free forever — built nights and weekends, kept going by [sponsors ❤](#support-development).*
+
+<details>
+<summary>See the lineage engine →</summary>
+
+![Visual Lineage diagram showing full data-source-to-visual dependency graph](docs/screenshot-lineage.png)
+
+</details>
 
 > **✨ Updated 2026-04-20** — M-step parser (10 kinds), Value.NativeQuery SQL tracing, BigQuery 3-part source paths, field-parameter + calc-group badges in diagrams, broken-reference visualization, Physical-Source Index in Markdown exports. [Full changelog ↓](#whats-new-2026-04-20)
 
@@ -56,6 +67,8 @@ You need the big picture:
 - Are there any dynamic features (field parameters, calculation groups) that behave differently than PBIR JSON suggests?
 
 **What you get:** Executive Summary at the top of every export with model stats, top measures by visual coverage, and top source tables by consumption.
+
+*Saved you an afternoon? → [Sponsor monthly](https://github.com/sponsors/JonathanJihwanKim?o=readme-persona) or [buy a coffee](https://buymeacoffee.com/jihwankim?o=readme-persona).*
 
 ---
 
@@ -206,24 +219,32 @@ MyProject/
 
 ## Support Development
 
-This tool is **free forever** — built and maintained solo by [Jihwan Kim](https://github.com/JonathanJihwanKim) (Microsoft MVP). If PBIP Documenter saves you even 30 minutes of documentation work, please consider sponsoring.
+PBIP Documenter is **free and open source**, built solo by [Jihwan Kim](https://github.com/JonathanJihwanKim) (Microsoft MVP) in evenings and weekends. Sponsorship is what lets me keep shipping — recent additions that landed directly from sponsor feedback: demo mode, Dynamic Features view, detailed ERD export, and lineage impact analysis.
 
-<a href="https://github.com/sponsors/JonathanJihwanKim"><img src="https://img.shields.io/badge/GitHub%20Sponsors-❤%20Monthly%20from%207%20EUR-ea4aaa?style=for-the-badge" alt="GitHub Sponsors" /></a> <a href="https://buymeacoffee.com/jihwankim"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-☕%20One--time%20support-orange?style=for-the-badge" alt="Buy Me a Coffee" /></a>
+### What your support enables
+
+- Keeping the tool free, ad-free, and privacy-first (no data ever leaves your browser)
+- Faster response on issues and feature requests
+- Time for bigger roadmap items: printable detailed ERD, measure dependency diffing across model versions, more TMDL edge cases
+- More open-source tooling in the `pbip-*` family for the Power BI / Fabric community
+
+<a href="https://github.com/sponsors/JonathanJihwanKim?o=readme-support"><img src="https://img.shields.io/badge/GitHub%20Sponsors-❤%20Monthly%20from%207%20EUR-ea4aaa?style=for-the-badge" alt="GitHub Sponsors" /></a> <a href="https://buymeacoffee.com/jihwankim?o=readme-support"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-☕%20One--time%20support-orange?style=for-the-badge" alt="Buy Me a Coffee" /></a>
 
 ### Sponsor Tiers
 
-| Tier | Amount | Recognition |
-|------|--------|-------------|
-| **Gold** | 50+ EUR/mo | Logo + link on README and app footer |
-| **Silver** | 10+ EUR/mo | Name + link on README + shoutout in release notes |
-| **Bronze** | Monthly supporter | Name + link on README |
-| **Coffee** | One-time | Name listed in Hall of Sponsors |
+| Tier | Amount | What you get |
+|------|--------|--------------|
+| **Gold** | 50+ EUR/mo | Logo + link on README and app footer · Priority on feature requests |
+| **Silver** | 10+ EUR/mo | Name + link on README · Shoutout in release notes · Priority on feature requests |
+| **Bronze** | 7+ EUR/mo | Name + link in Hall of Sponsors · Early access to `pbip-*` betas |
+| **Coffee** | One-time | Name listed in Hall of Sponsors · Warm fuzzy feeling |
 
-### Hall of Sponsors
+### Hall of Sponsors 🙏
 
 | Name | Tier |
 |------|------|
 | [Alessandro Tiberti Bertin](https://www.linkedin.com/in/aletb/) | Bronze |
+| *Your name here* | [Become a sponsor →](https://github.com/sponsors/JonathanJihwanKim?o=readme-hall) |
 
 ---
 

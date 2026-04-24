@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: "\U0001F4AC Questions & community discussion"
+    url: https://github.com/JonathanJihwanKim/pbip-documenter/discussions
+    about: Ask how to use the tool, share your PBIP workflow, or discuss Power BI / Fabric topics.
+  - name: "❤️ Support this project"
+    url: https://github.com/sponsors/JonathanJihwanKim?o=readme-issue-picker
+    about: Sponsorship keeps pbip-* tools free, maintained, and growing. Even a coffee helps.
