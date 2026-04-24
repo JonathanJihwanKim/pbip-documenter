@@ -3,12 +3,10 @@
 **Generate comprehensive, bidirectional documentation from Power BI PBIP/TMDL semantic models — instantly, in your browser.**
 
 [![Try It Now](https://img.shields.io/badge/Try%20It%20Now-▶%20Live%20Demo-1a3a5c?style=for-the-badge&logo=powerbi)](https://jonathanjihwankim.github.io/pbip-documenter/)
-[![Fund This Tool](https://img.shields.io/badge/Fund_This_Tool-❤_from_7_EUR/mo-ea4aaa?style=for-the-badge)](https://github.com/sponsors/JonathanJihwanKim)
-[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-☕-orange?style=for-the-badge)](https://buymeacoffee.com/jihwankim)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
-[![Stars](https://img.shields.io/github/stars/JonathanJihwanKim/pbip-documenter?style=for-the-badge&color=gold)](https://github.com/JonathanJihwanKim/pbip-documenter/stargazers)
-[![Last Commit](https://img.shields.io/github/last-commit/JonathanJihwanKim/pbip-documenter?style=for-the-badge&color=1a3a5c)](https://github.com/JonathanJihwanKim/pbip-documenter/commits/main)
-[![Microsoft MVP](https://img.shields.io/badge/Microsoft%20MVP-Power%20BI-0078d4?style=for-the-badge&logo=microsoft)](https://mvp.microsoft.com/en-us/PublicProfile/5005229)
+[![Sponsor](https://img.shields.io/badge/Sponsor-❤%20Support%20This%20Tool-ea4aaa?style=for-the-badge&logo=github-sponsors)](https://github.com/sponsors/JonathanJihwanKim)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-☕%20One--time-orange?style=for-the-badge)](https://buymeacoffee.com/jihwankim)
+[![GitHub Stars](https://img.shields.io/github/stars/JonathanJihwanKim/pbip-documenter?style=for-the-badge&logo=github&color=f0a500)](https://github.com/JonathanJihwanKim/pbip-documenter/stargazers)
+[![Microsoft MVP](https://img.shields.io/badge/Microsoft%20MVP-Power%20BI-0078d4?style=for-the-badge&logo=microsoft)](https://mvp.microsoft.com/en-us/PublicProfile/5005229?wt.mc_id=DP-MVP-5004989)
 
 > **No PBIP file?** [Try the live demo with Contoso sample data](https://jonathanjihwankim.github.io/pbip-documenter/) — no setup required, runs entirely in your browser.
 
@@ -83,6 +81,8 @@ You need the big picture:
    - **Full Report (.html)** — self-contained with DAX highlighting, collapsible sections, column usage, data source drill-down
    - **Full Report (.md)** — clean Markdown with tables, ASCII layout grids, ideal for Git wikis
    - **JSON** — machine-readable with `whereUsed` blocks per column and `consumers` blocks per data source
+
+> Using this at work? [A small sponsorship](#support-development) keeps it maintained and free.
 
 ### Manual documentation vs. PBIP Documenter
 
@@ -211,6 +211,7 @@ MyProject/
 
 | Tool | Description |
 |------|-------------|
+| [PBIP Lineage Explorer](https://jonathanjihwankim.github.io/pbip-lineage-explorer/) | Trace Power BI visuals to source columns in one click — full DAX + Power Query rename chain |
 | [PBIR Visual Manager](https://jonathanjihwankim.github.io/isHiddenInViewMode/) | Manage `isHiddenInViewMode` and visual properties in PBIR reports |
 | [PBIP Impact Analyzer](https://jonathanjihwankim.github.io/pbip-impact-analyzer/) | Analyze what breaks when you change a measure, column, or table |
 | **PBIP Documenter** | Generate bidirectional documentation from TMDL (you are here) |
@@ -234,10 +235,13 @@ PBIP Documenter is **free and open source**, built solo by [Jihwan Kim](https://
 
 | Tier | Amount | What you get |
 |------|--------|--------------|
-| **Gold** | 50+ EUR/mo | Logo + link on README and app footer · Priority on feature requests |
+| **Expert** | **25 EUR/mo** | **30-min monthly "Ask a Power BI MVP" video call** + name in app + early access |
+| **Gold** | 50+ EUR/mo | Company logo + link on README and app footer + all Expert benefits |
 | **Silver** | 10+ EUR/mo | Name + link on README · Shoutout in release notes · Priority on feature requests |
 | **Bronze** | 7+ EUR/mo | Name + link in Hall of Sponsors · Early access to `pbip-*` betas |
 | **Coffee** | One-time | Name listed in Hall of Sponsors · Warm fuzzy feeling |
+
+See [SPONSORS.md](SPONSORS.md) for full tier details, corporate invoicing, and FAQ.
 
 ### Hall of Sponsors 🙏
 
