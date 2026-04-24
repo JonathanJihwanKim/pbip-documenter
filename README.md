@@ -12,14 +12,14 @@
 
 > **No PBIP file?** [Try the live demo with Contoso sample data](https://jonathanjihwankim.github.io/pbip-documenter/) — no setup required, runs entirely in your browser.
 
-[![Model Overview — click to open live demo](docs/screenshot-overview.png)](https://jonathanjihwankim.github.io/pbip-documenter/)
+[![Visual Lineage — click to open live demo](docs/screenshot-lineage.png)](https://jonathanjihwankim.github.io/pbip-documenter/)
 
 *Free forever — built nights and weekends, kept going by [sponsors ❤](#support-development).*
 
 <details>
-<summary>See the lineage engine →</summary>
+<summary>See the model overview →</summary>
 
-![Visual Lineage diagram showing full data-source-to-visual dependency graph](docs/screenshot-lineage.png)
+![Model overview showing stats, export panel, and measure catalog](docs/screenshot-overview.png)
 
 </details>
 
