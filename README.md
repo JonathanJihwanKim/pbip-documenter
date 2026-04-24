@@ -229,17 +229,17 @@ PBIP Documenter is **free and open source**, built solo by [Jihwan Kim](https://
 - Time for bigger roadmap items: printable detailed ERD, measure dependency diffing across model versions, more TMDL edge cases
 - More open-source tooling in the `pbip-*` family for the Power BI / Fabric community
 
-<a href="https://github.com/sponsors/JonathanJihwanKim?o=readme-support"><img src="https://img.shields.io/badge/GitHub%20Sponsors-❤%20Monthly%20from%207%20EUR-ea4aaa?style=for-the-badge" alt="GitHub Sponsors" /></a> <a href="https://buymeacoffee.com/jihwankim?o=readme-support"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-☕%20One--time%20support-orange?style=for-the-badge" alt="Buy Me a Coffee" /></a>
+<a href="https://github.com/sponsors/JonathanJihwanKim?o=readme-support"><img src="https://img.shields.io/badge/GitHub%20Sponsors-❤%20from%20%242%2Fmo-ea4aaa?style=for-the-badge" alt="GitHub Sponsors" /></a> <a href="https://buymeacoffee.com/jihwankim?o=readme-support"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-☕%20One--time%20support-orange?style=for-the-badge" alt="Buy Me a Coffee" /></a>
 
 ### Sponsor Tiers
 
 | Tier | Amount | What you get |
 |------|--------|--------------|
-| **Expert** | **25 EUR/mo** | **30-min monthly "Ask a Power BI MVP" video call** + name in app + early access |
-| **Gold** | 50+ EUR/mo | Company logo + link on README and app footer + all Expert benefits |
-| **Silver** | 10+ EUR/mo | Name + link on README · Shoutout in release notes · Priority on feature requests |
-| **Bronze** | 7+ EUR/mo | Name + link in Hall of Sponsors · Early access to `pbip-*` betas |
-| **Coffee** | One-time | Name listed in Hall of Sponsors · Warm fuzzy feeling |
+| **Expert** | **$25/mo** | **30-min monthly "Ask a Power BI MVP" video call** + name in app + early access |
+| **Gold** | $50/mo | Company logo + link on README and app footer + all Expert benefits |
+| **Community Supporter** | $10/mo | Name + link on README · Shoutout in release notes · Priority on feature requests |
+| **Coffee** | $2/mo | Name listed in Hall of Sponsors · Early access to `pbip-*` betas |
+| **One-time** | any | Name listed in Hall of Sponsors via Buy Me a Coffee · Warm fuzzy feeling |
 
 See [SPONSORS.md](SPONSORS.md) for full tier details, corporate invoicing, and FAQ.
 
