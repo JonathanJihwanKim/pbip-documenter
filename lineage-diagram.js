@@ -37,6 +37,7 @@ class LineageDiagramRenderer {
         this._cleanupFn = null;
         this._expandedTables = new Set();
         this._expandedPages = new Set();
+        this._expandedColumns = new Set();
     }
 
     /**
@@ -644,7 +645,9 @@ class LineageDiagramRenderer {
         const colPositions = [];
 
         for (const col of columns) {
-            const visibleCount = Math.min(col.items.length, MAX_VISIBLE);
+            const visibleCount = this._expandedColumns.has(col.label)
+                ? col.items.length
+                : Math.min(col.items.length, MAX_VISIBLE);
             col._visibleCount = visibleCount;
             col._overflow = Math.max(0, col.items.length - visibleCount);
 
@@ -663,8 +666,8 @@ class LineageDiagramRenderer {
                 y += itemH + (isSubItem ? 4 : nodeGap);
             }
 
-            // Overflow indicator
-            if (col._overflow > 0) {
+            // Overflow/collapse indicator position — set when there are hidden items OR when expanded (for collapse button)
+            if (col._overflow > 0 || this._expandedColumns.has(col.label)) {
                 col._overflowY = y;
             }
 
@@ -673,7 +676,8 @@ class LineageDiagramRenderer {
 
         const maxY = Math.max(
             ...columns.map((col, i) => {
-                const count = col._visibleCount + (col._overflow > 0 ? 1 : 0);
+                const hasIndicator = col._overflow > 0 || this._expandedColumns.has(col.label);
+                const count = col._visibleCount + (hasIndicator ? 1 : 0);
                 return padding + titleHeight + headerHeight + count * (nodeHeight + nodeGap);
             }),
             300
@@ -734,13 +738,43 @@ class LineageDiagramRenderer {
                 this._drawNode(svg, item, col.color, col.colorBg);
             }
 
-            // Overflow
-            if (col._overflow > 0) {
-                svg.appendChild(this._createText(
-                    `+ ${col._overflow} more...`,
-                    x + layout.colWidth / 2, col._overflowY + 20,
-                    { fontSize: '11px', fill: this.colors.textLight, textAnchor: 'middle' }
-                ));
+            // Overflow indicator — clickable to expand/collapse in full lineage; plain text in trace views
+            const isExpanded = this._expandedColumns.has(col.label);
+            if (col._overflow > 0 || isExpanded) {
+                const overflowG = document.createElementNS(this.SVG_NS, 'g');
+                overflowG.dataset.nodeType = 'overflow';
+                overflowG.dataset.colLabel = col.label;
+
+                const hitRect = document.createElementNS(this.SVG_NS, 'rect');
+                hitRect.setAttribute('x', x);
+                hitRect.setAttribute('y', col._overflowY);
+                hitRect.setAttribute('width', layout.colWidth);
+                hitRect.setAttribute('height', 26);
+                hitRect.setAttribute('fill', 'transparent');
+                overflowG.appendChild(hitRect);
+
+                let overflowLabel;
+                if (!this._isFullLineageView) {
+                    overflowLabel = col._overflow > 0 ? `+ ${col._overflow} more` : '';
+                } else if (isExpanded) {
+                    overflowLabel = `− collapse`;
+                } else {
+                    overflowLabel = `+ ${col._overflow} more — click to expand`;
+                }
+                if (overflowLabel) {
+                    const overflowText = this._createText(
+                        overflowLabel,
+                        x + layout.colWidth / 2, col._overflowY + 17,
+                        { fontSize: '11px', fill: col.color, textAnchor: 'middle' }
+                    );
+                    if (this._isFullLineageView) {
+                        overflowText.style.textDecoration = 'underline';
+                        overflowText.style.fontStyle = 'italic';
+                        overflowG.style.cursor = 'pointer';
+                    }
+                    overflowG.appendChild(overflowText);
+                }
+                svg.appendChild(overflowG);
             }
 
             x += layout.colWidth + layout.colGap;
@@ -1391,6 +1425,25 @@ class LineageDiagramRenderer {
             });
 
             nodeEl.style.cursor = nodeEl.dataset.nodeType === 'placeholder' ? 'default' : 'pointer';
+        }
+
+        // Overflow expansion/collapse — click to toggle
+        for (const overflowEl of svg.querySelectorAll('[data-node-type="overflow"]')) {
+            overflowEl.addEventListener('click', () => {
+                if (!this._isFullLineageView) return;
+                const colLabel = overflowEl.dataset.colLabel;
+                const currentVB = svg.getAttribute('viewBox');
+                if (this._expandedColumns.has(colLabel)) {
+                    this._expandedColumns.delete(colLabel);
+                } else {
+                    this._expandedColumns.add(colLabel);
+                }
+                this.renderFullLineage(container);
+                if (currentVB) {
+                    const newSvg = container.querySelector('svg');
+                    if (newSvg) newSvg.setAttribute('viewBox', currentVB);
+                }
+            });
         }
 
         this._cleanupFn = () => {

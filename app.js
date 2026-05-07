@@ -3285,6 +3285,9 @@ class App {
                 case 'mermaid':
                     this._exportDiagramMermaid(diagramType, modelName);
                     break;
+                case 'pdf':
+                    this._exportDiagramPDF(diagramType, modelName);
+                    break;
             }
         } catch (err) {
             console.error('Diagram export error:', err);
@@ -3342,6 +3345,66 @@ class App {
         this._downloadFile(svgString, filename, 'image/svg+xml');
         this.showToast(`Downloaded ${filename}`);
         this._track('Diagram Export', { format: 'svg', diagram: diagramType });
+    }
+
+    _exportDiagramPDF(diagramType, modelName) {
+        const containerMap = {
+            'relationships': 'relationshipsDiagram',
+            'detailed-erd': 'detailedERDContainer',
+            'visual-usage': 'visualUsageByVisual',
+            'lineage-full': 'lineageDiagramContainer',
+            'lineage-trace': 'lineageTraceDiagram',
+            'lineage-source-trace': 'lineageSourceTraceDiagram',
+            'lineage-impact': 'lineageImpactDiagram',
+            'lineage-column': 'lineageColumnImpactDiagram'
+        };
+
+        const containerId = containerMap[diagramType];
+        if (!containerId) return;
+
+        const container = document.getElementById(containerId);
+        const svg = container?.querySelector('svg');
+        if (!svg) {
+            this.showToast('No diagram rendered yet. View the diagram first.', 'error');
+            return;
+        }
+
+        const clone = svg.cloneNode(true);
+        const viewBox = clone.getAttribute('viewBox');
+        if (viewBox) {
+            const parts = viewBox.split(/\s+/).map(Number);
+            clone.setAttribute('width', parts[2]);
+            clone.setAttribute('height', parts[3]);
+        }
+        clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+
+        const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+        style.textContent = `text { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }`;
+        clone.insertBefore(style, clone.firstChild);
+
+        const svgStr = new XMLSerializer().serializeToString(clone);
+        const safeTitle = `${modelName}-${diagramType}`.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+        const win = window.open('', '_blank');
+        if (!win) {
+            this.showToast('Pop-up blocked. Allow pop-ups for this page and try again.', 'error');
+            return;
+        }
+        win.onload = () => {
+            win.print();
+            win.onafterprint = () => win.close();
+        };
+        win.document.write(`<!DOCTYPE html><html><head><title>${safeTitle}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{display:flex;justify-content:center;align-items:flex-start;background:#fff}
+svg{max-width:100%;height:auto}
+@page{size:auto;margin:10mm}
+@media print{body{margin:0}}
+</style></head><body>${svgStr}</body></html>`);
+        win.document.close();
+
+        this._track('Diagram Export', { format: 'pdf', diagram: diagramType });
     }
 
     _exportDiagramDrawio(diagramType, modelName) {
