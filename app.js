@@ -584,7 +584,8 @@ class App {
         this._dynamicPromptShown = false;
         this._milestoneDismissed = false;
 
-        // Clear all diagram containers so previous dataset SVGs don't linger
+        // Clear all diagram containers so previous dataset SVGs don't linger,
+        // but preserve the static .diagram-controls toolbar that lives inside.
         const DIAGRAM_CONTAINERS = [
             'relationshipsDiagram', 'detailedERDContainer',
             'lineageDiagramContainer', 'lineageTraceDiagram',
@@ -594,7 +595,10 @@ class App {
         ];
         for (const id of DIAGRAM_CONTAINERS) {
             const el = document.getElementById(id);
-            if (el) el.innerHTML = '';
+            if (!el) continue;
+            Array.from(el.children).forEach(child => {
+                if (!child.classList.contains('diagram-controls')) child.remove();
+            });
         }
 
         // Clear lineage select options so they repopulate for the new dataset

@@ -817,11 +817,18 @@ class DiagramRenderer {
      * @param {Array} pages - Page info from VisualParser
      */
     renderVisualUsageDiagram(fieldUsageMap, pages) {
-        this.container.innerHTML = '';
+        // Preserve the static .diagram-controls toolbar; only remove dynamic content.
+        const existingSvg = this.container.querySelector('svg');
+        if (existingSvg) existingSvg.remove();
+        const existingP = this.container.querySelector('p');
+        if (existingP) existingP.remove();
 
         const entries = Object.entries(fieldUsageMap);
         if (entries.length === 0) {
-            this.container.innerHTML = '<p style="text-align:center;color:#666;padding:40px;">No visual usage data available. Make sure your PBIP folder contains a Report subfolder.</p>';
+            const p = document.createElement('p');
+            p.style.cssText = 'text-align:center;color:#666;padding:40px;';
+            p.textContent = 'No visual usage data available. Make sure your PBIP folder contains a Report subfolder.';
+            this.container.appendChild(p);
             return;
         }
 
