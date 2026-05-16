@@ -44,6 +44,9 @@ class LineageEngine {
         this.dataSources = MExpressionParser.extractAllFromModel(this.parsedModel);
         // Build per-table source key map using fully resolved sources (handles params + shared exprs)
         this._tableSourceKeys = MExpressionParser.buildTableSourceKeyMap(this.parsedModel);
+        // Issue #20: trace which loaded tables (transitively) reference each shared expression
+        // so non-loaded data sources can attribute consumers.
+        this._buildNonLoadedExpressionConsumers();
         for (const source of this.dataSources) {
             const id = `source:${MExpressionParser._sourceKey(source)}`;
             const sqlTableRefs = source.nativeQuery
@@ -961,19 +964,36 @@ class LineageEngine {
      * @returns {{ tables: Array, measures: Array, visuals: Array, pages: string[] }}
      */
     getDataSourceConsumers(sourceId) {
+        const srcNode = this.nodes.get(sourceId);
         // 1. Model tables that connect to this source
         const tables = [];
-        for (const edge of this.edges) {
-            if (edge.type === 'connects_to_source' && edge.to === sourceId) {
-                const node = this.nodes.get(edge.from);
-                if (node) tables.push({
-                    name: node.name,
-                    physicalSchema: edge.physicalSchema || null,
-                    physicalTable:  edge.physicalTable  || null,
-                    renames: edge.renames || [],
-                    selectedColumns: edge.selectedColumns || null,
-                    addedColumns: edge.addedColumns || []
+        if (srcNode && srcNode.isNonLoadedQuery && srcNode.expressionName) {
+            // Non-loaded source: consumers are loaded tables that transitively reference this expression name
+            const tableNames = this._expressionConsumers?.get(srcNode.expressionName) || new Set();
+            for (const name of tableNames) {
+                const tblLineage = this.tableLineage?.get(name) || null;
+                tables.push({
+                    name,
+                    physicalSchema: tblLineage?.physicalSchema || null,
+                    physicalTable:  tblLineage?.physicalTable  || null,
+                    renames: [],
+                    selectedColumns: null,
+                    addedColumns: []
                 });
+            }
+        } else {
+            for (const edge of this.edges) {
+                if (edge.type === 'connects_to_source' && edge.to === sourceId) {
+                    const node = this.nodes.get(edge.from);
+                    if (node) tables.push({
+                        name: node.name,
+                        physicalSchema: edge.physicalSchema || null,
+                        physicalTable:  edge.physicalTable  || null,
+                        renames: edge.renames || [],
+                        selectedColumns: edge.selectedColumns || null,
+                        addedColumns: edge.addedColumns || []
+                    });
+                }
             }
         }
 
@@ -1176,6 +1196,57 @@ class LineageEngine {
         const table = this.parsedModel.tables.find(t => t.name === tableName);
         if (!table || !table.calculationGroup || !table.calculationGroup.items || table.calculationGroup.items.length === 0) return null;
         return table.calculationGroup.items;
+    }
+
+    /**
+     * Build a map of shared expression name → Set<loaded table name> that transitively
+     * references the expression in its M body. Used to attribute consumers to non-loaded
+     * data sources (Issue #20).
+     */
+    _buildNonLoadedExpressionConsumers() {
+        const expressionBodies = {};
+        const expressionNames = [];
+        for (const expr of (this.parsedModel.expressions || [])) {
+            if (expr.name && expr.expression) {
+                expressionBodies[expr.name] = expr.expression;
+                expressionNames.push(expr.name);
+            }
+        }
+
+        const findRefs = (mText) => {
+            const refs = new Set();
+            if (!mText) return refs;
+            for (const name of expressionNames) {
+                const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const pat = new RegExp(`#"${escaped}"|\\b${escaped}\\b`);
+                if (pat.test(mText)) refs.add(name);
+            }
+            return refs;
+        };
+
+        const expressionConsumers = new Map(); // exprName → Set<tableName>
+
+        for (const table of (this.parsedModel.tables || [])) {
+            for (const partition of (table.partitions || [])) {
+                if (!partition.source) continue;
+                const allRefs = new Set();
+                const queue = [...findRefs(partition.source)];
+                while (queue.length) {
+                    const cur = queue.shift();
+                    if (allRefs.has(cur)) continue;
+                    allRefs.add(cur);
+                    const next = findRefs(expressionBodies[cur]);
+                    for (const n of next) {
+                        if (!allRefs.has(n)) queue.push(n);
+                    }
+                }
+                for (const r of allRefs) {
+                    if (!expressionConsumers.has(r)) expressionConsumers.set(r, new Set());
+                    expressionConsumers.get(r).add(table.name);
+                }
+            }
+        }
+        this._expressionConsumers = expressionConsumers;
     }
 
     /**

@@ -12,6 +12,8 @@ class LineageDiagramRenderer {
         this.colors = {
             source: '#4caf50',
             sourceBg: '#e8f5e9',
+            nonLoadedSource: '#6a1b9a',
+            nonLoadedSourceBg: '#f3e5f5',
             table: '#1565c0',
             tableBg: '#e3f2fd',
             measure: '#f9a825',
@@ -89,7 +91,9 @@ class LineageDiagramRenderer {
                     id: `source:${MExpressionParser._sourceKey(s)}`,
                     name: this._formatSourceName(s),
                     type: 'dataSource',
-                    detail: s.type
+                    detail: s.isNonLoadedQuery ? `${s.type} · non-loaded` : s.type,
+                    isNonLoadedQuery: !!s.isNonLoadedQuery,
+                    expressionName: s.expressionName || null
                 }))
             },
             ...(hasPhysicalCols ? [{
@@ -520,7 +524,10 @@ class LineageDiagramRenderer {
             switch (node.type) {
                 case 'dataSource':
                     sourceItems.push({
-                        id, name: node.name, type: 'dataSource', detail: node.sourceType
+                        id, name: node.name, type: 'dataSource',
+                        detail: node.isNonLoadedQuery ? `${node.sourceType} · non-loaded` : node.sourceType,
+                        isNonLoadedQuery: !!node.isNonLoadedQuery,
+                        expressionName: node.expressionName || null
                     });
                     break;
                 case 'table':
@@ -657,7 +664,17 @@ class LineageDiagramRenderer {
             for (let i = 0; i < visibleCount; i++) {
                 const item = col.items[i];
                 const isSubItem = item.isSubItem;
-                const itemH = isSubItem ? 28 : nodeHeight;
+                // Determine whether the node's primary label would overflow its single-line budget.
+                // When it does, the renderer wraps to a second line and the node needs extra height.
+                let maxNameLen;
+                if (item._isPlaceholder) maxNameLen = 22;
+                else if (item.isPageHeader) maxNameLen = 17;
+                else if (isSubItem) maxNameLen = 20;
+                else maxNameLen = item.expandable ? 19 : 22;
+                item._wrapped = !!(item.name && item.name.length > maxNameLen);
+
+                const baseH = isSubItem ? 28 : nodeHeight;
+                const itemH = item._wrapped ? baseH + 14 : baseH;
                 item._x = isSubItem ? x + 10 : x;
                 item._y = y;
                 item._w = isSubItem ? colWidth - 10 : colWidth;
@@ -670,15 +687,15 @@ class LineageDiagramRenderer {
             if (col._overflow > 0 || this._expandedColumns.has(col.label)) {
                 col._overflowY = y;
             }
+            col._endY = y;
 
             x += colWidth + colGap;
         }
 
         const maxY = Math.max(
-            ...columns.map((col, i) => {
+            ...columns.map((col) => {
                 const hasIndicator = col._overflow > 0 || this._expandedColumns.has(col.label);
-                const count = col._visibleCount + (hasIndicator ? 1 : 0);
-                return padding + titleHeight + headerHeight + count * (nodeHeight + nodeGap);
+                return (col._endY || (padding + titleHeight + headerHeight)) + (hasIndicator ? nodeHeight + nodeGap : 0);
             }),
             300
         );
@@ -844,14 +861,15 @@ class LineageDiagramRenderer {
             });
             rect.setAttribute('stroke-dasharray', '6 3');
             g.appendChild(rect);
-            g.appendChild(this._createText(
-                this._truncate(item.name, 22), item._x + 8, item._y + 16,
+            g.appendChild(this._createWrappedText(
+                item.name, item._x + 8, item._y + 16, 22,
                 { fontSize: '11px', fontWeight: '500', fill: '#9e9e9e' }
             ));
             if (item.detail) {
+                const detailY = item._y + (item._wrapped ? 42 : 28);
                 g.appendChild(this._createText(
-                    this._truncate(item.detail, 26), item._x + 8, item._y + 28,
-                    { fontSize: '10px', fill: '#bdbdbd' }
+                    this._truncate(item.detail, 26), item._x + 8, detailY,
+                    { fontSize: '10px', fill: '#bdbdbd', title: item.detail }
                 ));
             }
             svg.appendChild(g);
@@ -865,13 +883,14 @@ class LineageDiagramRenderer {
             g.appendChild(this._createRect(item._x, item._y, item._w, item._h, {
                 fill: bgColor, stroke: color, strokeWidth: '2', rx: '4'
             }));
-            g.appendChild(this._createText(
-                this._truncate(item.name, 17), item._x + 8, item._y + 16,
+            g.appendChild(this._createWrappedText(
+                item.name, item._x + 8, item._y + 16, 17,
                 { fontSize: '12px', fontWeight: '700', fill: this.colors.text }
             ));
+            const headerDetailY = item._y + (item._wrapped ? 42 : 28);
             g.appendChild(this._createText(
-                item.detail, item._x + 8, item._y + 28,
-                { fontSize: '10px', fill: this.colors.textLight }
+                item.detail, item._x + 8, headerDetailY,
+                { fontSize: '10px', fill: this.colors.textLight, title: item.detail }
             ));
             const indicator = this._createText(
                 item.expanded ? '\u25BC' : '\u25B6',
@@ -890,8 +909,11 @@ class LineageDiagramRenderer {
             return;
         }
 
-        // Override colors for calc group and field parameter items
-        if (item.type === 'calcItem') {
+        // Override colors for calc group, field parameter, and non-loaded data source items
+        if (item.type === 'dataSource' && item.isNonLoadedQuery) {
+            color = this.colors.nonLoadedSource;
+            bgColor = this.colors.nonLoadedSourceBg;
+        } else if (item.type === 'calcItem') {
             color = this.colors.calcGroup;
             bgColor = this.colors.calcGroupBg;
         } else if (item.type === 'fpItem') {
@@ -912,32 +934,33 @@ class LineageDiagramRenderer {
 
         if (item.isSubItem) {
             // Compact sub-item: name only, smaller text
-            const name = this._truncate(item.name, 20);
-            g.appendChild(this._createText(name, item._x + 6, item._y + 16, {
-                fontSize: '11px', fontWeight: '500', fill: this.colors.text
-            }));
-            // Data type on the right
-            if (item.detail) {
+            g.appendChild(this._createWrappedText(
+                item.name, item._x + 6, item._y + 16, 20,
+                { fontSize: '11px', fontWeight: '500', fill: this.colors.text, lineHeight: 11 }
+            ));
+            // Data type on the right (only when not wrapped, to avoid overlap with second line)
+            if (item.detail && !item._wrapped) {
                 g.appendChild(this._createText(
                     this._truncate(item.detail, 10),
                     item._x + item._w - 8, item._y + 16,
-                    { fontSize: '9px', fill: this.colors.textLight, textAnchor: 'end' }
+                    { fontSize: '9px', fill: this.colors.textLight, textAnchor: 'end', title: item.detail }
                 ));
             }
         } else {
-            // Name (truncated)
+            // Name (wrapped to up to 2 lines if it overflows)
             const maxNameLen = item.expandable ? 19 : 22;
-            const name = this._truncate(item.name, maxNameLen);
-            g.appendChild(this._createText(name, item._x + 8, item._y + 16, {
-                fontSize: '12px', fontWeight: '600', fill: this.colors.text
-            }));
+            g.appendChild(this._createWrappedText(
+                item.name, item._x + 8, item._y + 16, maxNameLen,
+                { fontSize: '12px', fontWeight: '600', fill: this.colors.text }
+            ));
 
-            // Detail line
+            // Detail line — pushed down when the name wrapped
             if (item.detail) {
+                const detailY = item._y + (item._wrapped ? 42 : 28);
                 g.appendChild(this._createText(
                     this._truncate(item.detail, 26),
-                    item._x + 8, item._y + 28,
-                    { fontSize: '10px', fill: this.colors.textLight }
+                    item._x + 8, detailY,
+                    { fontSize: '10px', fill: this.colors.textLight, title: item.detail }
                 ));
             }
 
@@ -1194,7 +1217,7 @@ class LineageDiagramRenderer {
                 const labelEl = this._createText(
                     this._truncate(label, 30),
                     x1 + arcOffset * 0.6, midY,
-                    { fontSize: '9px', fill: '#c62828', textAnchor: 'start' }
+                    { fontSize: '9px', fill: '#c62828', textAnchor: 'start', title: label }
                 );
                 labelEl.setAttribute('opacity', '0.7');
                 if (firstNode) {
@@ -1501,6 +1524,75 @@ class LineageDiagramRenderer {
         if (attrs.fill) el.setAttribute('fill', attrs.fill);
         if (attrs.textAnchor) el.setAttribute('text-anchor', attrs.textAnchor);
         el.style.fontFamily = "'Segoe UI', system-ui, sans-serif";
+        if (attrs.title) {
+            const t = document.createElementNS(this.SVG_NS, 'title');
+            t.textContent = attrs.title;
+            el.appendChild(t);
+        }
+        return el;
+    }
+
+    /**
+     * Create an SVG <text> element whose content wraps to up to 2 lines.
+     * Always appends a <title> child with the full untruncated string for hover tooltips.
+     * Splits on a word boundary when possible, otherwise on a character boundary.
+     * @param {string} fullText - The complete original text
+     * @param {number} x
+     * @param {number} y - Baseline of the first line
+     * @param {number} maxChars - Approximate per-line character budget
+     * @param {Object} attrs - { fontSize, fontWeight, fill, textAnchor, lineHeight }
+     * @returns {SVGTextElement}
+     */
+    _createWrappedText(fullText, x, y, maxChars, attrs = {}) {
+        const text = fullText || '';
+        const lineHeight = attrs.lineHeight || 12;
+        const el = document.createElementNS(this.SVG_NS, 'text');
+        el.setAttribute('x', x);
+        el.setAttribute('y', y);
+        if (attrs.fontSize) el.style.fontSize = attrs.fontSize;
+        if (attrs.fontWeight) el.style.fontWeight = attrs.fontWeight;
+        if (attrs.fill) el.setAttribute('fill', attrs.fill);
+        if (attrs.textAnchor) el.setAttribute('text-anchor', attrs.textAnchor);
+        el.style.fontFamily = "'Segoe UI', system-ui, sans-serif";
+
+        if (text.length <= maxChars) {
+            el.textContent = text;
+        } else {
+            // Choose a split point near maxChars, preferring a word boundary
+            let splitAt = -1;
+            const searchStart = Math.max(1, Math.floor(maxChars * 0.5));
+            for (let i = maxChars; i >= searchStart; i--) {
+                const ch = text.charAt(i);
+                if (ch === ' ' || ch === '.' || ch === '_' || ch === '-' || ch === '/') {
+                    splitAt = i;
+                    break;
+                }
+            }
+            if (splitAt < 0) splitAt = maxChars;
+
+            const line1 = text.substring(0, splitAt).trimEnd();
+            let line2 = text.substring(splitAt).trimStart();
+            if (line2.length > maxChars) {
+                line2 = line2.substring(0, maxChars - 1) + '\u2026';
+            }
+
+            const tspan1 = document.createElementNS(this.SVG_NS, 'tspan');
+            tspan1.setAttribute('x', x);
+            tspan1.textContent = line1;
+            el.appendChild(tspan1);
+
+            const tspan2 = document.createElementNS(this.SVG_NS, 'tspan');
+            tspan2.setAttribute('x', x);
+            tspan2.setAttribute('dy', lineHeight);
+            tspan2.textContent = line2;
+            el.appendChild(tspan2);
+        }
+
+        // Always attach full text as a tooltip so users can read truncated content on hover
+        const title = document.createElementNS(this.SVG_NS, 'title');
+        title.textContent = text;
+        el.appendChild(title);
+
         return el;
     }
 

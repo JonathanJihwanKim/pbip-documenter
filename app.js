@@ -3292,6 +3292,9 @@ class App {
                 case 'pdf':
                     this._exportDiagramPDF(diagramType, modelName);
                     break;
+                case 'pdf-download':
+                    this._downloadDiagramPDF(diagramType, modelName);
+                    break;
             }
         } catch (err) {
             console.error('Diagram export error:', err);
@@ -3351,7 +3354,7 @@ class App {
         this._track('Diagram Export', { format: 'svg', diagram: diagramType });
     }
 
-    _exportDiagramPDF(diagramType, modelName) {
+    _getDiagramSVGClone(diagramType) {
         const containerMap = {
             'relationships': 'relationshipsDiagram',
             'detailed-erd': 'detailedERDContainer',
@@ -3362,23 +3365,24 @@ class App {
             'lineage-impact': 'lineageImpactDiagram',
             'lineage-column': 'lineageColumnImpactDiagram'
         };
-
         const containerId = containerMap[diagramType];
-        if (!containerId) return;
-
+        if (!containerId) return null;
         const container = document.getElementById(containerId);
         const svg = container?.querySelector('svg');
-        if (!svg) {
-            this.showToast('No diagram rendered yet. View the diagram first.', 'error');
-            return;
-        }
+        if (!svg) return null;
 
         const clone = svg.cloneNode(true);
+        let width = 0, height = 0;
         const viewBox = clone.getAttribute('viewBox');
         if (viewBox) {
             const parts = viewBox.split(/\s+/).map(Number);
-            clone.setAttribute('width', parts[2]);
-            clone.setAttribute('height', parts[3]);
+            width = parts[2];
+            height = parts[3];
+            clone.setAttribute('width', width);
+            clone.setAttribute('height', height);
+        } else {
+            width = parseFloat(clone.getAttribute('width')) || 800;
+            height = parseFloat(clone.getAttribute('height')) || 600;
         }
         clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
 
@@ -3386,7 +3390,17 @@ class App {
         style.textContent = `text { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }`;
         clone.insertBefore(style, clone.firstChild);
 
-        const svgStr = new XMLSerializer().serializeToString(clone);
+        return { clone, width, height };
+    }
+
+    _exportDiagramPDF(diagramType, modelName) {
+        const result = this._getDiagramSVGClone(diagramType);
+        if (!result) {
+            this.showToast('No diagram rendered yet. View the diagram first.', 'error');
+            return;
+        }
+
+        const svgStr = new XMLSerializer().serializeToString(result.clone);
         const safeTitle = `${modelName}-${diagramType}`.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
         const win = window.open('', '_blank');
@@ -3409,6 +3423,42 @@ svg{max-width:100%;height:auto}
         win.document.close();
 
         this._track('Diagram Export', { format: 'pdf', diagram: diagramType });
+    }
+
+    async _downloadDiagramPDF(diagramType, modelName) {
+        if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) {
+            this.showToast('PDF library still loading. Try again in a moment.', 'error');
+            return;
+        }
+
+        const result = this._getDiagramSVGClone(diagramType);
+        if (!result) {
+            this.showToast('No diagram rendered yet. View the diagram first.', 'error');
+            return;
+        }
+        const { clone, width, height } = result;
+
+        // svg2pdf.js needs the SVG mounted in the DOM to resolve text metrics.
+        // Use a hidden host that preserves layout (display:block, opacity:0).
+        const host = document.createElement('div');
+        host.style.cssText = 'position:fixed;left:-99999px;top:0;width:auto;height:auto;visibility:hidden;';
+        host.appendChild(clone);
+        document.body.appendChild(host);
+
+        try {
+            const { jsPDF } = window.jspdf;
+            const orientation = width >= height ? 'landscape' : 'portrait';
+            const pdf = new jsPDF({ orientation, unit: 'pt', format: [width, height] });
+            await pdf.svg(clone, { x: 0, y: 0, width, height });
+            pdf.save(`${modelName}-${diagramType}.pdf`);
+            this.showToast('PDF downloaded', 'success');
+            this._track('Diagram Export', { format: 'pdf-download', diagram: diagramType });
+        } catch (err) {
+            console.error('PDF generation failed:', err);
+            this.showToast('PDF generation failed: ' + err.message, 'error');
+        } finally {
+            host.remove();
+        }
     }
 
     _exportDiagramDrawio(diagramType, modelName) {

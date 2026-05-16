@@ -682,7 +682,8 @@ class TMDLParser {
                 currentExpr = {
                     name: this._extractName(trimmed, 'expression'),
                     kind: null,
-                    expression: null
+                    expression: null,
+                    resultType: null
                 };
                 exprLines = [];
                 inExpression = false;
@@ -710,7 +711,12 @@ class TMDLParser {
                 }
 
                 if (trimmed.startsWith('annotation ')) {
-                    // Skip annotation lines inside expressions block
+                    // Capture PBI_ResultType so downstream code can distinguish
+                    // table-returning expressions from parameters, functions, lists, etc.
+                    const m = trimmed.match(/^annotation\s+PBI_ResultType\s*=\s*(.+)$/);
+                    if (m) {
+                        currentExpr.resultType = m[1].trim().replace(/^["']|["']$/g, '');
+                    }
                     continue;
                 }
 

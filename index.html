@@ -35,6 +35,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@400;700;900&family=Source+Serif+4:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script defer src="https://unpkg.com/svg2pdf.js@2.2.4/dist/svg2pdf.umd.min.js"></script>
 </head>
 <body>
     <!-- Header -->
@@ -432,8 +434,11 @@
                             <button class="diagram-ctrl-btn" data-export="svg" data-diagram="visual-usage" title="Download SVG">
                                 <span class="material-symbols-outlined">download</span>
                             </button>
-                            <button class="diagram-ctrl-btn" data-export="pdf" data-diagram="visual-usage" title="Print / Save as PDF">
+                            <button class="diagram-ctrl-btn" data-export="pdf" data-diagram="visual-usage" title="Open in new tab for printing">
                                 <span class="material-symbols-outlined">print</span>
+                            </button>
+                            <button class="diagram-ctrl-btn" data-export="pdf-download" data-diagram="visual-usage" title="Download as PDF">
+                                <span class="material-symbols-outlined">picture_as_pdf</span>
                             </button>
                         </div>
                     </div>
@@ -466,8 +471,11 @@
                                 <button class="diagram-ctrl-btn" data-export="svg" data-diagram="lineage-full" title="Download SVG">
                                     <span class="material-symbols-outlined">download</span>
                                 </button>
-                                <button class="diagram-ctrl-btn" data-export="pdf" data-diagram="lineage-full" title="Print / Save as PDF">
+                                <button class="diagram-ctrl-btn" data-export="pdf" data-diagram="lineage-full" title="Open in new tab for printing">
                                     <span class="material-symbols-outlined">print</span>
+                                </button>
+                                <button class="diagram-ctrl-btn" data-export="pdf-download" data-diagram="lineage-full" title="Download as PDF">
+                                    <span class="material-symbols-outlined">picture_as_pdf</span>
                                 </button>
                                 <button class="diagram-ctrl-btn" data-export="drawio" data-diagram="lineage-full" title="Download draw.io">
                                     <span class="material-symbols-outlined">edit_note</span>
@@ -502,8 +510,11 @@
                                 <button class="diagram-ctrl-btn" data-export="svg" data-diagram="lineage-trace" title="Download SVG">
                                     <span class="material-symbols-outlined">download</span>
                                 </button>
-                                <button class="diagram-ctrl-btn" data-export="pdf" data-diagram="lineage-trace" title="Print / Save as PDF">
+                                <button class="diagram-ctrl-btn" data-export="pdf" data-diagram="lineage-trace" title="Open in new tab for printing">
                                     <span class="material-symbols-outlined">print</span>
+                                </button>
+                                <button class="diagram-ctrl-btn" data-export="pdf-download" data-diagram="lineage-trace" title="Download as PDF">
+                                    <span class="material-symbols-outlined">picture_as_pdf</span>
                                 </button>
                             </div>
                         </div>
@@ -532,8 +543,11 @@
                                 <button class="diagram-ctrl-btn" data-export="svg" data-diagram="lineage-source-trace" title="Download SVG">
                                     <span class="material-symbols-outlined">download</span>
                                 </button>
-                                <button class="diagram-ctrl-btn" data-export="pdf" data-diagram="lineage-source-trace" title="Print / Save as PDF">
+                                <button class="diagram-ctrl-btn" data-export="pdf" data-diagram="lineage-source-trace" title="Open in new tab for printing">
                                     <span class="material-symbols-outlined">print</span>
+                                </button>
+                                <button class="diagram-ctrl-btn" data-export="pdf-download" data-diagram="lineage-source-trace" title="Download as PDF">
+                                    <span class="material-symbols-outlined">picture_as_pdf</span>
                                 </button>
                             </div>
                         </div>
@@ -562,8 +576,11 @@
                                 <button class="diagram-ctrl-btn" data-export="svg" data-diagram="lineage-impact" title="Download SVG">
                                     <span class="material-symbols-outlined">download</span>
                                 </button>
-                                <button class="diagram-ctrl-btn" data-export="pdf" data-diagram="lineage-impact" title="Print / Save as PDF">
+                                <button class="diagram-ctrl-btn" data-export="pdf" data-diagram="lineage-impact" title="Open in new tab for printing">
                                     <span class="material-symbols-outlined">print</span>
+                                </button>
+                                <button class="diagram-ctrl-btn" data-export="pdf-download" data-diagram="lineage-impact" title="Download as PDF">
+                                    <span class="material-symbols-outlined">picture_as_pdf</span>
                                 </button>
                             </div>
                         </div>
@@ -594,8 +611,11 @@
                                 <button class="diagram-ctrl-btn" data-export="svg" data-diagram="lineage-column" title="Download SVG">
                                     <span class="material-symbols-outlined">download</span>
                                 </button>
-                                <button class="diagram-ctrl-btn" data-export="pdf" data-diagram="lineage-column" title="Print / Save as PDF">
+                                <button class="diagram-ctrl-btn" data-export="pdf" data-diagram="lineage-column" title="Open in new tab for printing">
                                     <span class="material-symbols-outlined">print</span>
+                                </button>
+                                <button class="diagram-ctrl-btn" data-export="pdf-download" data-diagram="lineage-column" title="Download as PDF">
+                                    <span class="material-symbols-outlined">picture_as_pdf</span>
                                 </button>
                             </div>
                         </div>
@@ -638,8 +658,11 @@
                             <button class="diagram-ctrl-btn" data-export="svg" data-diagram="relationships" title="Download SVG">
                                 <span class="material-symbols-outlined">download</span>
                             </button>
-                            <button class="diagram-ctrl-btn" data-export="pdf" data-diagram="relationships" title="Print / Save as PDF">
+                            <button class="diagram-ctrl-btn" data-export="pdf" data-diagram="relationships" title="Open in new tab for printing">
                                 <span class="material-symbols-outlined">print</span>
+                            </button>
+                            <button class="diagram-ctrl-btn" data-export="pdf-download" data-diagram="relationships" title="Download as PDF">
+                                <span class="material-symbols-outlined">picture_as_pdf</span>
                             </button>
                             <button class="diagram-ctrl-btn" data-export="drawio" data-diagram="relationships" title="Download draw.io">
                                 <span class="material-symbols-outlined">edit_note</span>
@@ -664,8 +687,11 @@
                             <button class="diagram-ctrl-btn" data-export="svg" data-diagram="detailed-erd" title="Download SVG">
                                 <span class="material-symbols-outlined">download</span>
                             </button>
-                            <button class="diagram-ctrl-btn" data-export="pdf" data-diagram="detailed-erd" title="Print / Save as PDF">
+                            <button class="diagram-ctrl-btn" data-export="pdf" data-diagram="detailed-erd" title="Open in new tab for printing">
                                 <span class="material-symbols-outlined">print</span>
+                            </button>
+                            <button class="diagram-ctrl-btn" data-export="pdf-download" data-diagram="detailed-erd" title="Download as PDF">
+                                <span class="material-symbols-outlined">picture_as_pdf</span>
                             </button>
                             <button class="diagram-ctrl-btn" data-export="drawio" data-diagram="detailed-erd" title="Download draw.io">
                                 <span class="material-symbols-outlined">edit_note</span>

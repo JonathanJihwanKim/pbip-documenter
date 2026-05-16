@@ -725,6 +725,26 @@ class MExpressionParser {
             }
         }
 
+        // Issue #20: also scan all shared expressions for data source connectors.
+        // These are queries with "Enable Load = false" (or helpers referenced via merge/append)
+        // that the partition loop above misses because they're never the direct M of a loaded table.
+        for (const expr of (parsedModel.expressions || [])) {
+            if (!expr.expression || !expr.name) continue;
+            if (declaredParams.has(expr.name)) continue;
+            // Skip helpers, functions, lists, records — they're not data-bound queries
+            const rt = (expr.resultType || '').toLowerCase();
+            if (rt === 'function' || rt === 'list' || rt === 'record') continue;
+            if (this._looksLikeMFunction(expr.expression)) continue;
+
+            const sources = this.extractDataSources(expr.expression);
+            for (const src of sources) {
+                src.expressionName = expr.name;
+                src.isNonLoadedQuery = true;
+                // tableName intentionally left null — populated only when a partition consumes it
+            }
+            allSources.push(...sources);
+        }
+
         // Resolve parameters
         const resolved = this.resolveParameters(allSources, parsedModel.expressions || []);
 
@@ -734,6 +754,21 @@ class MExpressionParser {
         }
 
         return this.deduplicateSources(resolved);
+    }
+
+    /**
+     * Detect whether an M expression body declares a function rather than a query
+     * (e.g. `let f = (x) => x + 1 in f` or `(a, b) => ...`). Returns true if the body
+     * is a function declaration so it should be excluded from data-source scanning.
+     */
+    static _looksLikeMFunction(body) {
+        if (!body) return false;
+        const stripped = body.replace(/^\s*```[^\n]*\n?/, '').replace(/\n?```\s*$/, '').trim();
+        // Top-level fat arrow with leading parameter list: "(a, b) => ..."
+        if (/^\(\s*[^)]*\)\s*=>/.test(stripped)) return true;
+        // let-in where the only step is a function: "let f = (...) => ... in f"
+        if (/^let\s+\S+\s*=\s*\([^)]*\)\s*=>/i.test(stripped)) return true;
+        return false;
     }
 
     /**

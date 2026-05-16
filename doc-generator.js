@@ -714,14 +714,22 @@ class DocGenerator {
                 const db     = src.databaseResolved || src.database || '';
                 const gw     = src.gatewayRequired === true ? ' · Gateway Required' : src.gatewayRequired === false ? '' : '';
                 const paramStr = src.parameterized ? ' · Parameterized' : '';
+                const nonLoadedStr = src.isNonLoadedQuery ? ` · *Non-loaded query: \`${this._escMd(src.expressionName || '')}\`*` : '';
                 const sourceId = `source:${MExpressionParser._sourceKey(src)}`;
                 const consumers = this.lineageEngine.getDataSourceConsumers(sourceId);
 
                 const header = [src.type, server, db].filter(Boolean).join(' / ');
-                lines.push(`### ${this._escMd(header)}${paramStr}${gw}`);
+                lines.push(`### ${this._escMd(header)}${paramStr}${gw}${nonLoadedStr}`);
                 lines.push('');
 
-                if (consumers.tables.length > 0) {
+                if (src.isNonLoadedQuery && consumers.tables.length > 0) {
+                    lines.push(`**Referenced by tables (via merge/append/delegation): ${consumers.tables.length}**`);
+                    lines.push('');
+                    for (const t of consumers.tables) {
+                        lines.push(`- **${this._escMd(t.name)}**`);
+                    }
+                    lines.push('');
+                } else if (consumers.tables.length > 0) {
                     lines.push(`**Physical tables loaded: ${consumers.tables.length}**`);
                     lines.push('');
                     for (const t of consumers.tables) {
@@ -2103,13 +2111,21 @@ ${rects}
                     const sourceId   = `source:${MExpressionParser._sourceKey(src)}`;
                     const consumers  = this.lineageEngine.getDataSourceConsumers(sourceId);
 
-                    html += `<div class="ds-source-card" style="margin:12px 0;padding:14px 16px;background:var(--surface,#f8f6f1);border:1px solid var(--border,#d0ccc4);border-left:4px solid var(--primary,#1a3a5c);border-radius:2px">`;
+                    const nonLoaded = src.isNonLoadedQuery ? `<span class="badge-hidden-query" style="margin-left:6px;font-size:11px;color:#6a1b9a;background:#f3e5f5;padding:1px 6px;border-radius:2px">Non-loaded query: ${this._escHtml(src.expressionName || '')}</span>` : '';
+                    const borderColor = src.isNonLoadedQuery ? 'var(--field-param,#7e57c2)' : 'var(--primary,#1a3a5c)';
+                    html += `<div class="ds-source-card" style="margin:12px 0;padding:14px 16px;background:var(--surface,#f8f6f1);border:1px solid var(--border,#d0ccc4);border-left:4px solid ${borderColor};border-radius:2px">`;
                     html += `<h4 style="margin:0 0 6px;font-size:14px">${this._escHtml(src.type)}`;
                     if (server) html += ` <code style="font-size:12px;font-weight:normal">${this._escHtml(server)}</code>`;
                     if (db) html += ` / <code style="font-size:12px;font-weight:normal">${this._escHtml(db)}</code>`;
-                    html += `${param}${gw}</h4>`;
+                    html += `${param}${gw}${nonLoaded}</h4>`;
 
-                    if (consumers.tables.length > 0) {
+                    if (src.isNonLoadedQuery && consumers.tables.length > 0) {
+                        html += `<p style="font-size:12px;margin:6px 0 4px;font-weight:600">Referenced by tables (via merge/append/delegation): ${consumers.tables.length}</p><ul style="margin:0 0 8px;padding-left:20px;font-size:12px">`;
+                        for (const t of consumers.tables) {
+                            html += `<li><strong>${this._escHtml(t.name)}</strong></li>`;
+                        }
+                        html += `</ul>`;
+                    } else if (consumers.tables.length > 0) {
                         html += `<p style="font-size:12px;margin:6px 0 4px;font-weight:600">Physical tables loaded (${consumers.tables.length}):</p><ul style="margin:0 0 8px;padding-left:20px;font-size:12px">`;
                         for (const t of consumers.tables) {
                             const physLabel = [t.physicalSchema, t.physicalTable].filter(Boolean).join('.');
