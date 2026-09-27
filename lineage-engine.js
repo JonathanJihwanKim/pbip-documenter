@@ -1163,6 +1163,92 @@ class LineageEngine {
             .slice(0, n);
     }
 
+    // ── Measure chain ──
+
+    _buildMeasureAdjacency() {
+        if (this._measureAdj) return this._measureAdj;
+        const up = new Map(), down = new Map();   // up: uses, down: used by
+        for (const name of this.measureLookup.keys()) { up.set(name, []); down.set(name, []); }
+        for (const name of this.measureLookup.keys()) {
+            const refs = this.measureRefs[name];
+            if (!refs) continue;
+            for (const r of refs.measureRefs) {
+                if (r === name || !up.has(r) || up.get(name).includes(r)) continue;
+                up.get(name).push(r);
+                down.get(r).push(name);
+            }
+        }
+        return (this._measureAdj = { up, down });
+    }
+
+    getMeasureLinkCounts(name) {
+        const { up, down } = this._buildMeasureAdjacency();
+        return { up: (up.get(name) || []).length, down: (down.get(name) || []).length };
+    }
+
+    /** All direct edges, dependency → dependent. */
+    getMeasureDependencyEdges() {
+        const { up } = this._buildMeasureAdjacency();
+        const edges = [];
+        for (const [name, deps] of up) for (const d of deps) edges.push({ from: d, to: name });
+        return edges;
+    }
+
+    /**
+     * Full transitive chain for one measure.
+     * @returns {{target, upstream: Array<Array>, downstream: Array<Array>, edges: Array}|null}
+     *   upstream[0] = direct dependencies, upstream[1] = their dependencies, ...
+     *   downstream[0] = direct dependents, ...
+     *   edges are { from: dependency, to: dependent } (names)
+     */
+    getMeasureChain(measureName) {
+        const table = this.measureLookup.get(measureName);
+        if (!table) return null;
+        const { up, down } = this._buildMeasureAdjacency();
+
+        const walk = (adj, dependencyFirst) => {
+            const seen = new Set([measureName]);
+            const queue = [measureName];
+            const edges = [];
+            while (queue.length) {
+                const cur = queue.shift();
+                for (const n of adj.get(cur) || []) {
+                    edges.push(dependencyFirst ? { from: n, to: cur } : { from: cur, to: n });
+                    if (!seen.has(n)) { seen.add(n); queue.push(n); }
+                }
+            }
+            // Longest-path layering so every edge crosses columns (capped to survive cycles)
+            const level = new Map([[measureName, 0]]);
+            for (const n of seen) if (n !== measureName) level.set(n, 1);
+            for (let i = 0; i < seen.size; i++) {
+                let changed = false;
+                for (const e of edges) {
+                    const [a, b] = dependencyFirst ? [e.to, e.from] : [e.from, e.to]; // a is nearer the target
+                    if (b === measureName) continue;
+                    const l = level.get(a) + 1;
+                    if (l > level.get(b) && l <= seen.size) { level.set(b, l); changed = true; }
+                }
+                if (!changed) break;
+            }
+            const levels = [];
+            for (const [n, l] of level) {
+                if (l === 0) continue;
+                (levels[l - 1] = levels[l - 1] || []).push({ name: n, table: this.measureLookup.get(n) });
+            }
+            return {
+                levels: levels.map(l => (l || []).sort((a, b) => a.name.localeCompare(b.name))),
+                edges
+            };
+        };
+
+        const u = walk(up, true);
+        const d = walk(down, false);
+        return { target: { name: measureName, table }, upstream: u.levels, downstream: d.levels, edges: [...u.edges, ...d.edges] };
+    }
+
+
+
+
     /**
      * Returns NAMEOF field items for a field parameter table, or null if not a field parameter.
      */

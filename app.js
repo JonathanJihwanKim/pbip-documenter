@@ -590,7 +590,7 @@ class App {
             'relationshipsDiagram', 'detailedERDContainer',
             'lineageDiagramContainer', 'lineageTraceDiagram',
             'lineageImpactDiagram', 'lineageColumnImpactDiagram',
-            'lineageSourceTraceDiagram', 'visualUsageByField',
+            'lineageSourceTraceDiagram', 'lineageMeasureChainDiagram', 'visualUsageByField',
             'visualUsageByVisual'
         ];
         for (const id of DIAGRAM_CONTAINERS) {
@@ -602,7 +602,7 @@ class App {
         }
 
         // Clear lineage select options so they repopulate for the new dataset
-        for (const id of ['lineageVisualSelect', 'lineageMeasureSelect', 'lineageTableSelect', 'lineageColumnSelect', 'lineagePhysicalTableSelect']) {
+        for (const id of ['lineageVisualSelect', 'lineageMeasureSelect', 'lineageTableSelect', 'lineageColumnSelect', 'lineagePhysicalTableSelect', 'lineageChainMeasureSelect']) {
             const el = document.getElementById(id);
             if (el) el.innerHTML = '';
         }
@@ -1758,6 +1758,8 @@ class App {
         if (this._traceDelegationBound) return;
         this._traceDelegationBound = true;
         document.getElementById('mainContent').addEventListener('click', (e) => {
+            const chainBtn = e.target.closest('.btn-chain-measure');
+            if (chainBtn) { this._showMeasureChain(chainBtn.dataset.measure); return; }
             const traceBtn = e.target.closest('.btn-trace-lineage[data-page][data-visual]');
             if (!traceBtn) return;
             const pageName = traceBtn.dataset.page;
@@ -1770,6 +1772,7 @@ class App {
             document.getElementById('lineageFullView').classList.add('hidden');
             document.getElementById('lineageTraceView').classList.remove('hidden');
             document.getElementById('lineageImpactView').classList.add('hidden');
+            document.getElementById('lineageMeasureChainView').classList.add('hidden');
             // Set select and render
             this._populateVisualSelect();
             const sel = document.getElementById('lineageVisualSelect');
@@ -1798,12 +1801,18 @@ class App {
                 document.getElementById('lineageSourceView').classList.toggle('hidden', view !== 'source-trace');
                 document.getElementById('lineageImpactView').classList.toggle('hidden', view !== 'impact');
                 document.getElementById('lineageColumnImpactView').classList.toggle('hidden', view !== 'column-impact');
+                document.getElementById('lineageMeasureChainView').classList.toggle('hidden', view !== 'measure-chain');
                 document.getElementById('lineageDetailPanel').classList.add('hidden');
                 if (view === 'full' && !this._lineageRendered) this._renderFullLineage();
                 if (view === 'trace') this._populateVisualSelect();
                 if (view === 'source-trace') this._populatePhysicalTableSelect();
                 if (view === 'impact') this._populateMeasureSelect();
                 if (view === 'column-impact') this._populateTableSelect();
+                if (view === 'measure-chain') {
+                    this._populateChainMeasureSelect();
+                    const chainSel = document.getElementById('lineageChainMeasureSelect');
+                    if (chainSel.value) this._renderMeasureChain(chainSel.value);
+                }
             });
 
             // Trace button
@@ -1848,6 +1857,15 @@ class App {
                 renderer.renderSourceTrace(container, table, schema || null);
             });
 
+            // Measure Chain button + select
+            document.getElementById('lineageChainBtn').addEventListener('click', () => {
+                const name = document.getElementById('lineageChainMeasureSelect').value;
+                if (name) this._renderMeasureChain(name);
+            });
+            document.getElementById('lineageChainMeasureSelect').addEventListener('change', (e) => {
+                if (e.target.value) this._renderMeasureChain(e.target.value);
+            });
+
             // Table select cascade for Column Impact
             document.getElementById('lineageTableSelect').addEventListener('change', (e) => {
                 this._populateColumnSelect(e.target.value);
@@ -1883,6 +1901,53 @@ class App {
             opt.textContent = `${visual.pageName} — ${visual.visualName}`;
             sel.appendChild(opt);
         }
+    }
+
+    // ── Measure Chain ──
+
+    _populateChainMeasureSelect() {
+        const sel = document.getElementById('lineageChainMeasureSelect');
+        if (sel.options.length > 0) return;
+        const rows = [];
+        for (const table of this.parsedModel.tables) {
+            for (const m of table.measures) {
+                rows.push({ name: m.name, table: table.name, ...this.lineageEngine.getMeasureLinkCounts(m.name) });
+            }
+        }
+        // Connected measures first
+        rows.sort((a, b) => (b.up + b.down) - (a.up + a.down) || a.name.localeCompare(b.name));
+        for (const r of rows) {
+            const opt = document.createElement('option');
+            opt.value = r.name;
+            opt.textContent = `${r.table}[${r.name}]` + (r.up || r.down ? `  (\u2191${r.up} \u2193${r.down})` : '');
+            sel.appendChild(opt);
+        }
+    }
+
+    _renderMeasureChain(measureName) {
+        const container = document.getElementById('lineageMeasureChainDiagram');
+        const renderer = new LineageDiagramRenderer(container, this.lineageEngine);
+        renderer.renderMeasureChain(container, measureName);
+    }
+
+    _switchLineageView(view) {
+        const toggle = document.getElementById('lineageToggle');
+        toggle.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+        const map = {
+            'full': 'lineageFullView', 'trace': 'lineageTraceView', 'source-trace': 'lineageSourceView',
+            'impact': 'lineageImpactView', 'column-impact': 'lineageColumnImpactView',
+            'measure-chain': 'lineageMeasureChainView'
+        };
+        for (const [v, id] of Object.entries(map)) document.getElementById(id).classList.toggle('hidden', v !== view);
+        document.getElementById('lineageDetailPanel').classList.add('hidden');
+    }
+
+    _showMeasureChain(measureName) {
+        this.showSection('lineage');
+        this._switchLineageView('measure-chain');
+        this._populateChainMeasureSelect();
+        document.getElementById('lineageChainMeasureSelect').value = measureName;
+        this._renderMeasureChain(measureName);
     }
 
     _populateMeasureSelect() {
@@ -1934,6 +1999,7 @@ class App {
         document.getElementById('lineageSourceView').classList.remove('hidden');
         document.getElementById('lineageImpactView').classList.add('hidden');
         document.getElementById('lineageColumnImpactView').classList.add('hidden');
+        document.getElementById('lineageMeasureChainView').classList.add('hidden');
         this._populatePhysicalTableSelect(schema, table);
         const container = document.getElementById('lineageSourceTraceDiagram');
         const renderer = new LineageDiagramRenderer(container, this.lineageEngine);
@@ -3186,6 +3252,12 @@ class App {
             }
         }
 
+        // Measure chain button
+        if (this.lineageEngine) {
+            html += `<button type="button" class="btn-trace-lineage btn-trace-sm btn-chain-measure" style="margin-top:6px" data-measure="${this._esc(measure.name)}">
+                <span class="material-symbols-outlined" style="font-size:14px">device_hub</span> Chain</button>`;
+        }
+
         // Visual usage
         if (this.visualData) {
             const usageKey = `measure|${tableName}|${measure.name}`;
@@ -3314,7 +3386,8 @@ class App {
             'lineage-trace': 'lineageTraceDiagram',
             'lineage-source-trace': 'lineageSourceTraceDiagram',
             'lineage-impact': 'lineageImpactDiagram',
-            'lineage-column': 'lineageColumnImpactDiagram'
+            'lineage-column': 'lineageColumnImpactDiagram',
+            'lineage-measure-chain': 'lineageMeasureChainDiagram'
         };
 
         const containerId = containerMap[diagramType];
@@ -3363,7 +3436,8 @@ class App {
             'lineage-trace': 'lineageTraceDiagram',
             'lineage-source-trace': 'lineageSourceTraceDiagram',
             'lineage-impact': 'lineageImpactDiagram',
-            'lineage-column': 'lineageColumnImpactDiagram'
+            'lineage-column': 'lineageColumnImpactDiagram',
+            'lineage-measure-chain': 'lineageMeasureChainDiagram'
         };
         const containerId = containerMap[diagramType];
         if (!containerId) return null;
