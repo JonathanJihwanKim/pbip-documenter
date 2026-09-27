@@ -473,6 +473,79 @@ async function runAllTests() {
         t.assertEqual(edges.length, 0, 'No cross-table refs → no derived_from_table edges');
     });
 
+    t.test('Measure Chain: direct upstream/downstream levels', () => {
+        const m = {
+            tables: [{ name: 'T', columns: [], partitions: [], measures: [
+                { name: 'A', expression: '1' },
+                { name: 'B', expression: '[A]*2' },
+                { name: 'C', expression: '[B]+1' }
+            ]}],
+            relationships: [], expressions: []
+        };
+        const refs = {
+            B: DAXReferenceExtractor.extract('[A]*2'),
+            C: DAXReferenceExtractor.extract('[B]+1')
+        };
+        const engine = new LineageEngine(m, null, refs);
+        engine.buildGraph();
+        const chain = engine.getMeasureChain('B');
+        t.assertEqual(chain.upstream[0][0].name, 'A', 'B should depend on A');
+        t.assertEqual(chain.downstream[0][0].name, 'C', 'C should depend on B');
+        const chainA = engine.getMeasureChain('A');
+        t.assertEqual(chainA.downstream.length, 2, 'A should transitively affect both B and C');
+        t.assertEqual(chainA.downstream[0][0].name, 'B', 'Level 1 downstream of A is B');
+        t.assertEqual(chainA.downstream[1][0].name, 'C', 'Level 2 downstream of A is C');
+    });
+
+    t.test('Measure Chain: survives circular references without infinite loop', () => {
+        const m = {
+            tables: [{ name: 'T', columns: [], partitions: [], measures: [
+                { name: 'X', expression: '[Y]' },
+                { name: 'Y', expression: '[X]' }
+            ]}],
+            relationships: [], expressions: []
+        };
+        const refs = {
+            X: DAXReferenceExtractor.extract('[Y]'),
+            Y: DAXReferenceExtractor.extract('[X]')
+        };
+        const engine = new LineageEngine(m, null, refs);
+        engine.buildGraph();
+        const chain = engine.getMeasureChain('X');
+        t.assert(chain !== null, 'Should return a chain instead of hanging/throwing');
+        t.assertEqual(chain.upstream[0][0].name, 'Y', 'X depends on Y');
+        t.assertEqual(chain.downstream[0][0].name, 'Y', 'Y depends back on X (cycle)');
+    });
+
+    t.test('Measure Chain: unrelated measure returns empty chain', () => {
+        const m = {
+            tables: [{ name: 'T', columns: [], partitions: [], measures: [
+                { name: 'Solo', expression: '1' }
+            ]}],
+            relationships: [], expressions: []
+        };
+        const engine = new LineageEngine(m, null, {});
+        engine.buildGraph();
+        const chain = engine.getMeasureChain('Solo');
+        t.assertEqual(chain.upstream.length, 0, 'No upstream expected');
+        t.assertEqual(chain.downstream.length, 0, 'No downstream expected');
+    });
+
+    t.test('getMeasureDependencyEdges: returns dependency to dependent edges', () => {
+        const m = {
+            tables: [{ name: 'T', columns: [], partitions: [], measures: [
+                { name: 'A', expression: '1' },
+                { name: 'B', expression: '[A]*2' }
+            ]}],
+            relationships: [], expressions: []
+        };
+        const refs = { B: DAXReferenceExtractor.extract('[A]*2') };
+        const engine = new LineageEngine(m, null, refs);
+        engine.buildGraph();
+        const edges = engine.getMeasureDependencyEdges();
+        t.assert(edges.some(e => e.from === 'A' && e.to === 'B'), 'Edge should point from A (dependency) to B (dependent)');
+    });
+
     // ─── Exporter Regression (D6/D7) ───
     t.suite('Exporter Regression — Table Alignment (D6/D7)');
 
