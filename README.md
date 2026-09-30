@@ -123,12 +123,12 @@ Point the tool at your PBIP project folder and get professional, bidirectional d
 
 ### Interactive Diagrams
 - **Relationship Diagram** — SVG with pan, zoom, and zoom-to-fit; star-schema layout. Field parameters shown with purple headers, calculation groups with brown headers, inactive relationships dashed, and parallel edges between the same table pair offset so they don't overlap
-- **Visual Lineage** — full model, visual trace (including new "Physical Columns" column), measure impact, column impact (including upstream physical source), and source trace modes. Broken field references shown with red dashed border + ⚠ icon
+- **Visual Lineage** — full model, visual trace (including new "Physical Columns" column), measure impact, column impact (including upstream physical source), source trace, and measure chain modes. Measure chain shows everything a measure depends on and everything that depends on it, level by level (contributed by [@Dashboard-Design](https://github.com/Dashboard-Design) in [#21](https://github.com/JonathanJihwanKim/pbip-documenter/pull/21)). Broken field references shown with red dashed border + ⚠ icon
 - **Visual Usage Diagram** — field-to-visual mapping
 
 ### Export
 - **HTML** — fully self-contained, embeds CSS + SVG, DAX syntax highlighting, collapsible sections, table of contents
-- **Markdown** — clean document with fenced DAX blocks, ASCII page layout grids, structured tables, Physical-Source Index (`schema.table → model tables → consumer counts`), and per-visual back-trace (visual → fields → model tables → physical `schema.table` → renames → first M step)
+- **Markdown** — clean document with fenced DAX blocks, ASCII page layout grids, structured tables, Physical-Source Index (`schema.table → model tables → consumer counts`), Measure Dependency Graph (Mermaid flowchart of measure-to-measure references), and per-visual back-trace (visual → fields → model tables → physical `schema.table` → renames → first M step)
 - **JSON** — machine-readable with `whereUsed` and `consumers` blocks for downstream tooling
 
 > Your files never leave your browser. All parsing happens client-side — nothing is uploaded anywhere.

@@ -27,8 +27,8 @@ Browser-based documentation generator for Power BI PBIP/TMDL semantic models. Pa
 - `m-parser.js` — M expression parser (data sources, parameters, 15+ connectors, 10-kind step decomposition, `Value.NativeQuery` SQL extraction)
 - `doc-generator.js` — Output formatting (Markdown, HTML, JSON), Physical-Source Index, per-visual back-trace
 - `diagram.js` — SVG rendering (relationship diagrams, visual usage maps) with dynamic star-schema layout, FP/CG header tinting, parallel-edge offsetting
-- `lineage-engine.js` — Dependency graph builder (data sources → tables → measures → visuals); emits `physicalColumn` nodes, `brokenRefs` array
-- `lineage-diagram.js` — SVG lineage visualization (full, trace, impact, column impact); FP edges dashed purple, broken refs flagged
+- `lineage-engine.js` — Dependency graph builder (data sources → tables → measures → visuals); emits `physicalColumn` nodes, `brokenRefs` array; measure-to-measure chains via `getMeasureChain()` / `getMeasureDependencyEdges()`
+- `lineage-diagram.js` — SVG lineage visualization (full, trace, impact, column impact, source trace, measure chain); FP edges dashed purple, broken refs flagged
 - `detailed-erd.js` — Full-detail ERD with every column/measure and row-level relationship lines; large-format-print friendly
 - `drawio-exporter.js` — draw.io XML export (ERD + lineage diagrams)
 - `mermaid-exporter.js` — Mermaid syntax export (erDiagram + flowchart)
@@ -38,7 +38,7 @@ All diagram views share a unified toolbar with zoom controls and export buttons:
 - **SVG download** — standalone SVG with embedded fonts, explicit dimensions from viewBox
 - **draw.io export** — mxGraph XML with `shape=table` containers, ER cardinality arrows, star-schema layout. Reads `fromCardinality`/`toCardinality` from the TMDL parser (don't re-default to many-to-one).
 - **Mermaid export** — copies to clipboard; falls back to `.mmd` file download
-- Export routing: `app.js` `_handleDiagramExport()` → `_exportDiagramSVG/Drawio/Mermaid()`. The container map in `_exportDiagramSVG()` maps diagram types to DOM container IDs — when adding a new diagram, register it there.
+- Export routing: `app.js` `_handleDiagramExport()` → `_exportDiagramSVG/Drawio/Mermaid()`. The container maps in `_exportDiagramSVG()` and `_getDiagramSVGClone()` (used by print/PDF) map diagram types to DOM container IDs — when adding a new diagram, register it in both. A new Visual Lineage view also goes in `_switchLineageView()`'s view map and in `_resetState()`'s container/select lists.
 
 ## TMDL Parser
 State machine with states: IDLE → TABLE_BODY → PROPERTIES → EXPRESSION. Handles: table, column, measure, hierarchy, partition, relationship, role, expression. Key challenges: multi-line DAX (indentation-based), backtick blocks, quoted names, bare boolean keywords (`isHidden`, `isKey`, etc. without colons).
@@ -65,4 +65,4 @@ State machine with states: IDLE → TABLE_BODY → PROPERTIES → EXPRESSION. Ha
 - Footer cross-links to other `pbip-*` tools
 - Generated documents include "Generated with pbip-documenter" watermark
 - Enterprise sample data is for internal testing only — not exposed in the UI
-- When switching datasets, `_resetState()` must be called at the top of `parseModel()` and `loadSampleData()` to clear diagram containers, lineage selects, stale warning banners, and the static M-parser cache
+- When switching datasets, `_resetState()` must be called at the top of `parseModel()` and `loadSampleData()` to clear diagram containers, lineage selects, stale warning banners, and the static M-parser cache, and to return Visual Lineage to the Full Lineage tab

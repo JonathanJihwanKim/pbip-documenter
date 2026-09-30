@@ -1246,9 +1246,6 @@ class LineageEngine {
         return { target: { name: measureName, table }, upstream: u.levels, downstream: d.levels, edges: [...u.edges, ...d.edges] };
     }
 
-
-
-
     /**
      * Returns NAMEOF field items for a field parameter table, or null if not a field parameter.
      */

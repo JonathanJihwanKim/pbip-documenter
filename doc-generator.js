@@ -824,8 +824,8 @@ class DocGenerator {
                 lines.push(`| ${m.name} | ${m.table} | ${deps} |`);
             }
             lines.push('');
-        }
 
+            // Mermaid graph of every measure-to-measure edge (skipped for very large models)
             const depEdges = this.lineageEngine.getMeasureDependencyEdges();
             if (depEdges.length > 0 && depEdges.length <= 300) {
                 const ids = new Map();
@@ -841,6 +841,7 @@ class DocGenerator {
                 lines.push('```');
                 lines.push('');
             }
+        }
 
         // Visual Lineage — per-visual back-trace
         if (visualData && visualData.visuals && visualData.visuals.length > 0 && this.lineageEngine) {

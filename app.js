@@ -607,6 +607,9 @@ class App {
             if (el) el.innerHTML = '';
         }
 
+        // Return Visual Lineage to the Full Lineage tab so no sub-view is left open with an empty select
+        this._switchLineageView('full');
+
         // Hide warning banner (will be shown again if new parse has errors)
         const banner = document.getElementById('warningBanner');
         if (banner) banner.classList.add('hidden');
@@ -1765,14 +1768,7 @@ class App {
             const pageName = traceBtn.dataset.page;
             const visualName = traceBtn.dataset.visual;
             this.showSection('lineage');
-            // Switch to trace view
-            const toggle = document.getElementById('lineageToggle');
-            toggle.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.remove('active'));
-            toggle.querySelector('[data-view="trace"]').classList.add('active');
-            document.getElementById('lineageFullView').classList.add('hidden');
-            document.getElementById('lineageTraceView').classList.remove('hidden');
-            document.getElementById('lineageImpactView').classList.add('hidden');
-            document.getElementById('lineageMeasureChainView').classList.add('hidden');
+            this._switchLineageView('trace');
             // Set select and render
             this._populateVisualSelect();
             const sel = document.getElementById('lineageVisualSelect');
@@ -1794,15 +1790,7 @@ class App {
                 const btn = e.target.closest('.view-toggle-btn');
                 if (!btn) return;
                 const view = btn.dataset.view;
-                toggle.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                document.getElementById('lineageFullView').classList.toggle('hidden', view !== 'full');
-                document.getElementById('lineageTraceView').classList.toggle('hidden', view !== 'trace');
-                document.getElementById('lineageSourceView').classList.toggle('hidden', view !== 'source-trace');
-                document.getElementById('lineageImpactView').classList.toggle('hidden', view !== 'impact');
-                document.getElementById('lineageColumnImpactView').classList.toggle('hidden', view !== 'column-impact');
-                document.getElementById('lineageMeasureChainView').classList.toggle('hidden', view !== 'measure-chain');
-                document.getElementById('lineageDetailPanel').classList.add('hidden');
+                this._switchLineageView(view);
                 if (view === 'full' && !this._lineageRendered) this._renderFullLineage();
                 if (view === 'trace') this._populateVisualSelect();
                 if (view === 'source-trace') this._populatePhysicalTableSelect();
@@ -1991,15 +1979,7 @@ class App {
 
     _tracePhysicalTable(schema, table) {
         this.showSection('lineage');
-        const toggle = document.getElementById('lineageToggle');
-        toggle.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.remove('active'));
-        toggle.querySelector('[data-view="source-trace"]').classList.add('active');
-        document.getElementById('lineageFullView').classList.add('hidden');
-        document.getElementById('lineageTraceView').classList.add('hidden');
-        document.getElementById('lineageSourceView').classList.remove('hidden');
-        document.getElementById('lineageImpactView').classList.add('hidden');
-        document.getElementById('lineageColumnImpactView').classList.add('hidden');
-        document.getElementById('lineageMeasureChainView').classList.add('hidden');
+        this._switchLineageView('source-trace');
         this._populatePhysicalTableSelect(schema, table);
         const container = document.getElementById('lineageSourceTraceDiagram');
         const renderer = new LineageDiagramRenderer(container, this.lineageEngine);
@@ -3252,10 +3232,13 @@ class App {
             }
         }
 
-        // Measure chain button
+        // Measure chain button (only when the measure references, or is referenced by, another measure)
         if (this.lineageEngine) {
-            html += `<button type="button" class="btn-trace-lineage btn-trace-sm btn-chain-measure" style="margin-top:6px" data-measure="${this._esc(measure.name)}">
-                <span class="material-symbols-outlined" style="font-size:14px">device_hub</span> Chain</button>`;
+            const links = this.lineageEngine.getMeasureLinkCounts(measure.name);
+            if (links.up + links.down > 0) {
+                html += `<button type="button" class="btn-trace-lineage btn-trace-sm btn-chain-measure" style="margin-top:6px" data-measure="${this._esc(measure.name)}">
+                    <span class="material-symbols-outlined" style="font-size:14px">device_hub</span> Chain</button>`;
+            }
         }
 
         // Visual usage

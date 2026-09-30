@@ -406,8 +406,6 @@ class LineageDiagramRenderer {
         this._initInteractivity(svg, layout.width, layout.height, target);
     }
 
-
-
     /**
      * Render forward lineage starting from a physical source table.
      * Entry point: Source → Model Table → Measures/Columns → Visuals.
