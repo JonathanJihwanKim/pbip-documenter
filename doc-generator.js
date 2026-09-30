@@ -789,14 +789,10 @@ class DocGenerator {
                 lines.push('|-----------------|----------------|-----------|');
                 for (const [key, entry] of physIndex) {
                     const modelList = entry.modelTables.join(', ');
-                    // Count downstream consumers through lineage engine
-                    let measureCount = 0, visualCount = 0;
-                    for (const mt of entry.modelTables) {
-                        const consumers = this.lineageEngine.getPhysicalTableConsumers
-                            ? this.lineageEngine.getPhysicalTableConsumers(entry.physicalSchema, entry.physicalTable)
-                            : null;
-                        if (consumers) { measureCount += consumers.measures?.length || 0; visualCount += consumers.visuals?.length || 0; }
-                    }
+                    // Downstream consumers of the model tables loaded from this physical object
+                    const consumers = this.lineageEngine.getPhysicalTableConsumers(entry.physicalTable, entry.physicalSchema);
+                    const measureCount = consumers.measures.length;
+                    const visualCount = consumers.visuals.length;
                     const consumerStr = measureCount || visualCount ? `${measureCount} measure${measureCount!==1?'s':''} · ${visualCount} visual${visualCount!==1?'s':''}` : '—';
                     lines.push(`| \`${this._escMd(key)}\` | ${this._escMd(modelList)} | ${consumerStr} |`);
                 }

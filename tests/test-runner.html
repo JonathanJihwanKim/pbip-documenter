@@ -546,6 +546,57 @@ async function runAllTests() {
         t.assert(edges.some(e => e.from === 'A' && e.to === 'B'), 'Edge should point from A (dependency) to B (dependent)');
     });
 
+    // Two SQL tables on one shared data source, plus a BigQuery table with no schema
+    const physicalSourceFixture = () => {
+        const sql = (item) => `let\n    Source = Sql.Database("srv01", "SalesDB"),\n    Nav = Source{[Schema="dbo",Item="${item}"]}[Data]\nin\n    Nav`;
+        const bigQuery = 'let\n    Source = GoogleBigQuery.Database(),\n    Nav = Source{[Name="proj"]}[Data]{[Name="ds"]}[Data]{[Name="orders"]}[Data]\nin\n    Nav';
+        const m = {
+            tables: [
+                { name: 'Sales', columns: [{ name: 'Amount', dataType: 'decimal' }],
+                  measures: [{ name: 'Total Sales', expression: 'SUM(Sales[Amount])' }],
+                  partitions: [{ name: 'Sales', sourceType: 'm', source: sql('FactSales') }] },
+                { name: 'Customer', columns: [{ name: 'CustomerKey', dataType: 'int64' }],
+                  measures: [{ name: 'Customers', expression: 'COUNTROWS(Customer)' }],
+                  partitions: [{ name: 'Customer', sourceType: 'm', source: sql('DimCustomer') }] },
+                { name: 'Orders', columns: [{ name: 'OrderId', dataType: 'int64' }],
+                  measures: [{ name: 'Order Count', expression: 'COUNTROWS(Orders)' }],
+                  partitions: [{ name: 'Orders', sourceType: 'm', source: bigQuery }] }
+            ],
+            relationships: [], expressions: []
+        };
+        const refs = {};
+        for (const tbl of m.tables) for (const ms of tbl.measures) refs[ms.name] = DAXReferenceExtractor.extract(ms.expression);
+        const engine = new LineageEngine(m, null, refs);
+        engine.buildGraph();
+        return { m, refs, engine };
+    };
+
+    t.test('Physical source: consumers are scoped to the physical table, not its shared data source', () => {
+        const { engine } = physicalSourceFixture();
+        const c = engine.getPhysicalTableConsumers('FactSales', 'dbo');
+        t.assertEqual(c.tables.map(x => x.name).join(','), 'Sales', 'dbo.FactSales should map to the Sales table only');
+        t.assertEqual(c.measures.map(x => x.name).join(','), 'Total Sales', 'Only measures on Sales should count');
+        const top = engine.getTopSourceTablesByConsumption(5).find(x => x.physicalTable === 'FactSales');
+        t.assertEqual(top.measureCount, 1, 'Top Source Tables should rank by per-table consumers');
+        const srcId = engine.edges.find(e => e.type === 'connects_to_source' && e.from === 'table:Sales').to;
+        t.assertEqual(engine.getDataSourceConsumers(srcId).tables.length, 2, 'The shared SQL source still lists both tables');
+    });
+
+    t.test('Physical source: schema-less table and missing name do not throw', () => {
+        const { engine } = physicalSourceFixture();
+        t.assertEqual(engine.getPhysicalTableConsumers('orders', null).tables.map(x => x.name).join(','), 'Orders', 'BigQuery table without a schema should resolve');
+        t.assertEqual(engine.getPhysicalTableConsumers(null, 'dbo').tables.length, 0, 'Missing physical table name should return an empty result');
+    });
+
+    t.test('Physical-Source Index: per-table consumer counts in Markdown, including schema-less tables', () => {
+        const { m, refs, engine } = physicalSourceFixture();
+        const lines = [];
+        new DocGenerator(m, {}, refs, engine)._appendMarkdownLineageSections(lines, null);
+        const md = lines.join('\n');
+        t.assertIncludes(md, '| `dbo.FactSales` | Sales | 1 measure · 0 visuals |', 'FactSales row should count only Sales consumers');
+        t.assertIncludes(md, '| `orders` | Orders | 1 measure · 0 visuals |', 'Schema-less row should render instead of throwing');
+    });
+
     // ─── Exporter Regression (D6/D7) ───
     t.suite('Exporter Regression — Table Alignment (D6/D7)');
 

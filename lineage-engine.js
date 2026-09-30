@@ -997,7 +997,17 @@ class LineageEngine {
             }
         }
 
-        // 2. Measures that reference those tables (directly or via column refs)
+        return this._getTableConsumers(tables);
+    }
+
+    /**
+     * Measures, visuals and pages that consume the given model tables.
+     * Shared by getDataSourceConsumers() and getPhysicalTableConsumers().
+     * @param {Array<{name:string}>} tables - model tables (other fields are passed through)
+     * @returns {{ tables: Array, measures: Array, visuals: Array, pages: string[] }}
+     */
+    _getTableConsumers(tables) {
+        // Measures that reference those tables (directly or via column refs)
         const tableIds = new Set(tables.map(t => `table:${t.name}`));
         const measuresSet = new Set();
         for (const edge of this.edges) {
@@ -1021,7 +1031,7 @@ class LineageEngine {
             return { name, table };
         });
 
-        // 3. Visuals that use columns/measures from those tables
+        // Visuals that use columns/measures from those tables
         const visualsSet = new Set();
         const pagesSet   = new Set();
         for (const edge of this.edges) {
@@ -1068,45 +1078,34 @@ class LineageEngine {
     }
 
     /**
-     * Catalog: which model tables consume a given physical source table.
+     * Catalog: which model tables load a given physical source table, and what consumes them.
+     * Scoped to the tables loaded from this physical table, not every table on the same
+     * data source (that is getDataSourceConsumers).
      * @param {string} physicalTable - e.g. "FactSales"
      * @param {string} [physicalSchema] - optional schema filter e.g. "dbo"
-     * @returns {{ modelTables: Array, measures: Array, visuals: Array, pages: string[] }}
+     * @returns {{ tables: Array, measures: Array, visuals: Array, pages: string[] }}
      */
     getPhysicalTableConsumers(physicalTable, physicalSchema) {
-        const matchingSourceIds = new Set();
+        const tables = [];
+        if (!physicalTable) return this._getTableConsumers(tables);
+        const pt = physicalTable.toLowerCase();
+        const ps = physicalSchema ? physicalSchema.toLowerCase() : null;
         for (const edge of this.edges) {
-            if (edge.type === 'connects_to_source') {
-                const ptMatch = edge.physicalTable && edge.physicalTable.toLowerCase() === physicalTable.toLowerCase();
-                const psMatch = !physicalSchema || !edge.physicalSchema ||
-                    edge.physicalSchema.toLowerCase() === physicalSchema.toLowerCase();
-                if (ptMatch && psMatch) matchingSourceIds.add(edge.to);
-            }
+            if (edge.type !== 'connects_to_source' || !edge.physicalTable) continue;
+            if (edge.physicalTable.toLowerCase() !== pt) continue;
+            if (ps && edge.physicalSchema && edge.physicalSchema.toLowerCase() !== ps) continue;
+            const node = this.nodes.get(edge.from);
+            if (!node || tables.some(t => t.name === node.name)) continue;
+            tables.push({
+                name: node.name,
+                physicalSchema: edge.physicalSchema || null,
+                physicalTable:  edge.physicalTable,
+                renames: edge.renames || [],
+                selectedColumns: edge.selectedColumns || null,
+                addedColumns: edge.addedColumns || []
+            });
         }
-
-        const combined = { tables: [], measures: [], visuals: [], pages: [] };
-        const measuresSet = new Set();
-        const visualsSet  = new Set();
-        const pagesSet    = new Set();
-
-        for (const sourceId of matchingSourceIds) {
-            const consumers = this.getDataSourceConsumers(sourceId);
-            for (const t of consumers.tables) {
-                if (!combined.tables.some(x => x.name === t.name)) combined.tables.push(t);
-            }
-            for (const m of consumers.measures) {
-                const key = `${m.table}|${m.name}`;
-                if (!measuresSet.has(key)) { measuresSet.add(key); combined.measures.push(m); }
-            }
-            for (const v of consumers.visuals) {
-                const key = `${v.page}|${v.name}`;
-                if (!visualsSet.has(key)) { visualsSet.add(key); combined.visuals.push(v); }
-            }
-            for (const p of consumers.pages) {
-                if (!pagesSet.has(p)) { pagesSet.add(p); combined.pages.push(p); }
-            }
-        }
-        return combined;
+        return this._getTableConsumers(tables);
     }
 
     /**
