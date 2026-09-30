@@ -343,6 +343,72 @@ class LineageDiagramRenderer {
     }
 
     /**
+     * Measure chain: what the measure depends on (left) and what breaks if it changes (right).
+     */
+    renderMeasureChain(container, measureName) {
+        const target = container || this.container;
+        this._clearContainer(target);
+        this._isFullLineageView = false;
+
+        const engine = this.lineageEngine;
+        const chain = engine.getMeasureChain(measureName);
+        const message = (text) => {
+            const p = document.createElement('p');
+            p.style.cssText = 'text-align:center;color:#666;padding:40px';
+            p.textContent = text;
+            target.appendChild(p);
+        };
+        if (!chain) return message('Measure not found.');
+        if (!chain.upstream.length && !chain.downstream.length) {
+            return message(`[${measureName}] does not reference, and is not referenced by, any other measure.`);
+        }
+
+        const fieldUsage = engine.visualData?.fieldUsageMap || {};
+        const mk = (m) => {
+            const visuals = (fieldUsage[`measure|${m.table}|${m.name}`] || []).length;
+            return {
+                id: `measure:${m.table}.${m.name}`,
+                name: `[${m.name}]`,
+                type: 'measure',
+                detail: visuals ? `${m.table} · ${visuals} visual${visuals !== 1 ? 's' : ''}` : m.table
+            };
+        };
+
+        const upColor = { color: '#1565c0', colorBg: '#e3f2fd' };
+        const targetColor = { color: '#f9a825', colorBg: '#fff8e1' };
+        const downColor = { color: '#2e7d32', colorBg: '#e8f5e9' };
+
+        const columns = [];
+        for (let i = chain.upstream.length - 1; i >= 0; i--) {
+            columns.push({ label: `Upstream L${i + 1}`, ...upColor, items: chain.upstream[i].map(mk) });
+        }
+        columns.push({ label: 'Selected', ...targetColor, items: [mk(chain.target)] });
+        chain.downstream.forEach((lvl, i) => {
+            columns.push({ label: `Downstream L${i + 1}`, ...downColor, items: lvl.map(mk) });
+        });
+
+        const layout = this._layoutColumns(columns);
+        const svg = this._renderLayout(layout, columns, `Measure Chain: [${measureName}]`);
+
+        const posMap = new Map();
+        for (const col of columns) {
+            for (let i = 0; i < (col._visibleCount || col.items.length); i++) posMap.set(col.items[i].id, col.items[i]);
+        }
+        const idOf = (name) => `measure:${engine.measureLookup.get(name)}.${name}`;
+        for (const e of chain.edges) {
+            const a = posMap.get(idOf(e.from));   // dependency (left)
+            const b = posMap.get(idOf(e.to));     // dependent (right)
+            if (!a || !b || Math.abs(a._x - b._x) < 20) continue;
+            this._drawEdge(svg, a, b, 'depends_on_measure');
+        }
+
+        target.appendChild(svg);
+        this._initInteractivity(svg, layout.width, layout.height, target);
+    }
+
+
+
+    /**
      * Render forward lineage starting from a physical source table.
      * Entry point: Source → Model Table → Measures/Columns → Visuals.
      * Same direction as existing lineage; the new part is the source-first entry point.

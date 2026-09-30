@@ -454,6 +454,7 @@
                         <button type="button" class="view-toggle-btn" data-view="source-trace">Source Trace</button>
                         <button type="button" class="view-toggle-btn" data-view="impact">Impact Analysis</button>
                         <button type="button" class="view-toggle-btn" data-view="column-impact">Column Impact</button>
+                        <button type="button" class="view-toggle-btn" data-view="measure-chain">Measure Chain</button>
                     </div>
                     <div id="lineageFullView">
                         <div id="lineageDiagramContainer" class="lineage-diagram-container diagram-interactive">
@@ -585,6 +586,27 @@
                             </div>
                         </div>
                     </div>
+                    <div id="lineageMeasureChainView" class="hidden">
+                        <div class="lineage-select-row">
+                            <label for="lineageChainMeasureSelect">Select a measure:</label>
+                            <select id="lineageChainMeasureSelect" class="lineage-select"></select>
+                            <button type="button" id="lineageChainBtn" class="btn-trace-lineage">
+                                <span class="material-symbols-outlined" style="font-size:16px">device_hub</span>
+                                Show Measure Chain
+                            </button>
+                        </div>
+                        <p class="section-subtitle">Blue = measures the selected one depends on. Green = measures affected if you change it. Click a node for details.</p>
+                        <div id="lineageMeasureChainDiagram" class="lineage-diagram-container diagram-interactive">
+                            <div class="diagram-controls diagram-controls-lineage">
+                                <button class="diagram-ctrl-btn" data-zoom="in" data-target="lineageMeasureChainDiagram" title="Zoom In"><span class="material-symbols-outlined">add</span></button>
+                                <button class="diagram-ctrl-btn" data-zoom="out" data-target="lineageMeasureChainDiagram" title="Zoom Out"><span class="material-symbols-outlined">remove</span></button>
+                                <button class="diagram-ctrl-btn" data-zoom="reset" data-target="lineageMeasureChainDiagram" title="Fit to View"><span class="material-symbols-outlined">fit_screen</span></button>
+                                <div class="diagram-ctrl-separator"></div>
+                                <button class="diagram-ctrl-btn" data-export="svg" data-diagram="lineage-measure-chain" title="Download SVG"><span class="material-symbols-outlined">download</span></button>
+                                <button class="diagram-ctrl-btn" data-export="pdf-download" data-diagram="lineage-measure-chain" title="Download as PDF"><span class="material-symbols-outlined">picture_as_pdf</span></button>
+                            </div>
+                    </div>
+                </div>
                     <div id="lineageColumnImpactView" class="hidden">
                         <div class="lineage-select-row">
                             <label for="lineageTableSelect">Table:</label>

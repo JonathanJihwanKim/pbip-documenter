@@ -826,6 +826,22 @@ class DocGenerator {
             lines.push('');
         }
 
+            const depEdges = this.lineageEngine.getMeasureDependencyEdges();
+            if (depEdges.length > 0 && depEdges.length <= 300) {
+                const ids = new Map();
+                const idFor = (n) => { if (!ids.has(n)) ids.set(n, 'm' + ids.size); return ids.get(n); };
+                const q = (s) => s.replace(/"/g, "'");
+                lines.push('### Measure Dependency Graph');
+                lines.push('');
+                lines.push('```mermaid');
+                lines.push('flowchart LR');
+                for (const e of depEdges) {
+                    lines.push(`    ${idFor(e.from)}["${q(e.from)}"] --> ${idFor(e.to)}["${q(e.to)}"]`);
+                }
+                lines.push('```');
+                lines.push('');
+            }
+
         // Visual Lineage — per-visual back-trace
         if (visualData && visualData.visuals && visualData.visuals.length > 0 && this.lineageEngine) {
             const DECORATION_TYPES = new Set(['actionButton','shape','textbox','bookmarkNavigator','pageNavigator','image','groupContainer']);
