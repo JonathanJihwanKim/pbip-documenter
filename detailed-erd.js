@@ -54,11 +54,12 @@ class DetailedERDRenderer {
      * @param {Array} relationships - Parsed relationships
      */
     render(tables, relationships) {
-        // Remove existing SVG but keep controls
-        const existingSvg = this.container.querySelector('svg');
-        if (existingSvg) existingSvg.remove();
-        const existingP = this.container.querySelector('p');
-        if (existingP) existingP.remove();
+        // Clear everything except the static .diagram-controls toolbar — this also
+        // removes the ".loading" indicator app.js injects before calling render()
+        // (previously only <svg>/<p> were cleared, so "Building detailed ERD…" stuck around).
+        Array.from(this.container.children).forEach(child => {
+            if (!child.classList.contains('diagram-controls')) child.remove();
+        });
 
         // Filter out auto-date tables
         const visibleTables = tables.filter(t => !t._isAutoDate);

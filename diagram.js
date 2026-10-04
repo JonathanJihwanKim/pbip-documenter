@@ -38,11 +38,13 @@ class DiagramRenderer {
      * @param {Array} relationships - Parsed relationships
      */
     renderRelationshipDiagram(tables, relationships) {
-        // Keep only the SVG area, preserve control buttons
-        const existingSvg = this.container.querySelector('svg');
-        if (existingSvg) existingSvg.remove();
-        const existingPlaceholder = this.container.querySelector('p');
-        if (existingPlaceholder) existingPlaceholder.remove();
+        // Clear everything except the static .diagram-controls toolbar —
+        // this also removes any leftover ".loading" indicator app.js injected
+        // before calling this method (previously only <svg>/<p> were cleared,
+        // so the "Building diagram…" message never went away).
+        Array.from(this.container.children).forEach(child => {
+            if (!child.classList.contains('diagram-controls')) child.remove();
+        });
 
         if (tables.length === 0) {
             const p = document.createElement('p');
@@ -818,10 +820,9 @@ class DiagramRenderer {
      */
     renderVisualUsageDiagram(fieldUsageMap, pages) {
         // Preserve the static .diagram-controls toolbar; only remove dynamic content.
-        const existingSvg = this.container.querySelector('svg');
-        if (existingSvg) existingSvg.remove();
-        const existingP = this.container.querySelector('p');
-        if (existingP) existingP.remove();
+        Array.from(this.container.children).forEach(child => {
+            if (!child.classList.contains('diagram-controls')) child.remove();
+        });
 
         const entries = Object.entries(fieldUsageMap);
         if (entries.length === 0) {
